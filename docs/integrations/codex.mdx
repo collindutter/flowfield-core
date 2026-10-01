@@ -1,0 +1,60 @@
+---
+title: Codex
+description: Connect a Codex coordinator and configure managed workers.
+---
+
+Install the [Codex CLI](https://developers.openai.com/codex/cli/) and sign in.
+Make sure `codex` is available in the terminal where you start Flowfield.
+
+## Connect the coordinator
+
+With `flowfield serve` running:
+
+```sh
+flowfield integration connect codex
+flowfield integration status codex
+```
+
+Connect verifies the service and saves a native MCP connection in Codex's user settings.
+Repeated connections are idempotent. Status checks reachability and tool discovery without
+starting a model turn. Other configured MCP connections remain intact.
+
+In your existing project's directory, install its coordinator guidance:
+
+```sh
+flowfield project guidance preview
+flowfield project guidance install
+```
+
+Review and commit adoption files under your project's rules. Start a fresh Codex conversation
+in the project, inspect `/mcp`, and ask it to read your Flowfield board. This checks that the
+coordinator can actually use the connection and identify the correct project.
+
+## Configure workers
+
+Ask the coordinator to configure the project's target branch, dependency setup, verification
+and run commands, then validate setup. Choose a model and reasoning effort from the available
+catalog. You can also use the project's **Workers** and **Integration** settings in the browser.
+
+Managed execution requires a usable committed Git baseline. Each worker receives an isolated
+checkout and runtime environment. Keep project and service state outside shared temporary
+directories for managed work. Workers can install project dependencies within the configured
+environment; machine-wide tools and credentials are configured separately.
+
+If the service cannot find Codex, restart it from a terminal with the correct PATH, then use
+**Reload models**. A missing executable and a missing login are separate setup problems.
+
+## Disconnect
+
+```sh
+flowfield integration disconnect codex
+```
+
+Restart Codex to unload the connection. Project state and saved work remain intact.
+For a custom connection name or service port, use the same options for connect, status and disconnect:
+
+```sh
+flowfield --port 8770 integration connect codex --name flowfield-local
+flowfield --port 8770 integration status codex --name flowfield-local
+flowfield --port 8770 integration disconnect codex --name flowfield-local
+```

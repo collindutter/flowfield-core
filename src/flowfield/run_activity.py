@@ -1,0 +1,174 @@
+"""Bounded public attempt activity. Never used for ownership, context or approval."""
+
+import asyncio
+import re
+import sqlite3
+from typing import TYPE_CHECKING, Literal
+
+from pydantic import BaseModel, Field
+
+from flowfield.activity_text import preview, retain
+from flowfield.errors import ApplicationError
+from flowfield.execution_models import Usage
+
+if TYPE_CHECKING:
+    from flowfield.application import Workspace
+
+Kind = Literal["agent", "tool", "command", "output", "status"]
+MAX_ENTRIES = 100
+MAX_TEXT = 6000
+MAX_TOTAL = 60000
+SCHEMA = """
+CREATE TABLE run_activity (
+    run_id TEXT PRIMARY KEY REFERENCES runs(id), revision INTEGER NOT NULL,
+    data TEXT NOT NULL
+);
+"""
+
+
+class ActivityUpdate(BaseModel):
+    key: str = Field(max_length=100)
+    kind: Kind
+    text: str
+    append: bool = False
+    omitted: bool = False
+
+
+class RunActivityEntry(BaseModel):
+    key: str
+    kind: Kind
+    text: str
+    omitted: bool = False
+    preview: str = ""
+    abridged: bool = False
+
+
+class RunActivityPage(BaseModel):
+    revision: int = 0
+    supported: bool = False
+    active: bool = False
+    changed: bool = True
+    omitted: bool = False
+    items: list[RunActivityEntry] = []
+    usage: Usage = Field(default_factory=Usage)
+
+
+def clean(text: str) -> str:
+    # Terminal control sequences must never become browser commands or presentation.
+    text = re.sub(r"\x1b\][^\x07]*(?:\x07|\x1b\\)", "", text)
+    text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
+    return re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", text)
+
+
+class RunActivity:
+    def __init__(self, workspace: "Workspace"):
+        self.workspace = workspace
+
+    def write(self, project: str, run: str, updates: list[ActivityUpdate]) -> None:
+        # Output does not invalidate the entire board. Mounted panes read their own revision.
+        with self.workspace.connection(write=True, notify=False) as db:
+            owner = db.execute(
+                "SELECT status FROM runs WHERE project_id=? AND id=?", (project, run)
+            ).fetchone()
+            if not owner:
+                raise ApplicationError("not_found", "Attempt not found.", 404)
+            if owner[0] not in ("preparing", "running", "stopping"):
+                return  # Late output cannot mutate a closed/uncertain attempt.
+            saved = db.execute("SELECT data FROM run_activity WHERE run_id=?", (run,)).fetchone()
+            page = RunActivityPage.model_validate_json(saved[0]) if saved else RunActivityPage()
+            entries = {entry.key: entry for entry in page.items}
+            for update in updates:
+                old = entries.get(update.key)
+                text = (old.text if old and update.append else "") + clean(update.text)
+                omitted = update.omitted or len(text) > MAX_TEXT or bool(old and old.omitted)
+                entries[update.key] = RunActivityEntry(
+                    key=update.key, kind=update.kind, text=retain(text, MAX_TEXT), omitted=omitted
+                )
+            page.items = list(entries.values())
+            while len(page.items) > MAX_ENTRIES or sum(len(e.text) for e in page.items) > MAX_TOTAL:
+                page.items.pop(0)
+                page.omitted = True
+            page.revision += 1
+            page.supported = True
+            db.execute(
+                "INSERT INTO run_activity VALUES (?,?,?) ON CONFLICT(run_id) DO UPDATE SET "
+                "revision=excluded.revision,data=excluded.data",
+                (run, page.revision, page.model_dump_json()),
+            )
+
+    def read(self, project: str, run: str, after: int = -1) -> RunActivityPage:
+        with self.workspace.connection() as db:
+            owner = db.execute(
+                "SELECT status,json_extract(data,'$.usage') FROM runs WHERE project_id=? AND id=?",
+                (project, run),
+            ).fetchone()
+            if not owner:
+                raise ApplicationError("not_found", "Attempt not found.", 404)
+            saved = db.execute("SELECT data FROM run_activity WHERE run_id=?", (run,)).fetchone()
+            page = RunActivityPage.model_validate_json(saved[0]) if saved else RunActivityPage()
+            page.active = owner[0] in ("preparing", "running", "stopping")
+            page.usage = Usage.model_validate_json(owner[1]) if owner[1] else Usage()
+            page.changed = after != page.revision
+            if not page.changed:
+                page.items = []
+            for entry in page.items:
+                entry.preview = preview(entry.text, entry.kind)
+                entry.abridged = entry.preview != entry.text
+            return page
+
+
+class ActivityRecorder:
+    """Coalesce deltas before SQLite; bound queued output even when storage is slow."""
+
+    def __init__(self, workspace: "Workspace", project: str, run: str):
+        self.store, self.project, self.run = RunActivity(workspace), project, run
+        self.pending: list[ActivityUpdate] = []
+        self.lost = False
+        self.closed = False
+        self.job = asyncio.create_task(self._pump())
+
+    def emit(self, update: ActivityUpdate) -> None:
+        if self.closed:
+            return
+        self.pending.append(
+            update.model_copy(
+                update={
+                    "text": retain(update.text, MAX_TEXT),
+                    "omitted": update.omitted or len(update.text) > MAX_TEXT,
+                }
+            )
+        )
+        if len(self.pending) > 100:
+            self.pending.pop(0)
+            self.lost = True
+
+    async def flush(self) -> None:
+        updates, self.pending = self.pending, []
+        if self.lost:
+            updates.insert(
+                0,
+                ActivityUpdate(
+                    key="stream-gap",
+                    kind="status",
+                    text="Some activity was omitted during interrupted or rapid output delivery.",
+                    omitted=True,
+                ),
+            )
+            self.lost = False
+        if updates:
+            try:
+                await asyncio.to_thread(self.store.write, self.project, self.run, updates)
+            except sqlite3.OperationalError:
+                # Activity must not stop execution or grow an unbounded retry queue.
+                # A later successful flush records the gap explicitly.
+                self.lost = True
+
+    async def _pump(self) -> None:
+        while not self.closed:
+            await asyncio.sleep(0.25)
+            await self.flush()
+
+    async def close(self) -> None:
+        self.closed = True
+        await self.job
+        await self.flush()

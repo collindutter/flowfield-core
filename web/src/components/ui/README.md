@@ -1,0 +1,17 @@
+# Component provenance
+
+Generated with the official shadcn CLI/registry on 2026-09-23, using the `new-york`
+Radix components and neutral CSS variables. Configuration: `web/components.json`.
+Source: https://github.com/shadcn-ui/ui (MIT; see LICENSE.md).
+
+Keep standard component variants and update through the registry. Local adaptations:
+sidebar skeleton width is deterministic rather than random; the generated mobile hook
+uses useSyncExternalStore to meet this repository's React purity rules; badges use the
+shared compact rounded radius instead of the registry's pill default. Outline buttons explicitly
+use foreground text so linked actions and buttons inside muted containers match ordinary buttons. Formatting follows
+the repository. The application uses the fixed Sidebar variant and its own
+responsive layout; sheet support remains an upstream sidebar dependency.
+
+Application-specific layout, colors for task types, router integration, and retained
+editor drafts live outside this directory. The `cn` utility package is the official
+registry's current generated import. Do not fork controls independently per view.

@@ -1,0 +1,7 @@
+{
+  "name": "flowfield-docs",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": { "check": "mint validate && mint broken-links", "dev": "mint dev" },
+  "devDependencies": { "mint": "4.2.968" }
+}

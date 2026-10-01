@@ -1,0 +1,58 @@
+---
+title: Concepts
+description: How people, agents, tasks and review fit together.
+---
+
+## People and agents
+
+You and the **coordinator** shape intent, priorities and review through your coding
+conversation. **Workers** implement bounded assignments. The **service** schedules
+ready work, preserves execution facts and delivers explicitly approved code.
+
+The coordinator can continue planning while workers run. Closing its conversation
+does not stop the service's enabled queue. The browser gives you direct control of
+priorities, answers, pause, stop and approval.
+
+## Projects, tasks and milestones
+
+A **project** is an existing directory registered with Flowfield. Its settings identify
+the worker environment, model, checks and code delivery branch.
+
+A **task** expresses an agreed outcome and success criteria. Its stable key, such as
+`APP-1`, links to the same task across the browser, CLI and MCP. Tasks can depend on
+other tasks in the same project; an incomplete prerequisite blocks execution.
+
+A **milestone** groups related tasks. Dependencies connect tasks, not milestones.
+
+## The task feed
+
+One feed brings together the definition and its revisions, progress, worker attempts,
+questions, answers, testing observations and results. Messages and testing retain their
+connection to the relevant result version.
+
+Answering a question continues work; asking about a result does not automatically request
+changes. Recording a test result does not approve code. Earlier results remain inspectable.
+
+## The board and queue
+
+Tasks move through **Backlog**, **Up next**, **In progress**, **In review** and **Done**.
+Up next expresses your execution priorities. Run queue enables eligible starts; an enabled
+empty queue stays enabled. New ready tasks can start when added to it.
+
+The queue starts paused, including after restart. Pause leaves active work running.
+Each project starts with one worker slot; two independent tasks can run in separate
+checkouts after you increase the maximum to two. Waiting for review frees the worker slot.
+
+**Needs you** collects questions, reviews and interventions. Notifications show operational
+notices. The browser's Connected indicator describes its live update stream.
+
+## Results and approval
+
+A result contains the worker's outcome and verification evidence. Code approval names
+an exact candidate and destination. Approval in your coding conversation uses the same
+record as browser approval, without a second confirmation there.
+
+The service validates and delivers approved code. Done means the agreed outcome has
+completed, including code delivery. A checkout blocker preserves approval for a delivery
+retry; a changed candidate needs its own review. Inspection is optional and never grants
+approval by itself.

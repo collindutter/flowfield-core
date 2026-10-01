@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flowfield-core"
+version = "0.1.0.dev0"
+description = "Shared task feeds and parallel workers for agent software development"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = [
+  "anyio>=4.5,<5",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "mcp>=1.28,<2",
+  "pydantic>=2.10,<3",
+  "rich>=13.9,<15",
+  "sse-starlette>=3.4,<4",
+  "typer>=0.15,<1",
+  "uvicorn>=0.34,<1",
+]
+
+[project.urls]
+Repository = "https://github.com/flowfield-sh/flowfield-core"
+Issues = "https://github.com/flowfield-sh/flowfield-core/issues"
+
+[project.scripts]
+flowfield = "flowfield.cli:app"
+
+[dependency-groups]
+dev = ["httpx>=0.28,<1", "mypy>=1.15,<2", "pytest>=8.3,<10", "ruff>=0.11,<1"]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flowfield"]
+artifacts = ["src/flowfield/_web/**"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/web", "/scripts", "/examples", "/tests", "/docs", "/README.md", "/CONTRIBUTING.md", "/pyproject.toml", "/uv.lock", "/Makefile", "/hatch_build.py", "/LICENSE"]
+exclude = ["/web/node_modules", "/web/test-results", "/web/playwright-report", "/docs/node_modules", "/docs/.mintlify"]
+artifacts = ["src/flowfield/_web/**"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src/flowfield"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

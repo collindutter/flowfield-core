@@ -1,0 +1,16 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Flowfield",
+  "colors": { "primary": "#2563eb" },
+  "navigation": {
+    "groups": [
+      { "group": "Start here", "pages": ["getting-started", "concepts"] },
+      { "group": "Reference", "pages": ["cli", "installation", "storage"] },
+      { "group": "Agent integrations", "pages": ["integrations/overview", "integrations/codex"] }
+    ]
+  },
+  "navbar": {
+    "links": [{ "label": "GitHub", "href": "https://github.com/flowfield-sh/flowfield-core" }]
+  }
+}

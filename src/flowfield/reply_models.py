@@ -1,0 +1,45 @@
+"""Durable, exactly bound task replies; messages and revision requests have distinct effects."""
+
+from typing import Literal
+from uuid import uuid4
+
+from pydantic import Field
+
+from flowfield.execution_models import Record
+from flowfield.project_config import Identifier
+
+
+class ReplyBinding(Record):
+    task_revision: int
+    agreement_revision: int
+    result_id: str | None = None
+    result_revision: int | None = None
+    question_id: str | None = None
+    question_revision: int | None = None
+
+
+class ReplyCreate(Record):
+    id: Identifier = Field(default_factory=lambda: uuid4().hex)
+    binding: ReplyBinding
+    body: str = Field(min_length=1, max_length=8000)
+    action: Literal["message", "changes", "answer", "observation"] = "message"
+    author: str = Field(default="human", min_length=1, max_length=200)
+
+
+class Reply(ReplyCreate):
+    project_id: str
+    task_id: str
+    created_at: str
+    run_id: str | None = None
+    status: Literal["pending", "assigned", "recorded", "cancelled"] = "pending"
+
+
+SCHEMA = """
+CREATE TABLE task_replies (
+    project_id TEXT NOT NULL, task_id TEXT NOT NULL, id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL, data TEXT NOT NULL,
+    FOREIGN KEY(project_id,task_id) REFERENCES tasks(project_id,id)
+);
+CREATE INDEX reply_scope ON task_replies(project_id,task_id,created_at);
+CREATE VIEW work_runs AS SELECT * FROM runs WHERE json_extract(data,'$.purpose')='work';
+"""

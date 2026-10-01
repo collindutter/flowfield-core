@@ -1,0 +1,65 @@
+---
+title: Installation
+description: Install Flowfield with uv or pip and manage its local service.
+---
+
+## Recommended: uv
+
+With [uv](https://docs.astral.sh/uv/getting-started/installation/) installed:
+
+```sh
+uv tool install --python 3.12 flowfield-core
+flowfield serve
+```
+
+uv keeps Flowfield in its own environment and exposes the `flowfield` command.
+If the command is missing from PATH, run `uv tool update-shell` and open a new terminal.
+The package contains the CLI, service, browser UI and agent guidance. Node and pnpm are
+only needed to develop from source.
+
+## Alternative: pip
+
+Use Python 3.12 or newer in a dedicated virtual environment:
+
+```sh
+python3 -m venv ~/.local/share/flowfield-venv
+~/.local/share/flowfield-venv/bin/python -m pip install flowfield-core
+~/.local/share/flowfield-venv/bin/flowfield serve
+```
+
+Activate that environment to use the shorter command:
+
+```sh
+. ~/.local/share/flowfield-venv/bin/activate
+flowfield serve
+```
+
+## Start and stop
+
+Open [localhost:8765](http://127.0.0.1:8765). The service runs in the foreground;
+Ctrl-C stops it. Choose another port with `flowfield serve --port 8770` and give
+clients the same port using `flowfield --port 8770 ...`.
+
+Flowfield runs locally on macOS and Linux and binds to loopback. Managed work needs Git
+and an installed, signed-in [Codex CLI](https://developers.openai.com/codex/cli/).
+Installation does not start a service or change your Codex login.
+
+## Update
+
+Stop the service before upgrading:
+
+```sh
+uv tool upgrade flowfield-core
+flowfield serve
+```
+
+For the pip environment:
+
+```sh
+~/.local/share/flowfield-venv/bin/python -m pip install --upgrade flowfield-core
+~/.local/share/flowfield-venv/bin/flowfield serve
+```
+
+Read the [release notes](https://github.com/flowfield-sh/flowfield-core/releases) and
+[storage guidance](/storage) before changing builds. Restart your coding conversation
+after updating installed project guidance.

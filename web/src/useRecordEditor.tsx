@@ -1,0 +1,152 @@
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { useEffect, useRef, useState } from "react";
+import { request, RequestError, type RecordMeta } from "./workspace";
+
+export function useRecordEditor<R extends RecordMeta, V>({
+  incoming,
+  fields,
+  path,
+  saved,
+  onDirty,
+  otherDirty = false,
+}: {
+  incoming?: R;
+  fields: (record?: R) => V;
+  path: (record?: R) => string;
+  saved: (record: R) => void;
+  onDirty: (dirty: boolean) => void;
+  otherDirty?: boolean;
+}) {
+  const element = useRef<HTMLElement>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const [loaded, setLoaded] = useState(incoming);
+  const [values, setValues] = useState(() => fields(incoming));
+  const [editing, setEditing] = useState(!incoming);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [conflict, setConflict] = useState(false);
+  const dirty = JSON.stringify(values) !== JSON.stringify(fields(loaded));
+  useEffect(() => {
+    onDirty(dirty || otherDirty);
+  }, [dirty, otherDirty, onDirty]);
+  const newer = !!(incoming && loaded && incoming.revision > loaded.revision);
+  function adopt(record: R) {
+    setLoaded(record);
+    setValues(fields(record));
+    if (conflict) setError("");
+    setConflict(false);
+  }
+  if (newer && !dirty && !busy) adopt(incoming!);
+  function change<K extends keyof V>(key: K, value: V[K]) {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    onDirty(
+      JSON.stringify(next) !== JSON.stringify(fields(loaded)) || otherDirty,
+    );
+  }
+  async function run(method: string, payload?: unknown, suffix = "") {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await request<R>(path(loaded) + suffix, method, payload);
+      if (mounted.current) {
+        adopt(result);
+        if (method !== "GET") setEditing(false);
+        saved(result);
+        onDirty(otherDirty);
+        setNotice(method === "GET" ? "Latest version loaded." : "Saved.");
+      }
+    } catch (error) {
+      if (mounted.current) {
+        setError((error as Error).message);
+        if (error instanceof RequestError && error.code === "revision_conflict")
+          setConflict(true);
+      }
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  }
+  function cancel() {
+    if (!dirty || window.confirm("Discard your unsaved edits?")) {
+      setValues(fields(loaded));
+      setEditing(false);
+    }
+  }
+  function reload() {
+    if (
+      !dirty ||
+      window.confirm("Discard unsaved edits and load the latest revision?")
+    )
+      void run("GET");
+  }
+  return {
+    element,
+    loaded,
+    values,
+    editing,
+    setEditing,
+    busy,
+    error,
+    notice,
+    conflict,
+    dirty,
+    newer,
+    change,
+    run,
+    cancel,
+    reload,
+  };
+}
+
+export function EditorFeedback({
+  state,
+}: {
+  state: {
+    newer: boolean;
+    conflict: boolean;
+    busy: boolean;
+    error: string;
+    notice: string;
+    reload: () => void;
+  };
+}) {
+  return (
+    <>
+      {(state.newer || state.conflict) && (
+        <div className="notice content-stack">
+          <p role="status">
+            A newer revision is available. Your unsaved edits are preserved.
+            Copy what you need before loading the latest.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            className="quiet"
+            disabled={state.busy}
+            onClick={state.reload}
+          >
+            Load latest
+          </Button>
+        </div>
+      )}
+      {state.error && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {state.error} Your edits are preserved.
+          </AlertDescription>
+        </Alert>
+      )}
+      {state.notice && <p role="status">{state.notice}</p>}
+    </>
+  );
+}

@@ -1,0 +1,192 @@
+import { useEffect, useState, useRef, type ReactNode } from "react";
+import { ContentStack, DetailSection, Disclosure } from "./DetailLayout";
+import { DetailHeader, DraftBadge, TaskTypeBadge } from "./Presentation";
+import { MilestoneBadge } from "./MilestoneBadge";
+import { Markdown } from "./Markdown";
+import { BlockedBy } from "./TaskLinks";
+import { TaskNeeds, TaskState, hasTaskNeeds } from "./TaskNeeds";
+import { TaskConversation, StageHeader } from "./TaskConversation";
+import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "./ConfirmButton";
+import { label, request, type Board, type Task } from "./workspace";
+export function TaskDetail({
+  task,
+  board,
+  path,
+  setUnsaved,
+  saved,
+  close,
+  openTask,
+  priorityControls,
+}: {
+  task: Task;
+  board: Board;
+  path: string;
+  setUnsaved: (dirty: boolean) => void;
+  saved: (task: Task) => void;
+  close: () => void;
+  openTask: (id: string) => void;
+  priorityControls: ReactNode;
+}) {
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setUnsaved(dirty);
+    return () => setUnsaved(false);
+  }, [dirty, setUnsaved]);
+  const archiveReason = dirty
+    ? "Send or discard your message before archiving."
+    : task.archive_blocker;
+  async function archive() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await request<Task>(
+        path + "/view/tasks/" + task.id,
+        "PUT",
+        {
+          expected_revision: task.revision,
+          archived: !task.archived,
+          author: "human",
+        },
+      );
+      if (alive.current) saved(result);
+    } catch (e) {
+      if (alive.current) setError((e as Error).message);
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  }
+  return (
+    <section className="editor task-detail" aria-label="Task details">
+      <DetailHeader title={task.key + " · " + task.title} close={close}>
+        <div className="task-conversation-header content-stack">
+          <div className="entity-labels">
+            <TaskTypeBadge type={task.task_type} />
+            <DraftBadge publicationStatus={task.publication_status} />
+            <MilestoneBadge
+              milestone={board.milestones.find(
+                (m) => m.id === task.milestone_id,
+              )}
+            />
+          </div>
+          <TaskState
+            projectId={board.project.id}
+            open={openTask}
+            task={{
+              ...task,
+              state: task.state ?? {
+                label: label(task.status),
+                tone: "idle",
+                href: null,
+              },
+            }}
+          />
+          <StageHeader
+            projectId={board.project.id}
+            task={task}
+            refresh={board}
+          />
+        </div>
+      </DetailHeader>
+      <ContentStack space="section" className="task-context">
+        <div
+          className="task-definition content-stack"
+          aria-label="Current task definition"
+        >
+          <strong>Definition</strong>
+          <Markdown>{task.body}</Markdown>
+        </div>
+        {hasTaskNeeds(task, board.pending_code[task.id], false) && (
+          <DetailSection title="Waiting on">
+            <TaskNeeds
+              task={task}
+              projectId={board.project.id}
+              pendingCode={board.pending_code[task.id]}
+              open={openTask}
+              detailed
+              showQuestions={false}
+            />
+          </DetailSection>
+        )}
+        {(task.prerequisites.some(
+          (p) => !task.blocked_by.some((b) => b.id === p.id),
+        ) ||
+          task.dependents.length > 0) && (
+          <Disclosure summary={<>Related work</>}>
+            {!!task.dependents.length && (
+              <p>
+                <BlockedBy
+                  prefix="Needed by:"
+                  projectId={board.project.id}
+                  tasks={task.dependents}
+                  open={openTask}
+                />
+              </p>
+            )}
+            {!!task.prerequisites.length && (
+              <p>
+                <BlockedBy
+                  prefix="Prerequisites:"
+                  projectId={board.project.id}
+                  tasks={task.prerequisites}
+                  open={openTask}
+                />
+              </p>
+            )}
+          </Disclosure>
+        )}
+      </ContentStack>
+      <TaskConversation
+        projectId={board.project.id}
+        task={task}
+        board={board}
+        refresh={board}
+        onDirty={setDirty}
+        taskActionContext={
+          <>
+            {error && <p role="alert">{error}</p>}
+            {archiveReason && (
+              <p className="detail-metadata">{archiveReason}</p>
+            )}
+          </>
+        }
+        taskActions={
+          <>
+            {priorityControls}
+            {task.archived ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busy || !!archiveReason}
+                onClick={() => void archive()}
+              >
+                Restore
+              </Button>
+            ) : (
+              <ConfirmButton
+                size="sm"
+                variant="outline"
+                disabled={busy || !!archiveReason}
+                title={`Archive ${task.key}?`}
+                description="This removes the task from the board without marking it Done. You can restore it from Archive."
+                action={() => void archive()}
+              >
+                Archive
+              </ConfirmButton>
+            )}
+          </>
+        }
+      />
+    </section>
+  );
+}

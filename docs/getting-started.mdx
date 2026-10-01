@@ -1,0 +1,79 @@
+---
+title: Getting Started
+description: Connect your coding agent, agree on a task, and review its result.
+---
+
+Flowfield keeps your plan and each task's feed beside your coding conversation.
+Discuss work with your coordinator while workers implement agreed tasks in parallel.
+Use the board to see progress and the task feed to follow questions, answers and results.
+
+## Install and start
+
+Install with [uv](https://docs.astral.sh/uv/getting-started/installation/):
+
+```sh
+uv tool install --python 3.12 flowfield-core
+flowfield serve
+```
+
+Open [localhost:8765](http://127.0.0.1:8765). Keep the terminal open;
+Ctrl-C stops the service. See [Installation](/installation) for the pip alternative.
+Managed workers also need Git and an installed, signed-in Codex CLI.
+
+## Add your project
+
+In another terminal, change to an existing project's directory:
+
+```sh
+flowfield project init
+flowfield project guidance preview
+flowfield project guidance install
+flowfield integration connect codex
+```
+
+Registration adds `.flowfield/config.toml`. Guidance installation preserves existing
+instructions and adds a reference to `.agents/skills/flowfield-coordinator/SKILL.md`.
+Review the added files and commit them using your project's usual workflow before
+running workers. Flowfield adopts your project; it does not scaffold an application.
+
+Start a fresh Codex conversation in that directory. Ask:
+
+> Read this project's Flowfield board and give me its link.
+
+The agent should identify your project and return its board link. A new conversation
+loads the installed skill and MCP connection. See [Codex](/integrations/codex) for
+connection checks and troubleshooting.
+
+## Agree on work
+
+Ask your coordinator to set up worker execution for the project: choose the target
+branch, dependency setup, checks and a local run command, then validate the environment.
+Choose a worker model and reasoning effort explicitly. These settings are also available
+under the settings icon beside the project name.
+
+Describe one small change and its success criteria. Ask the coordinator to capture and
+prepare the task in Flowfield. Open its feed to read the agreed definition. The coordinator
+maintains task intent; you control priorities and review.
+
+## Run the task
+
+Move the task to **Up next** and click **Run queue**. Ready tasks run when their
+dependencies, setup and input requirements are satisfied. The task moves to **In progress**;
+its feed shows worker activity and any questions.
+
+Answer questions in the task feed or **Needs you**. Your saved answer lets the service
+continue managed work when the queue permits it. **Pause queue** prevents new starts;
+active workers continue. **Stop worker** stops the selected attempt.
+
+## Review and finish
+
+When the task reaches **In review**, read its result and checks. Inspect the diff or use
+**Try result** to test an independent copy of that exact version. Record testing in the
+feed, request changes, or choose **Approve and integrate** for the selected result.
+
+Flowfield delivers approved code to your configured project checkout, then marks the task
+**Done**. Local edits that prevent delivery remain intact and the result explains the next
+action. A complete report-only task can finish without code approval.
+
+To run independent tasks together, set **Maximum parallel workers** to **2** under
+**Workers**. Dependent tasks wait until prerequisite work is complete and its code is available.

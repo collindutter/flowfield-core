@@ -1,0 +1,104 @@
+---
+title: CLI
+description: Common commands and structured automation.
+---
+
+The `flowfield` command talks to your running local service. Commands inside a registered
+project discover its identity from `.flowfield/config.toml`. Use `--project ID` when
+working elsewhere, and `--help` at any command level for its options.
+
+## Service and version
+
+```sh
+flowfield serve
+flowfield --version
+flowfield version --json
+flowfield --help
+```
+
+Global `--port` selects the service. `--data-dir` or `FLOWFIELD_DATA_DIR` selects storage;
+`FLOWFIELD_PORT` selects the client port.
+
+## Projects and guidance
+
+```sh
+flowfield project init
+flowfield project list
+flowfield project show
+flowfield project guidance preview
+flowfield project guidance install
+flowfield project guidance show
+```
+
+`project init /absolute/path` adopts an existing directory. Initial `--id`, `--name`
+and `--prefix` override derived values. The three-letter task prefix locks after the first task.
+`project guidance export --part coordinator` prints the packaged skill without connecting
+to a service. `project guidance remove` removes unchanged owned content and preserves local edits.
+
+## Tasks and milestones
+
+```sh
+flowfield task list
+flowfield task show APP-1
+flowfield task activity APP-1
+flowfield task relationships APP-1
+flowfield task revisions APP-1
+flowfield milestone list
+flowfield milestone --help
+```
+
+Use stable task keys or IDs. The coordinator prepares task definitions through MCP;
+CLI task operations expose the same workspace rules. Task dependencies and readiness
+are checked by the service.
+
+## Questions, execution and results
+
+```sh
+flowfield inbox list
+flowfield inbox show QUESTION_ID
+flowfield project workers show
+flowfield project workers models
+flowfield project workers run
+flowfield project workers pause
+flowfield task runs list
+flowfield task runs show ATTEMPT_ID
+flowfield task results list APP-1
+flowfield task results show RESULT_ID
+```
+
+`project workers run` enables eligible Up next starts; `pause` leaves active workers
+running. `task runs stop ATTEMPT_ID` targets one attempt. Inspect `task results review
+--help` for exact-candidate approval and request-changes options; a result revision and
+candidate commit are required. `task results retry-delivery --help` describes recovery
+when approved code is blocked from reaching the checkout.
+
+Questions and replies preserve their task, attempt and result bindings. Answering does
+not enable a paused queue; inspecting a result does not approve it.
+
+## Project integration
+
+```sh
+flowfield project integration show
+flowfield project integration configure --target main --check "make test"
+```
+
+Configure the target branch and trusted project checks to match your repository.
+Repeat `--check` for multiple commands; `--setup` adds dependency setup. Your coordinator
+can configure and validate richer environment and run-command settings through MCP.
+
+## Harness connections
+
+```sh
+flowfield integration connect codex
+flowfield integration status codex
+flowfield integration disconnect codex
+```
+
+See [Codex](/integrations/codex) for project setup and fresh-session verification.
+
+## Automation
+
+Add `--json` to data commands for structured output. Errors go to stderr with a nonzero
+exit status. Versioned edits require the current revision; do not overwrite newer intent
+from an outdated read. Paged reads return cursors and truncation metadata: follow them
+rather than treating the first page as complete history.
