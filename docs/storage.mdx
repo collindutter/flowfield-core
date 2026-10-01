@@ -20,8 +20,6 @@ directory together with the relevant project repositories. Keep a backup before 
 
 An incompatible database is preserved and rejected rather than reset. Use its matching
 build to reopen it. Reinstalling an older application does not downgrade a newer database.
-Keep Exocortex state and its matching build separate from a fresh Flowfield workspace;
-the rename does not automatically import old state or rewrite existing project guidance.
 
 The browser updates task state through the service. CLI commands and agent tools use that
 same service rather than independently opening the database. The queue is paused after restart.
