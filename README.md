@@ -57,6 +57,7 @@ uv run flowfield serve
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and issue reporting.
+Report vulnerabilities through [private security reporting](SECURITY.md).
 
 ## License
 

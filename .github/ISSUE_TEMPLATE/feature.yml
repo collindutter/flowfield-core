@@ -1,0 +1,26 @@
+name: Feature request
+description: Describe an outcome Flowfield could help you achieve.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Search existing issues first. Keep examples free of secrets and private project content.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What would a useful result look like?
+    validations:
+      required: true
+  - type: textarea
+    id: ideas
+    attributes:
+      label: Ideas or alternatives
+      description: Optional approaches or workarounds you have considered.

@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a problem with Flowfield.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Remove secrets and private project content from anything you share.
+        For a security vulnerability, use [private reporting](https://github.com/flowfield-sh/flowfield-core/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Flowfield version
+      description: Run `flowfield --version`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Python version, and installation method (uv, pip, or source).
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Give the smallest example that reproduces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Optional supporting evidence, with secrets and private content removed.

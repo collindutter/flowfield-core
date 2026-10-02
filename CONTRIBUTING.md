@@ -5,8 +5,37 @@ We are not accepting external pull requests at this time.
 
 For a bug, include the Flowfield version, operating system, steps to reproduce, expected
 behavior and actual behavior. Remove secrets and private project content from logs or screenshots.
-Public work issues describe outcomes and meaningful progress; completed implementations
-identify the release that contains them.
+Report potential vulnerabilities using [private security reporting](SECURITY.md).
+
+## Follow development
+
+Maintainers track public work with the **progress** label: one issue per user-facing outcome,
+with a short scope and completion criteria. Status is **Planned**, **In progress**,
+**Implemented**, or **Released**. Implemented means the code is on main; Released names
+the published version and links its release notes.
+
+Updates describe meaningful progress or a blocker and link relevant code. Progress issues
+stay open until released, or close with an explanation if the work is cancelled. Bug reports
+and feature requests can link the relevant progress issue.
+
+A progress issue uses this shape:
+
+```md
+## Outcome
+What this lets people do.
+
+## Done when
+- Observable completion criteria.
+
+## Status
+In progress
+
+## Implementation
+Links to code when implemented.
+
+## Release
+Version and release link when published.
+```
 
 ## Develop locally
 
@@ -60,6 +89,9 @@ make docs-serve
 `make docs` validates the build and internal links. `make docs-serve` starts a local
 preview. Hosted deployment uses the `docs/` subdirectory and its `docs.json` configuration.
 Keep user documentation concise and accurate for the behavior being released.
+Mintlify builds `docs/` from the `docs` branch. Advance that branch to the reviewed release
+commit after publication, using a normal fast-forward push, then verify the hosted pages.
+Feature development continues on main.
 
 ## Versioning and releases
 
