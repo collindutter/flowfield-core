@@ -18,3 +18,5 @@ web/playwright-report/
 .idea/
 site/
 docs/.mintlify/
+release-notes.md
+SHA256SUMS

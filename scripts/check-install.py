@@ -117,6 +117,14 @@ def main() -> None:
 
         command("--help")
         version = command("--version")
+        if expected := env.get("EXPECTED_VERSION"):
+            assert version == expected
+            import importlib.metadata
+
+            import flowfield
+
+            assert importlib.metadata.version("flowfield-core") == expected
+            assert Path(flowfield.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
         assert json.loads(command("version", "--json")) == {"version": version}
 
         def read(path: str) -> bytes:

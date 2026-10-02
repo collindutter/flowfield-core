@@ -1,4 +1,4 @@
-.PHONY: setup check format smoke build docs docs-serve api-types
+.PHONY: setup check format smoke build check-dist release-check docs docs-serve api-types
 
 setup:
 	uv sync --locked
@@ -25,7 +25,13 @@ smoke:
 
 build:
 	pnpm --dir web build
-	uv build
+	uv build --clear --no-sources
+
+check-dist:
+	uv run --no-sync python scripts/check_dist.py
+
+release-check: check smoke build check-dist
+	uv publish --dry-run --trusted-publishing never dist/*.whl dist/*.tar.gz
 
 docs:
 	pnpm --dir docs check

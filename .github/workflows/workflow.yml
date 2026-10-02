@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # Manual runs on main rehearse the exact release artifacts without publishing.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLOWFIELD_UPDATE_CHECKS: '0'
+  UV_NO_SYNC: '1'
+
+jobs:
+  checks:
+    uses: ./.github/workflows/tests.yml
+
+  build:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: '0.9.26'
+          python-version: '3.12'
+      - run: uv sync --locked
+      - name: Verify release identity and reviewed notes
+        id: identity
+        run: uv run --no-sync python scripts/release.py --check-ci
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: '11.19.0'
+      - run: pnpm --dir web install --frozen-lockfile
+      - run: make build
+      - run: uv publish --dry-run --trusted-publishing never dist/*.whl dist/*.tar.gz
+      - name: Record distribution checksums
+        working-directory: dist
+        run: shasum -a 256 ./*.whl ./*.tar.gz > ../SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-assets
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            release-notes.md
+            SHA256SUMS
+            scripts/check_dist.py
+            scripts/check-install.py
+          if-no-files-found: error
+          retention-days: 30
+
+  installed:
+    name: Release installs / ${{ matrix.os }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-assets
+      - name: Verify original artifact bytes
+        working-directory: dist
+        run: shasum -a 256 -c ../SHA256SUMS
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: '0.9.26'
+          python-version: '3.12'
+      - name: Exercise pip wheel/source and uv tool installations without a checkout
+        env:
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        run: uv run --no-project --python 3.12 python scripts/check_dist.py --version "$RELEASE_VERSION"
+
+  pypi:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [build, installed]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/flowfield-core/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-assets
+      - name: Verify original artifact bytes
+        working-directory: dist
+        run: shasum -a 256 -c ../SHA256SUMS
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: '0.9.26'
+      - name: Publish verified distributions; identical files may be retried
+        run: >-
+          uv publish --trusted-publishing always
+          --publish-url https://upload.pypi.org/legacy/
+          --check-url https://pypi.org/simple dist/*.whl dist/*.tar.gz
+
+  github:
+    needs: pypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-assets
+      - name: Verify original artifact bytes
+        working-directory: dist
+        run: shasum -a 256 -c ../SHA256SUMS
+      - name: Publish GitHub Release after PyPI succeeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "Flowfield $RELEASE_TAG" --notes-file release-notes.md
+          fi
+          gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz SHA256SUMS --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --notes-file release-notes.md
+          printf 'Published flowfield-core and GitHub release %s\n' "$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
