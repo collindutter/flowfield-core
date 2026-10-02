@@ -3,7 +3,7 @@ title: CLI
 description: Common commands and structured automation.
 ---
 
-The `flowfield` command talks to your running local service. Commands inside a registered
+Workspace commands talk to your running local service. Commands inside a registered
 project discover its identity from `.flowfield/config.toml`. Use `--project ID` when
 working elsewhere, and `--help` at any command level for its options.
 
@@ -18,6 +18,19 @@ flowfield --help
 
 Global `--port` selects the service. `--data-dir` or `FLOWFIELD_DATA_DIR` selects storage;
 `FLOWFIELD_PORT` selects the client port.
+
+## Storage and recovery
+
+```sh
+flowfield storage status
+flowfield storage backups
+flowfield storage restore BACKUP_ID --confirm
+```
+
+Storage commands run offline and accept `--json`. Status and backup listing do not
+initialize or migrate the workspace. Recovery requires a stopped service and refuses
+to discard writes made since the snapshot. See [local storage](/storage) for automatic
+migrations, recovery limits and full backups.
 
 ## Projects and guidance
 

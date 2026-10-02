@@ -32,6 +32,20 @@ under `src/flowfield/`; harness-specific behavior belongs in `src/flowfield/adap
 
 Ordinary checks use isolated disposable state and never launch live model calls.
 
+## Database changes
+
+Schema 29 is the immutable initialization baseline, captured in
+`tests/fixtures/schema_29.sql`. Append each schema change to the ordered registry in
+`src/flowfield/migrations.py`; do not edit previous migrations or the baseline SQL.
+Migration callbacks change only the database using `execute`/`executemany`. The storage
+owner controls the transaction, version, migration history and pre-upgrade snapshot;
+callbacks must not commit, use `executescript`, or mutate project files or artifacts.
+
+Test fresh initialization and upgrading populated fixtures, including failure rollback,
+interruption, restart and preserved application bindings. Keep application writes inside
+`Workspace.connection()` so recovery can detect newer work. Automatic snapshots cover
+the database; full workspace backups remain separate.
+
 ## Documentation
 
 Mintlify content and configuration live in `docs/`. Its CLI is pinned and locked locally:

@@ -1,4 +1,4 @@
-"""The public flowfield command; data operations go through the local service."""
+"""Public workspace commands and explicit offline storage maintenance."""
 
 import json
 import re
@@ -1619,6 +1619,8 @@ def decision_withdraw(
 
 from flowfield.execution_cli import register as register_execution  # noqa: E402
 from flowfield.integration_cli import register as register_integration  # noqa: E402
+from flowfield.storage_cli import register as register_storage  # noqa: E402
 
 register_execution(project_app, task_app)
 register_integration(project_app)
+register_storage(app)

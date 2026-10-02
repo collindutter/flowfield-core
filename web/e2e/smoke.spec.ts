@@ -4154,7 +4154,7 @@ test("entity identity and drafts persist across task and project tabs", async ({
   });
   await page.goto("/");
   const sidebar = page.locator(".sidebar");
-  const logo = sidebar.getByRole("link", { name: "e flowfield", exact: true });
+  const logo = sidebar.getByRole("link", { name: "f flowfield", exact: true });
   const projectLink = sidebar.getByRole("link", { name: project, exact: true });
   await expect(projectLink).toBeVisible();
   await expect(

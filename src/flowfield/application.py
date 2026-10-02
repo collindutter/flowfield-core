@@ -1,6 +1,5 @@
-"""Shared project board operations; only the service owns workspace state."""
+"""Service-owned project board operations with guarded storage maintenance."""
 
-import fcntl
 import json
 import re
 import sqlite3
@@ -36,6 +35,7 @@ from flowfield.execution_models import ACTIVE
 from flowfield.execution_models import SCHEMA as EXECUTION_SCHEMA
 from flowfield.inspection_models import SCHEMA as INSPECTION_SCHEMA
 from flowfield.integration_models import SCHEMA as INTEGRATION_SCHEMA
+from flowfield.migrations import current_version
 from flowfield.project_config import Identifier, ProjectConfig, Title, read_config, write_config
 from flowfield.publication import (
     Publication,
@@ -53,6 +53,7 @@ from flowfield.result_models import SCHEMA as RESULT_SCHEMA
 from flowfield.run_activity import SCHEMA as ACTIVITY_SCHEMA
 from flowfield.search import SCHEMA as SEARCH_SCHEMA
 from flowfield.stage_models import SCHEMA as STAGE_SCHEMA
+from flowfield.storage import acquire_lock, initialize, require_current
 
 Markdown = Annotated[str, StringConstraints(max_length=200_000)]
 TaskDescription = Annotated[str, StringConstraints(max_length=400_020)]
@@ -296,6 +297,7 @@ class Board(BaseModel):
     awaiting_application_count: int = 0
 
 
+# Immutable schema-29 baseline. New database changes belong in migrations.py.
 SCHEMA = """
 CREATE TABLE projects (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL UNIQUE,
@@ -365,39 +367,32 @@ class Workspace:
     def __init__(self, directory: Path, *, on_change: Callable[[str | None], None] | None = None):
         self.on_change = on_change
         self.directory = directory.expanduser().resolve()
-        self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.database = self.directory / "workspace.sqlite3"
-        with (self.directory / ".initialize.lock").open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            (self.directory / "artifacts").mkdir(mode=0o700, exist_ok=True)
-            with self.connection() as db:
-                version = db.execute("PRAGMA user_version").fetchone()[0]
-                if version == 0:
-                    db.executescript("BEGIN IMMEDIATE;" + SCHEMA + "COMMIT;")
-                elif version != 29:
-                    raise RuntimeError(
-                        f"Unsupported database version {version}; this build requires version 29. "
-                        "Use a matching build or a fresh --data-dir. Existing data is preserved; "
-                        "development builds do not migrate state."
-                    )
+        self.schema_version = current_version()
+        initialize(self.directory, SCHEMA)
+        (self.directory / "artifacts").mkdir(mode=0o700, exist_ok=True)
 
     @contextmanager
     def connection(
         self, *, write: bool = False, project_id: str | None = None, notify: bool = True
     ) -> Iterator[sqlite3.Connection]:
-        db = sqlite3.connect(self.database, timeout=10)
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA foreign_keys = ON")
-        try:
-            db.execute("BEGIN IMMEDIATE" if write else "BEGIN")
-            yield db
-            changed = db.total_changes > 0
-            db.commit()
-        except BaseException:
-            db.rollback()
-            raise
-        finally:
-            db.close()
+        with acquire_lock(self.directory, ".initialize.lock", shared=True):
+            db = sqlite3.connect(self.database.as_uri() + "?mode=rw", uri=True, timeout=10)
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA foreign_keys = ON")
+            try:
+                db.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+                require_current(db, self.schema_version)
+                yield db
+                changed = db.total_changes > 0
+                if changed and self.schema_version >= 30:
+                    db.execute("UPDATE storage_metadata SET revision=revision+1 WHERE id=1")
+                db.commit()
+            except BaseException:
+                db.rollback()
+                raise
+            finally:
+                db.close()
         if write and changed and notify and self.on_change is not None:
             self.on_change(project_id)
 

@@ -2,7 +2,6 @@
 
 import asyncio
 import contextlib
-import fcntl
 import json
 import os
 import signal
@@ -40,6 +39,7 @@ from flowfield.run_activity import ActivityRecorder, ActivityUpdate
 from flowfield.setup_validation import SetupValidation
 from flowfield.stage_models import StageUpdate
 from flowfield.stages import Stages
+from flowfield.storage import acquire_lock
 from flowfield.worker_context import brief_context
 
 
@@ -263,15 +263,30 @@ class Supervisor:
         self.closing = False
 
     async def start(self) -> None:
-        self.lock = (self.workspace.directory / ".execution.lock").open("ab")
+        self.lock = acquire_lock(self.workspace.directory, ".execution.lock")
         try:
-            fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as error:
+            # A different build may have upgraded between Workspace construction and start.
+            # connection() rechecks the schema under the shared maintenance lock.
+            with self.workspace.connection():
+                pass
+            self.execution.restart()
+            recovery = asyncio.create_task(asyncio.to_thread(self.integrations.restart))
+            try:
+                await asyncio.shield(recovery)
+            except asyncio.CancelledError:
+                # Cancellation must not release ownership while recovery's thread still writes.
+                while not recovery.done():
+                    try:
+                        await asyncio.shield(recovery)
+                    except asyncio.CancelledError:
+                        pass
+                recovery.result()
+                raise
+            self.loop_task = asyncio.create_task(self._schedule())
+        except BaseException:
             self.lock.close()
-            raise RuntimeError("Another Flowfield service owns this data directory.") from error
-        self.execution.restart()
-        await asyncio.to_thread(self.integrations.restart)
-        self.loop_task = asyncio.create_task(self._schedule())
+            self.lock = None
+            raise
 
     async def model_options(self) -> list[ModelOption]:
         client = CodexWorker(self.workspace.directory)
@@ -776,3 +791,4 @@ class Supervisor:
             await asyncio.gather(*list(self.delivery_jobs.values()), return_exceptions=True)
         if self.lock:
             self.lock.close()
+            self.lock = None

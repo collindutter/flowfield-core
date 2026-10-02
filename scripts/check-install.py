@@ -5,6 +5,7 @@ import json
 import os
 import re
 import socket
+import sqlite3
 import subprocess
 import sys
 import sysconfig
@@ -16,6 +17,38 @@ from urllib.request import ProxyHandler, build_opener
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+
+
+def check_storage(executable: str, cwd: str, env: dict[str, str]) -> None:
+    from flowfield.application import SCHEMA, Workspace
+    from flowfield.migrations import BASELINE_VERSION, current_version
+
+    directory = Path(cwd) / "upgrade-state"
+
+    def command(*args: str) -> dict | list:
+        return json.loads(
+            subprocess.check_output(
+                [executable, "--data-dir", str(directory), "storage", *args, "--json"],
+                cwd=cwd,
+                env=env,
+                text=True,
+            )
+        )
+
+    assert command("status")["schema_version"] is None
+    assert not directory.exists()
+    directory.mkdir()
+    with sqlite3.connect(directory / "workspace.sqlite3") as db:
+        db.executescript(SCHEMA)
+    assert command("status")["migration_required"] is True
+    Workspace(directory)
+    assert command("status")["schema_version"] == current_version()
+    saved = command("backups")[0]
+    assert saved["schema_version"] == BASELINE_VERSION
+    assert command("restore", saved["id"], "--confirm")["restored"] == saved["id"]
+    assert command("status")["schema_version"] == BASELINE_VERSION
+    Workspace(directory)
+    assert command("status")["schema_version"] == current_version()
 
 
 async def check_mcp(base: str, task: dict) -> None:
@@ -69,6 +102,7 @@ def main() -> None:
     env = {**os.environ, "PATH": sysconfig.get_path("scripts")}
     env.pop("PYTHONPATH", None)
     with tempfile.TemporaryDirectory(prefix="flowfield-installed-") as cwd:
+        check_storage(executable, cwd, env)
         state = Path(cwd) / "state"
         env["FLOWFIELD_DATA_DIR"] = str(state)
         with socket.socket() as listener:
@@ -248,7 +282,8 @@ def main() -> None:
                         process.wait()
     print(
         "Installed package: project setup, CLI/API/MCP/UI, "
-        "task board, briefing/handoff, activity/decisions, revisions and restart passed."
+        "task board, briefing/handoff, activity/decisions, revisions, restart "
+        "and offline storage upgrade/recovery passed."
     )
 
 

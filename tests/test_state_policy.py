@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from flowfield.application import Workspace
+from flowfield.errors import ApplicationError
 
 
 @pytest.mark.parametrize("version", list(range(1, 29)))
@@ -17,6 +18,6 @@ def test_old_state_is_preserved_without_migration(tmp_path: Path, version: int) 
             f"PRAGMA user_version = {version};"
         )
     original = database.read_bytes()
-    with pytest.raises(RuntimeError, match="fresh --data-dir"):
+    with pytest.raises(ApplicationError, match="fresh --data-dir"):
         Workspace(tmp_path)
     assert database.read_bytes() == original

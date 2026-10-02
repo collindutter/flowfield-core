@@ -15,11 +15,57 @@ Flowfield stores its workspace separately from the installed application and you
 Choose another workspace directory with `FLOWFIELD_DATA_DIR` or `flowfield --data-dir
 /absolute/path serve`. Project checkouts and their local edits remain separate from task state.
 
-Stop the service before backing up the workspace directory, and preserve the whole
-directory together with the relevant project repositories. Keep a backup before upgrading.
+## Upgrades
 
-An incompatible database is preserved and rejected rather than reset. Use its matching
-build to reopen it. Reinstalling an older application does not downgrade a newer database.
+On startup, Flowfield upgrades supported databases automatically. Before changing an
+existing database, it saves a verified snapshot in `~/.flowfield/backups/` (or your chosen
+data directory). Migration steps run in one transaction. An error or interrupted process
+rolls back the upgrade; an error stops startup and includes recovery instructions.
 
-The browser updates task state through the service. CLI commands and agent tools use that
-same service rather than independently opening the database. The queue is paused after restart.
+Upgrades require exclusive access: stop the service before updating, then start the new
+build. Flowfield refuses an incompatible database and preserves its contents. Reinstalling
+an older application does not downgrade a newer database. The queue is paused after restart;
+review interrupted work before enabling workers again.
+
+Database upgrades preserve project identity, installed guidance and execution artifacts.
+They do not rewrite project files or install new guidance. Update guidance separately
+using the [integration instructions](/integrations/codex).
+
+## Inspect and recover
+
+These commands work without a running service and never initialize or upgrade a database:
+
+```sh
+flowfield storage status
+flowfield storage backups
+```
+
+Add `--json` for structured output. For another workspace, put `--data-dir /absolute/path`
+before `storage`.
+
+A failed migration normally needs only a corrected build and another start. To recover
+the pre-upgrade database explicitly, stop the service, choose an ID from `storage backups`,
+and run:
+
+```sh
+flowfield storage restore BACKUP_ID --confirm
+```
+
+Recovery verifies the snapshot and saves the current database before replacing it.
+It refuses a running service, an incompatible schema, a different workspace, or a workspace
+that has received writes since the snapshot. This prevents recovery from discarding newer
+work. Start Flowfield to retry the upgrade after restoring. Keep the workspace at the same
+path when using these recovery snapshots.
+
+## Backups
+
+Flowfield retains up to three database snapshots, including snapshots made before recovery.
+These are for migration recovery: they do not contain execution artifacts, managed
+workspaces or your project repositories, and cannot repair an unreadable current database.
+
+For a full backup, stop the service and copy the whole workspace directory together with
+the relevant project repositories. Preserve those files together when recovering from disk
+loss or corruption. Keep a full backup before upgrading.
+
+Normal browser, CLI and agent operations use the service. Offline storage commands are
+limited to inspection and guarded recovery.
