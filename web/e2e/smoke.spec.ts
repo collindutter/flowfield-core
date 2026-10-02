@@ -4717,6 +4717,8 @@ test("inspection preserves exact versions, preview edits and direct approval", a
   page,
   request,
 }) => {
+  // Two result generations and multiple Git copies need a bounded hosted-runner budget.
+  test.setTimeout(60000);
   const project = "inspection-browser";
   const fixture = (operation: string) =>
     execFileSync(
