@@ -6,7 +6,11 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-  build: { outDir: "../src/flowfield/_web", emptyOutDir: true },
+  build: {
+    outDir: "../src/flowfield/_web",
+    emptyOutDir: true,
+    license: { fileName: "assets/third-party-licenses.md" },
+  },
   server: {
     port: 5173,
     strictPort: true,

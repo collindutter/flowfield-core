@@ -181,6 +181,14 @@ def main() -> None:
                         assert any(asset.endswith(".js") for asset in assets)
                         assert any(asset.endswith(".css") for asset in assets)
                         assert "2023 shadcn" in read("/assets/shadcn-license.txt").decode()
+                        licenses = read("/assets/third-party-licenses.md").decode()
+                        for dependency in ["react", "react-dom", "lucide-react", "refractor"]:
+                            assert f"## {dependency} - " in licenses
+                        assert "Tailwind Labs" in read("/assets/tailwindcss-license.txt").decode()
+                        assert (
+                            "Anton Korzunov"
+                            in read("/assets/react-remove-scroll-bar-license.txt").decode()
+                        )
                         for asset in assets:
                             assert read(asset), asset
                         for path, status in [("/api/unknown", 404)]:

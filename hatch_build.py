@@ -22,3 +22,15 @@ class CustomBuildHook(BuildHookInterface):
             raise RuntimeError(error)
         if any(not (web / asset.lstrip("/")).is_file() for asset in assets):
             raise RuntimeError(error)
+        notices = [
+            "third-party-licenses.md",
+            "shadcn-license.txt",
+            "tailwindcss-license.txt",
+            "react-remove-scroll-bar-license.txt",
+        ]
+        if any(
+            not (web / "assets" / notice).is_file()
+            or not (web / "assets" / notice).read_text().strip()
+            for notice in notices
+        ):
+            raise RuntimeError("Bundled UI license notices are missing. Rebuild the browser UI.")
