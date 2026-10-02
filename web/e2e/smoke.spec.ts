@@ -999,6 +999,7 @@ test("task keys link to persistent selections with native tabs, history and draf
     page.context().waitForEvent("page"),
     prerequisite.click({ button: "middle" }),
   ]);
+  await tab.waitForLoadState("domcontentloaded");
   await expect(tab).toHaveURL(/tasks\/NAV-1$/);
   await expect(
     tab.getByRole("heading", {
