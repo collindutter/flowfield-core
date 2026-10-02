@@ -8,7 +8,7 @@
   <a href="https://github.com/flowfield-sh/flowfield-core/blob/main/docs/getting-started.mdx"><img src="https://img.shields.io/badge/docs-getting%20started-2563eb" alt="Documentation"></a>
 </p>
 
-![Flowfield task feed with a worker result and review controls](docs/images/overview.png)
+![Flowfield board with priorities, questions and results ready for review](docs/images/board-overview.png)
 
 Flowfield runs agreed work in parallel and brings progress, questions, answers and results
 together for your review. Keep talking to your coordinator while workers implement tasks;
@@ -17,10 +17,6 @@ use the board to see what matters and what needs you.
 - **Shared task feeds.** Intent, worker activity, questions, testing and results stay together.
 - **Parallel work.** Independent tasks run in separate checkouts; dependencies hold work until it's ready.
 - **Explicit review.** Inspect or try an exact result, request changes, then approve its delivery to your project.
-
-![Flowfield board with priorities, questions and results ready for review](docs/images/board-overview.png)
-
-Screenshots use an offline demonstration workspace.
 
 ## Install
 
