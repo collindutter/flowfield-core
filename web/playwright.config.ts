@@ -18,6 +18,7 @@ export default defineConfig({
     command: "node e2e/server.mjs",
     env: {
       FLOWFIELD_DATA_DIR: state,
+      FLOWFIELD_UPDATE_CHECKS: "0",
       FLOWFIELD_SMOKE_CLEANUP: suppliedState ? "false" : "true",
     },
     url: "http://127.0.0.1:8766/api/health",

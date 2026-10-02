@@ -19,6 +19,20 @@ flowfield --help
 Global `--port` selects the service. `--data-dir` or `FLOWFIELD_DATA_DIR` selects storage;
 `FLOWFIELD_PORT` selects the client port.
 
+## Updates
+
+```sh
+flowfield update status
+flowfield update check
+flowfield update status --json
+```
+
+`status` reads the service's shared result, or the saved cache when the service is stopped.
+`check` requests a manual check from the running service and waits briefly for the result.
+Both accept `--json`; human update notices and errors use stderr. An unsuccessful manual
+check exits with an error. These commands do not install software or start a service.
+See [installation](/installation#update) for upgrade instructions and automatic checks.
+
 ## Storage and recovery
 
 ```sh

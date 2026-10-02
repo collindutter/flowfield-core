@@ -29,7 +29,21 @@ def storage_identity(db: sqlite3.Connection) -> None:
 
 # Never edit an applied migration or the baseline SCHEMA constants. Append a migration.
 # Use execute/executemany; the runner owns the transaction and schema version.
-MIGRATIONS = (Migration(30, storage_identity),)
+def persistent_notifications(db: sqlite3.Connection) -> None:
+    db.execute(
+        "CREATE TABLE notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "key TEXT NOT NULL UNIQUE, source TEXT NOT NULL, data TEXT NOT NULL, "
+        "created_at TEXT NOT NULL, dismissed_at TEXT, resolved_at TEXT)"
+    )
+    db.execute(
+        "CREATE TABLE notification_deliveries (notification_id INTEGER NOT NULL "
+        "REFERENCES notifications(id) ON DELETE CASCADE, channel TEXT NOT NULL, "
+        "claimed_at TEXT NOT NULL, PRIMARY KEY(notification_id, channel))"
+    )
+    db.execute("CREATE TABLE notification_state (name TEXT PRIMARY KEY, data TEXT NOT NULL)")
+
+
+MIGRATIONS = (Migration(30, storage_identity), Migration(31, persistent_notifications))
 
 
 def current_version() -> int:

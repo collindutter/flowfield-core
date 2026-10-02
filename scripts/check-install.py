@@ -13,7 +13,7 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.request import ProxyHandler, build_opener
+from urllib.request import ProxyHandler, Request, build_opener
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
@@ -99,7 +99,7 @@ async def check_mcp(base: str, task: dict) -> None:
 
 def main() -> None:
     executable = str(Path(sysconfig.get_path("scripts")) / "flowfield")
-    env = {**os.environ, "PATH": sysconfig.get_path("scripts")}
+    env = {**os.environ, "PATH": sysconfig.get_path("scripts"), "FLOWFIELD_UPDATE_CHECKS": "0"}
     env.pop("PYTHONPATH", None)
     with tempfile.TemporaryDirectory(prefix="flowfield-installed-") as cwd:
         check_storage(executable, cwd, env)
@@ -123,6 +123,16 @@ def main() -> None:
             with opener.open(base + path, timeout=2) as response:
                 assert response.status == 200
                 return response.read()
+
+        def write(path: str, body: dict) -> dict:
+            request = Request(
+                base + path,
+                data=json.dumps(body).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with opener.open(request, timeout=2) as response:
+                return json.load(response)
 
         original = Path(cwd) / "AGENTS.md"
         original.write_text("Preserve existing instructions.\n")
@@ -148,6 +158,14 @@ def main() -> None:
                     assert health == {"status": "ok", "version": version}
                     assert not (state / "access-token").exists()
                     if attempt == 0:
+                        write(
+                            "/api/notifications/operations",
+                            {
+                                "key": "installed-check",
+                                "title": "Package verification",
+                                "message": "This notice survives the service restart.",
+                            },
+                        )
                         assert json.loads(read("/api/projects")) == []
                         page = read("/").decode()
                         assert "Flowfield" in page
@@ -269,6 +287,17 @@ def main() -> None:
                     assert original.read_text() == "Preserve existing instructions.\n"
                     assert (state / "workspace.sqlite3").is_file()
                     assert (state / "artifacts").is_dir()
+                    updates = json.loads(command("update", "status", "--json"))
+                    assert updates["automatic"] is False and updates["last_attempt"] is None
+                    notices = json.loads(read("/api/notifications"))
+                    saved_notice = next(
+                        n for n in notices["items"] if n["title"] == "Package verification"
+                    )
+                    if attempt == 1:
+                        remaining = write(
+                            "/api/notifications/dismiss", {"ids": [saved_notice["id"]]}
+                        )
+                        assert all(n["id"] != saved_notice["id"] for n in remaining["items"])
                 except BaseException:
                     log.seek(0)
                     sys.stderr.write(log.read().decode())
@@ -283,7 +312,7 @@ def main() -> None:
     print(
         "Installed package: project setup, CLI/API/MCP/UI, "
         "task board, briefing/handoff, activity/decisions, revisions, restart "
-        "and offline storage upgrade/recovery passed."
+        "offline storage upgrade/recovery, persistent notifications and update status passed."
     )
 
 

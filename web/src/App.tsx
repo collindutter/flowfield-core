@@ -1,5 +1,5 @@
 import { MilestoneBadge } from "./MilestoneBadge";
-import { useAttentionNotifications } from "./BrowserNotices";
+import { useBrowserNotifications } from "./BrowserNotices";
 import { TaskNeeds, TaskState, hasTaskNeeds } from "./TaskNeeds";
 import { SetupInstructions } from "./SetupInstructions";
 import { taskTab } from "./navigation";
@@ -104,7 +104,7 @@ export function App() {
     overlayDirty,
     setOverlayDirty,
   );
-  useAttentionNotifications(changeLocation);
+  useBrowserNotifications(changeLocation);
   const projectId = params.projectId;
   const [sidebarTarget, setSidebarTarget] = useState<HTMLDivElement | null>(
     null,
@@ -399,6 +399,7 @@ function ProjectBoard({
     } catch (e) {
       notify({
         key: `priority:${projectId}`,
+        project_id: projectId,
         title: "Priority could not change",
         message: (e as Error).message,
       });

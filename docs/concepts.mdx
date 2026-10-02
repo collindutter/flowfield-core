@@ -43,8 +43,22 @@ The queue starts paused, including after restart. Pause leaves active work runni
 Each project starts with one worker slot; two independent tasks can run in separate
 checkouts after you increase the maximum to two. Waiting for review frees the worker slot.
 
-**Needs you** collects questions, reviews and interventions. Notifications show operational
-notices. The browser's Connected indicator describes its live update stream.
+**Needs you** collects questions, reviews and interventions. The browser's Connected
+indicator describes its live update stream.
+
+## Notifications
+
+Notifications collect task-attention alerts, operation errors and available updates.
+Flowfield saves them in the workspace, so notices and dismissals are shared across browsers
+and survive restarts. Dismissing a notice does not answer a question, approve code or change
+the queue. Clear notifications dismisses the currently observed set; newer notices stay visible.
+Flowfield keeps the 200 most recent notification records.
+
+Desktop alerts are optional: choose **Enable browser notifications** and allow them in your
+browser. Permission is required in each browser. Desktop delivery is best effort, with one
+attempt shared across tabs and browsers; the saved notification list remains available.
+An open browser is required for desktop alerts. See [installation](/installation#update)
+for automatic and manual update checks.
 
 ## Results and approval
 

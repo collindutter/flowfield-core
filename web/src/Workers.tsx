@@ -36,6 +36,7 @@ export function QueueControls({
       notify(
         {
           key: `queue-status:${projectId}`,
+          project_id: projectId,
           title: "Worker queue needs attention",
           message: problem,
           href: projectHref(projectId) + "/edit/workers",
@@ -76,6 +77,7 @@ export function QueueControls({
                 } catch (e) {
                   notify({
                     key: `queue-action:${projectId}`,
+                    project_id: projectId,
                     title: data.enabled
                       ? "Queue could not pause"
                       : "Queue could not start",
@@ -107,6 +109,7 @@ export function QueueControls({
           onClick={() =>
             notify({
               key: `queue-status:${projectId}`,
+              project_id: projectId,
               title: "Worker queue needs attention",
               message: problem,
               href: projectHref(projectId) + "/edit/workers",

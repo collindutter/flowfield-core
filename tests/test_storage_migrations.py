@@ -29,6 +29,8 @@ from flowfield.migrations import Migration
 from flowfield.questions import Questions
 from flowfield.supervisor import Supervisor
 
+CURRENT = migrations.current_version()
+
 
 def raw(directory):
     return closing(storage.connect(directory / storage.DATABASE))
@@ -52,10 +54,10 @@ def test_frozen_baseline_and_fresh_initialization(tmp_path):
     assert SCHEMA == frozen.read_text()  # Editing baseline would invalidate existing upgrades.
     workspace = Workspace(tmp_path / "state")
     with raw(workspace.directory) as db:
-        assert storage.version(db) == 30
+        assert storage.version(db) == CURRENT
         assert storage.identity(db)[1] == 0
         assert db.execute("SELECT version, backup FROM schema_migrations").fetchall() == [
-            (30, None)
+            *((migration.version, None) for migration in migrations.MIGRATIONS)
         ]
     assert storage.backups(workspace.directory) == []
     assert Workspace(workspace.directory).projects() == []
@@ -134,7 +136,7 @@ def test_multi_step_failure_rolls_back_data_ddl_versions_and_bounds_backups(tmp_
         db.execute("INSERT INTO should_rollback VALUES ('partial')")
         raise ValueError("injected migration failure")
 
-    later(monkeypatch, Migration(31, add_column), Migration(32, fail))
+    later(monkeypatch, Migration(CURRENT + 1, add_column), Migration(CURRENT + 2, fail))
     for _ in range(5):
         with pytest.raises(ApplicationError, match="rolled back.*injected") as error:
             Workspace(workspace.directory)
@@ -142,14 +144,14 @@ def test_multi_step_failure_rolls_back_data_ddl_versions_and_bounds_backups(tmp_
         assert logical_data(workspace.directory) == before
     assert len(storage.backups(workspace.directory)) == storage.BACKUP_LIMIT
     with raw(workspace.directory) as db:
-        assert storage.version(db) == 30
-        assert db.execute("SELECT max(version) FROM schema_migrations").fetchone() == (30,)
+        assert storage.version(db) == CURRENT
+        assert db.execute("SELECT max(version) FROM schema_migrations").fetchone() == (CURRENT,)
 
 
 def test_backup_failure_prevents_any_upgrade(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "state")
     before = logical_data(workspace.directory)
-    later(monkeypatch, Migration(31, add_column))
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
 
     def unavailable(*args, **kwargs):
         raise OSError("disk full")
@@ -169,7 +171,7 @@ def test_migration_cannot_commit_outside_runner_transaction(tmp_path, monkeypatc
         db.execute("CREATE TABLE should_rollback (value TEXT)")
         db.commit()
 
-    later(monkeypatch, Migration(31, bad))
+    later(monkeypatch, Migration(CURRENT + 1, bad))
     with pytest.raises(ApplicationError, match="not authorized"):
         Workspace(workspace.directory)
     assert logical_data(workspace.directory) == before
@@ -188,7 +190,7 @@ def interrupted(db):
     db.execute('CREATE TABLE interrupted (value TEXT)')
     Path(sys.argv[2]).write_text('ready')
     time.sleep(60)
-migrations.MIGRATIONS += (migrations.Migration(31, interrupted),)
+migrations.MIGRATIONS += (migrations.Migration(migrations.current_version() + 1, interrupted),)
 Workspace(Path(sys.argv[1]))
 """
     process = subprocess.Popen([sys.executable, "-c", code, str(workspace.directory), str(ready)])
@@ -214,7 +216,7 @@ def test_active_service_and_open_transactions_exclude_maintenance(tmp_path, monk
     workspace = Workspace(tmp_path / "state")
     with storage.acquire_lock(workspace.directory, ".execution.lock"):
         assert Workspace(workspace.directory).projects() == []
-    later(monkeypatch, Migration(31, add_column))
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
     with storage.acquire_lock(workspace.directory, ".execution.lock"):
         with pytest.raises(ApplicationError, match="owns this workspace"):
             Workspace(workspace.directory)
@@ -222,7 +224,7 @@ def test_active_service_and_open_transactions_exclude_maintenance(tmp_path, monk
         with pytest.raises(ApplicationError, match="owns this workspace"):
             Workspace(workspace.directory)
     assert storage.backups(workspace.directory) == []
-    assert Workspace(workspace.directory).schema_version == 31
+    assert Workspace(workspace.directory).schema_version == CURRENT + 1
     with pytest.raises(ApplicationError, match="Reopen"):
         workspace.projects()
 
@@ -230,7 +232,7 @@ def test_active_service_and_open_transactions_exclude_maintenance(tmp_path, monk
 def test_upgrade_between_construction_and_service_start_is_refused(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "state")
     service = Supervisor(workspace)
-    later(monkeypatch, Migration(31, add_column))
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
     Workspace(workspace.directory)
     with pytest.raises(ApplicationError, match="Reopen"):
         asyncio.run(service.start())
@@ -267,7 +269,7 @@ def test_recovery_preserves_artifacts_and_refuses_new_work(tmp_path, monkeypatch
     artifact = workspace.directory / "artifacts" / "keep.txt"
     artifact.write_text("evidence")
     before = logical_data(workspace.directory)
-    later(monkeypatch, Migration(31, add_column))
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
     upgraded = Workspace(workspace.directory)
     saved = storage.backups(workspace.directory)[0]["id"]
     with storage.acquire_lock(workspace.directory, ".execution.lock"):
@@ -335,7 +337,7 @@ def test_wal_snapshot_restore_and_cli_recovery(tmp_path, monkeypatch):
             "harbor", ActivityCreate(task_id="task-0", body="Committed in WAL")
         )
         before = logical_data(directory)
-        later(monkeypatch, Migration(31, add_column))
+        later(monkeypatch, Migration(CURRENT + 1, add_column))
         Workspace(directory)
         saved = storage.backups(directory)[0]["id"]
         with closing(
@@ -355,7 +357,7 @@ def test_wal_snapshot_restore_and_cli_recovery(tmp_path, monkeypatch):
 
 def test_foreign_workspace_and_newer_schema_recovery_are_refused(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "state")
-    later(monkeypatch, Migration(31, add_column))
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
     Workspace(workspace.directory)
     name = storage.backups(workspace.directory)[0]["id"]
     with raw(workspace.directory) as db:

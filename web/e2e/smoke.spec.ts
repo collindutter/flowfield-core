@@ -4255,6 +4255,8 @@ test("queue errors open shared notifications with a direct settings action", asy
   await expect(page.locator(".queue-controls [role=alert]")).toHaveCount(0);
 
   await notices
+    .getByRole("alert")
+    .filter({ hasText: "Queue could not start" })
     .getByRole("link", { name: "Worker settings", exact: true })
     .click();
   await expect(notices).toHaveCount(0);
@@ -5403,9 +5405,11 @@ test("browser notifications are opt-in, deduplicate across tabs and link to a ta
     .click();
   await expect
     .poll(() =>
-      page.evaluate(() => localStorage.getItem("flowfield-attention-receipts")),
+      request
+        .get("/api/notifications/settings")
+        .then(async (r) => (await r.json()).browser_enabled),
     )
-    .not.toBeNull();
+    .toBe(true);
   await request.post("/api/projects/notify-project/questions", {
     data: {
       id: "notify-choice",
@@ -5429,7 +5433,7 @@ test("browser notifications are opt-in, deduplicate across tabs and link to a ta
     .toBe(1);
   const second = await context.newPage();
   const secondRead = second.waitForResponse((response) =>
-    response.url().endsWith("/api/attention-notifications"),
+    response.url().endsWith("/api/notifications/browser/claim"),
   );
   await second.goto("/projects/notify-project");
   await secondRead;
@@ -5440,12 +5444,17 @@ test("browser notifications are opt-in, deduplicate across tabs and link to a ta
     ),
   ).toBe(0);
   await expect
-    .poll(() =>
-      second.evaluate(() =>
-        localStorage.getItem("flowfield-attention-receipts"),
+    .poll(async () =>
+      (await (await request.get("/api/notifications")).json()).items.some(
+        (item: { key: string }) => item.key.includes("notify-choice"),
       ),
     )
-    .toContain("notify-choice");
+    .toBe(true);
+  expect(
+    await second.evaluate(() =>
+      localStorage.getItem("flowfield-attention-receipts"),
+    ),
+  ).toBeNull();
   await page.evaluate(() =>
     (
       window as unknown as { demoNotices: { onclick: () => void }[] }
@@ -5743,4 +5752,114 @@ test("sidebar names disclose only clipped text and idle input opens deliberately
       (item: { kind: string }) => item.kind === "reply",
     ),
   ).toBe(false);
+});
+
+test("update notifications persist, dismiss across browsers and share manual discovery", async ({
+  page,
+  request,
+  browser,
+}) => {
+  const observe = (version: string) =>
+    execFileSync("uv", [
+      "run",
+      "--project",
+      "..",
+      "../tests/notification_browser_fixture.py",
+      state,
+      version,
+    ]);
+  observe("9.9.1");
+  let manualChecks = 0;
+  let startups = 0;
+  await page.route("**/api/updates/check", async (route) => {
+    if (route.request().postDataJSON().reason === "manual") {
+      manualChecks++;
+      observe(manualChecks === 1 ? "9.9.1" : "9.9.2");
+    } else startups++;
+    await route.fulfill({
+      json: await (await request.get("/api/updates")).json(),
+    });
+  });
+  await page.goto("/");
+  await expect.poll(() => startups).toBeGreaterThan(0);
+  await expect(
+    page.getByRole("dialog", { name: "Notifications", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: /Notifications/ }).click();
+  const sheet = page.getByRole("dialog", {
+    name: "Notifications",
+    exact: true,
+  });
+  const notice = sheet
+    .getByRole("alert")
+    .filter({ hasText: "Flowfield 9.9.1 is available" });
+  await expect(notice).toBeVisible();
+  await expect(
+    notice.getByRole("link", { name: "Release notes" }),
+  ).toHaveAttribute(
+    "href",
+    "https://github.com/flowfield-sh/flowfield-core/releases",
+  );
+  await expect(notice).toContainText("uv tool upgrade flowfield-core");
+  await expect(notice).toContainText(
+    "python -m pip install --upgrade flowfield-core",
+  );
+  await page.screenshot({
+    path: "test-results/persistent-update-notification.png",
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(notice).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await notice.evaluate((card) => {
+      const bounds = card.getBoundingClientRect();
+      return [...card.querySelectorAll("p, pre")].every((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.left >= bounds.left && rect.right <= bounds.right;
+      });
+    }),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/persistent-update-notification-mobile.png",
+  });
+  await notice
+    .getByRole("button", { name: "Dismiss Flowfield 9.9.1 is available" })
+    .click();
+  await expect(notice).toHaveCount(0);
+  await sheet
+    .getByRole("button", { name: "Check for updates", exact: true })
+    .click();
+  await expect.poll(() => manualChecks).toBe(1);
+  await expect(notice).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: /Notifications/ }).click();
+  await expect(notice).toHaveCount(0);
+  const secondContext = await browser.newContext();
+  const second = await secondContext.newPage();
+  await second.goto("/");
+  await second.getByRole("button", { name: /Notifications/ }).click();
+  await expect(
+    second.getByRole("heading", { name: "Flowfield 9.9.1 is available" }),
+  ).toHaveCount(0);
+  await sheet
+    .getByRole("button", { name: "Check for updates", exact: true })
+    .click();
+  await expect.poll(() => manualChecks).toBe(2);
+  await expect(
+    sheet.getByRole("heading", { name: "Flowfield 9.9.2 is available" }),
+  ).toBeVisible();
+  await expect(
+    second.getByRole("heading", { name: "Flowfield 9.9.2 is available" }),
+  ).toBeVisible();
+  await sheet
+    .getByRole("button", { name: "Clear notifications", exact: true })
+    .click();
+  await expect(
+    second.getByRole("heading", { name: "Flowfield 9.9.2 is available" }),
+  ).toHaveCount(0);
+  await secondContext.close();
 });

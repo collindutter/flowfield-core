@@ -38,7 +38,6 @@ from flowfield.application import (
     Workspace,
     health,
 )
-from flowfield.attention import AttentionNotice, attention_notices
 from flowfield.browser import browser_router
 from flowfield.changes import Changes
 from flowfield.context_api import context_router
@@ -49,6 +48,7 @@ from flowfield.guidance import Guidance, GuidanceChange, GuidanceView
 from flowfield.inspection_api import inspection_router
 from flowfield.integration_api import integration_router
 from flowfield.mcp import create_mcp
+from flowfield.notification_api import NotificationService, notification_router
 from flowfield.question_api import question_router
 from flowfield.result_api import result_router
 from flowfield.state import data_path
@@ -64,11 +64,16 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
         )
         app.state.supervisor = Supervisor(app.state.workspace)
         await app.state.supervisor.start()
+        app.state.notifications = NotificationService(app.state.workspace)
         try:
+            await app.state.notifications.start()
             async with mcp.session_manager.run():
                 yield
         finally:
-            await app.state.supervisor.close()
+            try:
+                await app.state.notifications.close()
+            finally:
+                await app.state.supervisor.close()
 
     app = FastAPI(title="Flowfield", version=__version__, lifespan=lifespan)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "[::1]"])
@@ -241,10 +246,7 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
     app.include_router(integration_router(supervisor))
     app.include_router(result_router(supervisor))
     app.include_router(inspection_router(lambda: supervisor().workspace))
-
-    @app.get("/api/attention-notifications")
-    def notifications() -> list[AttentionNotice]:
-        return attention_notices(workspace())
+    app.include_router(notification_router(lambda: app.state.notifications))
 
     @app.get("/api/events")
     async def events(request: Request) -> EventSourceResponse:

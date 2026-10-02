@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -18,16 +19,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { WorkspaceLink } from "./WorkspaceLink";
-import { BrowserNoticeSettings } from "./BrowserNotices";
+import { browserNoticesSupported } from "./BrowserNotices";
+import { request } from "./workspace";
+import type { components } from "./api-schema";
 
-type Notice = {
-  key: string;
-  title: string;
-  message: string;
-  href?: string;
-  action?: string;
-};
-type Entry = Notice & { time: string };
+type Notice = components["schemas"]["OperationNotice"];
+type Page = components["schemas"]["NotificationPage"];
+type Settings = components["schemas"]["NotificationSettings"];
+type Update = components["schemas"]["UpdateStatus"];
 const Context = createContext<{
   notify: (notice: Notice, open?: boolean) => void;
   show: () => void;
@@ -38,29 +37,116 @@ export function useNotifications() {
   if (!value) throw new Error("Notifications provider missing");
   return value;
 }
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<Entry[]>([]);
+  const [page, setPage] = useState<Page>({ items: [], through: 0 });
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [updates, setUpdates] = useState<Update | null>(null);
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [unsavedNotice, setUnsavedNotice] = useState<Notice | null>(null);
   const opener = useRef<HTMLElement | null>(null);
+  const generation = useRef(0);
   const show = useCallback(() => {
     if (document.activeElement instanceof HTMLElement)
       opener.current = document.activeElement;
     setOpen(true);
   }, []);
+  const refresh = useCallback(async (signal?: AbortSignal) => {
+    const current = ++generation.current;
+    const [notices, preferences, update] = await Promise.all([
+      request<Page>("notifications", "GET", undefined, signal),
+      request<Settings>("notifications/settings", "GET", undefined, signal),
+      request<Update>("updates", "GET", undefined, signal),
+    ]);
+    if (current !== generation.current || signal?.aborted) return;
+    setPage(notices);
+    setSettings(preferences);
+    setUpdates(update);
+    setLoadError("");
+  }, []);
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const controller = new AbortController();
+    async function poll() {
+      try {
+        await refresh(controller.signal);
+        if (!stopped) setLoadError("");
+      } catch (e) {
+        if (!stopped) setLoadError((e as Error).message);
+      }
+      if (!stopped) timer = setTimeout(() => void poll(), 3000);
+    }
+    void request<Update>("updates/check", "POST", { reason: "startup" }).catch(
+      () => {},
+    );
+    void poll();
+    return () => {
+      stopped = true;
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [refresh]);
   const notify = useCallback(
     (notice: Notice, reveal = true) => {
-      setItems((current) =>
-        [
-          { ...notice, time: new Date().toISOString() },
-          ...current.filter((item) => item.key !== notice.key),
-        ].slice(0, 30),
-      );
       if (reveal) show();
+      const occurrence =
+        reveal && !notice.occurrence
+          ? { ...notice, occurrence: crypto.randomUUID() }
+          : notice;
+      ++generation.current;
+      void request<Page>("notifications/operations", "POST", occurrence)
+        .then(() => {
+          setUnsavedNotice(null);
+          setError("");
+          void refresh().catch((e: Error) => setLoadError(e.message));
+        })
+        .catch((e: Error) => {
+          setUnsavedNotice(occurrence);
+          setError(`Notification could not be saved: ${e.message}`);
+        });
     },
-    [show],
+    [show, refresh],
   );
+  async function act(action: () => Promise<unknown>) {
+    setBusy(true);
+    setError("");
+    ++generation.current;
+    try {
+      await action();
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function toggleBrowser() {
+    if (!settings) return;
+    if (
+      !settings.browser_enabled &&
+      (await Notification.requestPermission()) !== "granted"
+    ) {
+      throw new Error(
+        "Notifications are blocked or not allowed. Change this site's browser permission to enable them.",
+      );
+    }
+    await request("notifications/settings", "PUT", {
+      browser_enabled: !settings.browser_enabled,
+    });
+  }
+  async function allowBrowser() {
+    if ((await Notification.requestPermission()) !== "granted") {
+      throw new Error(
+        "Notifications are blocked or not allowed. Change this site's browser permission to enable them.",
+      );
+    }
+  }
   return (
-    <Context.Provider value={{ notify, show, count: items.length }}>
+    <Context.Provider value={{ notify, show, count: page.items.length }}>
       {children}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
@@ -75,35 +161,201 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             <SheetTitle>Notifications</SheetTitle>
           </SheetHeader>
           <div className="notification-items">
-            <BrowserNoticeSettings />
-            {!items.length && <p className="muted">No notifications.</p>}
-            {items.map((item) => (
-              <Alert key={item.key}>
-                <AlertTitle>
+            <div className="content-stack">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy || !settings || !browserNoticesSupported()}
+                onClick={() => void act(toggleBrowser)}
+              >
+                {settings?.browser_enabled
+                  ? "Disable browser notifications"
+                  : "Enable browser notifications"}
+              </Button>
+              {!browserNoticesSupported() && (
+                <p>Browser notifications are unavailable here.</p>
+              )}
+              {settings?.browser_enabled &&
+                browserNoticesSupported() &&
+                Notification.permission !== "granted" && (
+                  <p>
+                    Allow notifications in this browser's site permissions to
+                    receive desktop alerts here.
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void act(allowBrowser)}
+                    >
+                      Allow in this browser
+                    </Button>
+                  </p>
+                )}
+            </div>
+            <section className="content-stack" aria-label="Updates">
+              <DetailHeading titleAs="h3" title="Updates" />
+              <p>
+                {updates
+                  ? `Installed: ${updates.installed_version}`
+                  : "Loading update status…"}
+              </p>
+              {updates?.last_success && (
+                <p>
+                  Last checked <Timestamp date={updates.last_success} />
+                </p>
+              )}
+              {updates?.latest_version && (
+                <p>Latest compatible: {updates.latest_version}</p>
+              )}
+              {updates?.error && <p role="status">{updates.error}</p>}
+              {!updates?.error &&
+                updates?.last_success &&
+                !updates?.available_version && (
+                  <p>No newer compatible release found.</p>
+                )}
+              <div className="actions">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || updates?.checking}
+                  onClick={() =>
+                    void act(() =>
+                      request("updates/check", "POST", { reason: "manual" }),
+                    )
+                  }
+                >
+                  {updates?.checking ? "Checking…" : "Check for updates"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || !updates || updates.disabled_by_environment}
+                  onClick={() =>
+                    void act(() =>
+                      request("updates/settings", "PUT", {
+                        automatic: !updates?.automatic,
+                      }),
+                    )
+                  }
+                >
+                  {updates?.automatic
+                    ? "Disable automatic checks"
+                    : "Enable automatic checks"}
+                </Button>
+              </div>
+              {updates?.disabled_by_environment && (
+                <p>
+                  Automatic checks are disabled by the service configuration.
+                </p>
+              )}
+            </section>
+            {(error || loadError) && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  <ContentStack>
+                    <p>{error || loadError}</p>
+                    {unsavedNotice && (
+                      <p>
+                        {unsavedNotice.title}: {unsavedNotice.message}
+                      </p>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        unsavedNotice
+                          ? notify(unsavedNotice)
+                          : void act(() => refresh())
+                      }
+                    >
+                      Retry
+                    </Button>
+                  </ContentStack>
+                </AlertDescription>
+              </Alert>
+            )}
+            {!page.items.length && <p className="muted">No notifications.</p>}
+            {page.items.map((item) => (
+              <Alert key={item.id}>
+                <AlertTitle className="line-clamp-none">
+                  {item.scope && (
+                    <p className="detail-metadata">{item.scope}</p>
+                  )}
                   <DetailHeading entry titleAs="h3" title={item.title} />
                 </AlertTitle>
                 <AlertDescription>
                   <ContentStack>
                     <p>{item.message}</p>
                     <span className="detail-metadata">
-                      <Timestamp date={item.time} />
+                      <Timestamp date={item.created_at} />
                     </span>
-                    {item.href && (
-                      <Button size="sm" variant="outline" asChild>
-                        <WorkspaceLink
-                          to={item.href}
-                          onClick={() => setOpen(false)}
+                    {item.commands.map((command) => (
+                      <div key={command.label} className="content-stack">
+                        <p>{command.label}</p>
+                        <pre className="overflow-x-auto">
+                          <code>{command.command}</code>
+                        </pre>
+                      </div>
+                    ))}
+                    <div className="actions">
+                      {item.actions.map((action) => (
+                        <Button
+                          key={action.href}
+                          size="sm"
+                          variant="outline"
+                          asChild
                         >
-                          {item.action ?? "Open"}
-                        </WorkspaceLink>
+                          {action.href.startsWith("/") ? (
+                            <WorkspaceLink
+                              to={action.href}
+                              onClick={() => setOpen(false)}
+                            >
+                              {action.label}
+                            </WorkspaceLink>
+                          ) : (
+                            <a
+                              href={action.href}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {action.label}
+                            </a>
+                          )}
+                        </Button>
+                      ))}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        aria-label={`Dismiss ${item.title}`}
+                        onClick={() =>
+                          void act(() =>
+                            request("notifications/dismiss", "POST", {
+                              ids: [item.id],
+                            }),
+                          )
+                        }
+                      >
+                        Dismiss
                       </Button>
-                    )}
+                    </div>
                   </ContentStack>
                 </AlertDescription>
               </Alert>
             ))}
-            {!!items.length && (
-              <Button size="sm" variant="outline" onClick={() => setItems([])}>
+            {!!page.items.length && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  void act(() =>
+                    request("notifications/dismiss", "POST", {
+                      through: page.through,
+                    }),
+                  )
+                }
+              >
                 Clear notifications
               </Button>
             )}
@@ -122,7 +374,7 @@ export function NotificationButton() {
       className="notification-button px-0"
       onClick={show}
     >
-      <Bell aria-hidden="true" /> Notifications
+      <Bell aria-hidden="true" /> Notifications{" "}
       {count ? <span>{count}</span> : null}
     </Button>
   );
