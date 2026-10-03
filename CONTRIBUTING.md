@@ -9,14 +9,14 @@ Report potential vulnerabilities using [private security reporting](SECURITY.md)
 
 ## Follow development
 
-Maintainers track public work with the **progress** label: one issue per user-facing outcome,
-described in plain prose with clear completion criteria.
+Maintainers track public work in issues: one issue per user-facing outcome, described
+in plain prose with clear completion criteria.
 
 Updates describe meaningful progress or a blocker, linking relevant code or a released
 version when useful. Close an issue when its described outcome is available, or explain
 why the work was cancelled. Bug reports and feature requests can link the relevant issue.
 
-A progress issue can be as simple as:
+A work issue can be as simple as:
 
 ```md
 Let people search their project's work history and follow results back to the original
