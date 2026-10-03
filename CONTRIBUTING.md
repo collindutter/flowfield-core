@@ -10,31 +10,20 @@ Report potential vulnerabilities using [private security reporting](SECURITY.md)
 ## Follow development
 
 Maintainers track public work with the **progress** label: one issue per user-facing outcome,
-with a short scope and completion criteria. Status is **Planned**, **In progress**,
-**Implemented**, or **Released**. Implemented means the code is on main; Released names
-the published version and links its release notes.
+described in plain prose with clear completion criteria.
 
-Updates describe meaningful progress or a blocker and link relevant code. Progress issues
-stay open until released, or close with an explanation if the work is cancelled. Bug reports
-and feature requests can link the relevant progress issue.
+Updates describe meaningful progress or a blocker, linking relevant code or a released
+version when useful. Close an issue when its described outcome is available, or explain
+why the work was cancelled. Bug reports and feature requests can link the relevant issue.
 
-A progress issue uses this shape:
+A progress issue can be as simple as:
 
 ```md
-## Outcome
-What this lets people do.
+Let people search their project's work history and follow results back to the original
+task conversation.
 
-## Done when
-- Observable completion criteria.
-
-## Status
-In progress
-
-## Implementation
-Links to code when implemented.
-
-## Release
-Version and release link when published.
+This is complete when search supports useful filters, links to exact sources, and clearly
+distinguishes current work from superseded text and archived tasks.
 ```
 
 ## Develop locally
