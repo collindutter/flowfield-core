@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://pypi.org/project/flowfield-core/"><img src="https://img.shields.io/pypi/v/flowfield-core?logo=pypi&amp;logoColor=white&amp;color=2563eb" alt="PyPI version"></a>
   <a href="https://github.com/flowfield-sh/flowfield-core/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/flowfield-sh/flowfield-core/tests.yml?branch=main&amp;label=tests" alt="Tests"></a>
-  <a href="https://github.com/flowfield-sh/flowfield-core/blob/main/docs/getting-started.mdx"><img src="https://img.shields.io/badge/docs-getting%20started-2563eb" alt="Documentation"></a>
+  <a href="https://github.com/flowfield-sh/flowfield-core/blob/main/docs/getting-started.mdx"><img src="https://github.com/flowfield-sh/flowfield-core/actions/workflows/docs.yml/badge.svg?branch=main" alt="Documentation"></a>
 </p>
 
 ![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-overview.png)
