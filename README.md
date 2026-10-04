@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://pypi.org/project/flowfield-core/"><img src="https://img.shields.io/pypi/v/flowfield-core?logo=pypi&amp;logoColor=white&amp;color=2563eb" alt="PyPI version"></a>
   <a href="https://github.com/flowfield-sh/flowfield-core/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/flowfield-sh/flowfield-core/tests.yml?branch=main&amp;label=tests" alt="Tests"></a>
-  <a href="https://github.com/flowfield-sh/flowfield-core/blob/main/docs/getting-started.mdx"><img src="https://github.com/flowfield-sh/flowfield-core/actions/workflows/docs.yml/badge.svg?branch=main" alt="Documentation"></a>
+  <a href="https://docs.flowfield.sh/getting-started"><img src="https://github.com/flowfield-sh/flowfield-core/actions/workflows/docs.yml/badge.svg?branch=main" alt="Documentation"></a>
 </p>
 
 ![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-overview.png)
@@ -26,7 +26,7 @@ flowfield serve
 ```
 
 Open [localhost:8765](http://127.0.0.1:8765). The browser UI is included.
-See [Installation](https://github.com/flowfield-sh/flowfield-core/blob/main/docs/installation.mdx) for the pip alternative.
+See [Installation](https://docs.flowfield.sh/installation) for the pip alternative.
 
 From an existing project directory:
 
@@ -43,8 +43,8 @@ model. Codex is the first supported harness; further integrations are planned.
 
 ## Documentation
 
-[Getting Started](https://github.com/flowfield-sh/flowfield-core/blob/main/docs/getting-started.mdx) · [Concepts](https://github.com/flowfield-sh/flowfield-core/blob/main/docs/concepts.mdx) ·
-[CLI](https://github.com/flowfield-sh/flowfield-core/blob/main/docs/cli.mdx) · [Agent integrations](https://github.com/flowfield-sh/flowfield-core/blob/main/docs/integrations/overview.mdx)
+[Getting Started](https://docs.flowfield.sh/getting-started) · [Concepts](https://docs.flowfield.sh/concepts) ·
+[CLI](https://docs.flowfield.sh/cli) · [Agent integrations](https://docs.flowfield.sh/integrations/overview)
 
 ## Build from source
 
