@@ -182,7 +182,7 @@ export function TaskTypeBadge({ type }: { type: TaskRevision["task_type"] }) {
   return (
     <Badge
       variant="outline"
-      className={`type-label ${{ feature: "border-blue-200 bg-blue-50 text-blue-700", bug: "border-orange-200 bg-orange-50 text-orange-700", investigation: "border-violet-200 bg-violet-50 text-violet-700", maintenance: "border-slate-200 bg-slate-50 text-slate-700" }[type]}`}
+      className={`type-label ${{ feature: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200", bug: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-200", investigation: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-200", maintenance: "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200" }[type]}`}
     >
       {label(type)}
     </Badge>

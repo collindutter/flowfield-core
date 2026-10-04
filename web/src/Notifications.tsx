@@ -1,3 +1,4 @@
+import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { ContentStack, DetailHeading } from "./DetailLayout";
 import { Timestamp } from "./Timestamp";
 import {
@@ -368,14 +369,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 export function NotificationButton() {
   const { show, count } = useNotifications();
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      className="notification-button px-0"
+    <SidebarMenuButton
+      className="relative"
+      tooltip={count ? `Notifications (${count})` : "Notifications"}
+      aria-label={count ? `Notifications (${count})` : "Notifications"}
       onClick={show}
     >
-      <Bell aria-hidden="true" /> Notifications{" "}
-      {count ? <span>{count}</span> : null}
-    </Button>
+      <Bell aria-hidden="true" />
+      <span className="group-data-[collapsible=icon]:hidden">
+        Notifications{count ? ` (${count})` : ""}
+      </span>
+      {count > 0 && (
+        <span className="hidden group-data-[collapsible=icon]:block absolute right-1 top-1 size-1.5 rounded-full bg-primary" />
+      )}
+    </SidebarMenuButton>
   );
 }

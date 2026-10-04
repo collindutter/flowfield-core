@@ -4,7 +4,7 @@
   overflow: hidden;
 }
 .workspace-sidebar-header {
-  height: 60px;
+  height: 64px;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
@@ -15,6 +15,8 @@
   font-size: 16px;
   font-weight: 650;
   letter-spacing: -0.025em;
+  color: var(--foreground);
+  text-decoration: none;
 }
 .workspace-projects {
   padding: 8px 12px;
@@ -98,8 +100,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 60px;
-  padding: 16px 20px;
+  height: 64px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--border);
 }
 .workspace-pane-header h1,
@@ -128,4 +130,97 @@
   .workspace-frame [data-slot="sidebar-container"] {
     transition: none;
   }
+}
+.workspace-work-only {
+  flex: 1;
+}
+.workspace-mobile-bar {
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+@media (max-width: 767px) {
+  .workspace-mobile-bar {
+    display: flex;
+  }
+}
+.workspace-project-tabs {
+  flex-shrink: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.workspace-project-tabs [role="tablist"] {
+  height: 46px;
+  width: max-content;
+}
+.workspace-work-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.workspace-work-content > * {
+  flex-shrink: 0;
+}
+.workspace-pane > .welcome,
+.workspace-pane > .setup-instructions {
+  overflow-y: auto;
+  padding: 24px;
+}
+.workspace-pane-header h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: normal;
+}
+.nav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  border-radius: 4px;
+  padding: 0 5px;
+  font-size: 11px;
+  background: var(--chrome);
+}
+.nav-count.needs-attention {
+  color: var(--warning-foreground);
+  background: var(--warning-background);
+}
+.theme-menu {
+  z-index: 70;
+  min-width: 150px;
+  border: 1px solid var(--border);
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 4px 12px #0002;
+}
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+}
+.theme-option[data-highlighted] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.theme-check {
+  width: 14px;
+}
+.workspace-project-view {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
 }

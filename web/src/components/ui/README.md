@@ -9,8 +9,9 @@ sidebar skeleton width is deterministic rather than random; the generated mobile
 uses useSyncExternalStore to meet this repository's React purity rules; badges use the
 shared compact rounded radius instead of the registry's pill default. Outline buttons explicitly
 use foreground text so linked actions and buttons inside muted containers match ordinary buttons. Formatting follows
-the repository. The application uses the fixed Sidebar variant and its own
-responsive layout; sheet support remains an upstream sidebar dependency.
+the repository. The application uses the icon-collapsible Sidebar and its mobile
+sheet. Hidden tooltip content is omitted so it cannot intercept the pointer grace
+area of the next visible tooltip.
 
 Application-specific layout, colors for task types, router integration, and retained
 editor drafts live outside this directory. The `cn` utility package is the official

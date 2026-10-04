@@ -4,19 +4,12 @@ import { TaskNeeds, TaskState, hasTaskNeeds } from "./TaskNeeds";
 import { SetupInstructions } from "./SetupInstructions";
 import { taskTab } from "./navigation";
 import { NotificationButton, useNotifications } from "./Notifications";
-import { WorkspaceLink } from "./WorkspaceLink";
-import { ProjectNameLink } from "./ProjectNameLink";
+import { WorkspaceFrame } from "./WorkspaceFrame";
+import { ThemeMenu } from "./ThemeMenu";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ContentStack } from "./DetailLayout";
 import { Card } from "@/components/ui/card";
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarMenuButton,
-} from "@/components/ui/sidebar";
 import {
   Settings,
   Columns3,
@@ -29,7 +22,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
-import { createPortal } from "react-dom";
 import { EntityOverlay } from "./EntityOverlay";
 import { DecisionDetail } from "./Decisions";
 import { DetailHeader } from "./Presentation";
@@ -106,9 +98,6 @@ export function App() {
   );
   useBrowserNotifications(changeLocation);
   const projectId = params.projectId;
-  const [sidebarTarget, setSidebarTarget] = useState<HTMLDivElement | null>(
-    null,
-  );
   useEffect(() => {
     let active = true;
     request<Project[]>("projects")
@@ -172,123 +161,101 @@ export function App() {
     action();
   }
   return (
-    <SidebarProvider className="shell">
-      <Sidebar
-        collapsible="none"
-        className="sidebar h-dvh w-[248px] max-[700px]:h-auto max-[700px]:w-full"
-      >
-        <SidebarHeader className="p-0">
-          <WorkspaceLink className="brand" to="/">
-            <span className="brand-mark">f</span> flowfield
-          </WorkspaceLink>
-        </SidebarHeader>
-        <SidebarContent className="max-[700px]:flex-none max-[700px]:overflow-visible">
-          <p className="eyebrow">Projects</p>
-          <nav aria-label="Projects">
-            {projects.map((project) => (
-              <div className="project-group" key={project.id}>
-                <div className="project-nav-heading">
-                  <h2 className="project-nav-title">
-                    <ProjectNameLink
-                      name={project.name}
-                      to={projectHref(project.id)}
-                    />
-                  </h2>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    className="project-settings"
-                    aria-label={
-                      projectId === project.id
-                        ? "Project details"
-                        : "Settings for " + project.name
-                    }
-                    title="Project settings"
-                    onClick={() =>
-                      changeLocation(projectHref(project.id) + "/edit")
-                    }
-                  >
-                    <Settings />
-                  </Button>
-                </div>
-                {projectId === project.id && <div ref={setSidebarTarget} />}
-              </div>
-            ))}
-          </nav>
-        </SidebarContent>
-        <SidebarFooter className="sidebar-bottom px-0">
-          <NotificationButton />
-          <p className="connection" role="status">
-            <span className={live ? "live-dot" : "live-dot offline"} />
-            {connected
-              ? live
-                ? "Connected"
-                : navigator.onLine
-                  ? "Reconnecting…"
-                  : "Disconnected"
-              : loading
-                ? "Connecting…"
-                : "Disconnected"}
-          </p>
-        </SidebarFooter>
-      </Sidebar>
-      <main className="content-stack" data-space="section">
-        {error && (
-          <Alert variant="destructive">
-            <CircleAlert aria-hidden="true" />
-            <AlertTitle>Could not refresh the workspace</AlertTitle>
-            <AlertDescription>
-              <p>{error}</p>
-            </AlertDescription>
-          </Alert>
-        )}
-        {!connected ? (
-          <section className="welcome">
-            <h1>
-              {loading ? "Opening your workspace" : "Service unavailable"}
-            </h1>
-            {!loading && (
-              <>
-                <p>Check that Flowfield is running, then try again.</p>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setLoading(true);
-                    setRefresh((v) => v + 1);
-                  }}
-                >
-                  Retry connection
-                </Button>
-              </>
+    <>
+      <WorkspaceFrame
+        projects={projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          href: projectHref(project.id),
+        }))}
+        activeProjectId={projectId ?? ""}
+        onProjectSelect={(project) => changeLocation(project.href)}
+        onHome={() => changeLocation("/")}
+        footer={
+          <>
+            <ThemeMenu />
+            <NotificationButton />
+            <p
+              className="connection"
+              role="status"
+              title={
+                connected ? (live ? "Connected" : "Disconnected") : "Connecting"
+              }
+            >
+              <span className={live ? "live-dot" : "live-dot offline"} />
+              <span className="group-data-[collapsible=icon]:sr-only">
+                {connected
+                  ? live
+                    ? "Connected"
+                    : navigator.onLine
+                      ? "Reconnecting…"
+                      : "Disconnected"
+                  : loading
+                    ? "Connecting…"
+                    : "Disconnected"}
+              </span>
+            </p>
+          </>
+        }
+        work={
+          <>
+            {error && (
+              <Alert variant="destructive">
+                <CircleAlert aria-hidden="true" />
+                <AlertTitle>Could not refresh the workspace</AlertTitle>
+                <AlertDescription>
+                  <p>{error}</p>
+                </AlertDescription>
+              </Alert>
             )}
-          </section>
-        ) : notFound ? (
-          <section className="welcome">
-            <h1>Page not found</h1>
-            <p>Choose a project to return to your workspace.</p>
-          </section>
-        ) : projectId ? (
-          <ProjectBoard
-            key={projectId}
-            projectId={projectId}
-            refresh={`${refresh}:${projectRefresh[projectId] ?? 0}`}
-            params={params}
-            pathname={pathname}
-            backgroundPath={backgroundPath}
-            closeEntity={closeEntity}
-            sidebarTarget={sidebarTarget}
-            changeLocation={changeLocation}
-            navigate={navigate}
-            setUnsaved={setUnsaved}
-            setOverlayDirty={setOverlayDirty}
-            closeQuestion={closeQuestion}
-          />
-        ) : (
-          <SetupInstructions />
-        )}
-      </main>
+            {!connected ? (
+              <section className="welcome">
+                <h1>
+                  {loading ? "Opening your workspace" : "Service unavailable"}
+                </h1>
+                {!loading && (
+                  <>
+                    <p>Check that Flowfield is running, then try again.</p>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setLoading(true);
+                        setRefresh((v) => v + 1);
+                      }}
+                    >
+                      Retry connection
+                    </Button>
+                  </>
+                )}
+              </section>
+            ) : notFound ? (
+              <section className="welcome">
+                <h1>Page not found</h1>
+                <p>Choose a project to return to your workspace.</p>
+              </section>
+            ) : projectId ? (
+              <ProjectBoard
+                key={projectId}
+                projectId={projectId}
+                refresh={`${refresh}:${projectRefresh[projectId] ?? 0}`}
+                params={params}
+                pathname={pathname}
+                backgroundPath={backgroundPath}
+                closeEntity={closeEntity}
+                changeLocation={changeLocation}
+                navigate={navigate}
+                setUnsaved={setUnsaved}
+                setOverlayDirty={setOverlayDirty}
+                closeQuestion={closeQuestion}
+              />
+            ) : (
+              <SetupInstructions />
+            )}
+          </>
+        }
+      />
       <DiscardChangesDialog {...discardChanges} />
-    </SidebarProvider>
+    </>
   );
 }
 
@@ -304,7 +271,6 @@ function ProjectBoard({
   closeQuestion,
   closeEntity,
   backgroundPath,
-  sidebarTarget,
 }: {
   projectId: string;
   refresh: string;
@@ -317,7 +283,6 @@ function ProjectBoard({
   closeQuestion: () => void;
   closeEntity: (fallback: string) => void;
   backgroundPath?: string;
-  sidebarTarget: HTMLDivElement | null;
 }) {
   const { notify } = useNotifications();
   const [retry, setRetry] = useState(0);
@@ -439,11 +404,6 @@ function ProjectBoard({
       changeLocation(selectionUrl(next));
     });
   }
-  function showArchive(value: boolean) {
-    navigate(() => {
-      changeLocation(projectHref(projectId) + (value ? "/archive" : ""));
-    });
-  }
   function saved(kind: Selection["kind"], item: WorkRecord) {
     // Invalidate older in-flight snapshots before applying a completed mutation.
     invalidate();
@@ -514,6 +474,15 @@ function ProjectBoard({
         : board.milestones.find(
             (e) => e.id === selection?.id || e.key === selection?.id,
           );
+  const view = showInbox
+    ? "inbox"
+    : decisionsView
+      ? "decisions"
+      : milestonesView
+        ? "milestones"
+        : archive
+          ? "archive"
+          : "board";
   const editorPanel = (
     <>
       {selection?.id &&
@@ -601,281 +570,195 @@ function ProjectBoard({
   );
   return (
     <>
-      {sidebarTarget &&
-        createPortal(
-          <>
-            {/* Project navigation stays beside its project, not above the board. */}{" "}
-            <nav className="project-views" aria-label="Project views">
-              <SidebarMenuButton
-                className={
-                  !archive && !decisionsView && !showInbox && !milestonesView
-                    ? "tab active"
-                    : "tab"
-                }
-                onClick={() => showArchive(false)}
-              >
-                <Columns3 aria-hidden="true" /> Board
-                {activeTasks.length > 0 && (
-                  <span className="nav-count">{activeTasks.length}</span>
-                )}
-              </SidebarMenuButton>
-              <SidebarMenuButton
-                className={`tab${showInbox ? " active" : ""}${board.needs_you_count ? " needs-attention" : ""}`}
-                onClick={() =>
-                  navigate(() =>
-                    changeLocation(projectHref(projectId) + "/inbox"),
-                  )
-                }
-              >
-                <Inbox aria-hidden="true" /> Needs you
-                {board.needs_you_count > 0 && (
-                  <span className="nav-count">{board.needs_you_count}</span>
-                )}
-              </SidebarMenuButton>
-              <SidebarMenuButton
-                className={milestonesView ? "tab active" : "tab"}
-                onClick={() =>
-                  changeLocation(projectHref(projectId) + "/milestones")
-                }
-              >
-                <Flag aria-hidden="true" /> Milestones
-                {board.milestones.length > 0 && (
-                  <span className="nav-count">{board.milestones.length}</span>
-                )}
-              </SidebarMenuButton>
-              <SidebarMenuButton
-                className={decisionsView ? "tab active" : "tab"}
-                onClick={() =>
-                  navigate(() =>
-                    changeLocation(projectHref(projectId) + "/decisions"),
-                  )
-                }
-              >
-                <ListChecks aria-hidden="true" /> Decisions
-              </SidebarMenuButton>
-              <SidebarMenuButton
-                className={
-                  archive && !decisionsView && !showInbox ? "tab active" : "tab"
-                }
-                onClick={() => showArchive(true)}
-              >
-                <Archive aria-hidden="true" /> Archive
-                {board.tasks.length > activeTasks.length && (
-                  <span className="nav-count">
-                    {board.tasks.length - activeTasks.length}
-                  </span>
-                )}
-              </SidebarMenuButton>
-            </nav>
-          </>,
-          sidebarTarget,
-        )}
-      <header className="project-header">
-        <div>
-          <p className="eyebrow">
-            Project /{" "}
-            {showInbox
-              ? "Needs you"
-              : decisionsView
-                ? "Decisions"
-                : archive
-                  ? "Archive"
-                  : milestonesView
-                    ? "Milestones"
-                    : "Board"}
-          </p>
-          <h1>{board.project.name}</h1>
-        </div>
-        <div className="board-toolbar">
-          {decisionsView && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                navigate(() =>
-                  changeLocation(projectHref(projectId) + "/decisions/new"),
-                )
-              }
-            >
-              New decision
-            </Button>
-          )}
-          {milestonesView && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => choose({ kind: "milestone" })}
-            >
-              New milestone
-            </Button>
-          )}
-          {!decisionsView && !showInbox && !milestonesView && (
-            <div className="actions">
-              <Label className="field filter-label">
-                <span className="sr-only">Filter by milestone</span>
-                <NativeSelect
-                  size="sm"
-                  aria-label="Filter by milestone"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  <option value="">All work</option>
-                  <option value="none">Without a milestone</option>
-                  {board.milestones.map((milestone) => (
-                    <option key={milestone.id} value={milestone.id}>
-                      {milestone.key} · {milestone.title}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Label>
-              <Button
-                size="sm"
-                variant="outline"
-                className="quiet"
-                onClick={() =>
-                  choose(
-                    filter && filter !== "none"
-                      ? { kind: "milestone", id: filter }
-                      : { kind: "milestone" },
-                  )
-                }
-              >
-                {filter && filter !== "none"
-                  ? "Edit milestone"
-                  : "New milestone"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => choose({ kind: "task" })}
-              >
-                New task
-              </Button>
-            </div>
-          )}
-        </div>
+      <header className="workspace-pane-header">
+        <h1>{board.project.name}</h1>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label="Project details"
+          onClick={() => choose({ kind: "project", id: projectId })}
+        >
+          <Settings />
+        </Button>
       </header>
-      {milestonesView ? (
-        <section className="collection-view" aria-label="Milestones">
-          <CollectionLayout>
-            <MilestoneList
-              board={board}
-              selected={selection?.id}
-              open={(id) => choose({ kind: "milestone", id })}
-            />
-          </CollectionLayout>
-        </section>
-      ) : showInbox ? (
-        <AttentionBoard
-          projectId={projectId}
-          identity={params.questionId}
-          refresh={refresh}
-        />
-      ) : decisionsView ? (
-        <Decisions
-          projectId={projectId}
-          identity={params.decisionId}
-          refresh={refresh}
-          open={(url) => navigate(() => changeLocation(url))}
-        />
-      ) : (
-        <ContentStack space="section">
-          {error && (
-            <Alert variant="destructive">
-              <CircleAlert aria-hidden="true" />
-              <AlertTitle>Could not refresh the board</AlertTitle>
-              <AlertDescription>
-                <ContentStack>
-                  <p>{error}</p>
-                  <Button
+      <Tabs
+        className="workspace-project-view"
+        activationMode="manual"
+        value={view}
+        onValueChange={(value) =>
+          changeLocation(
+            projectHref(projectId) + (value === "board" ? "" : "/" + value),
+          )
+        }
+      >
+        <div className="workspace-project-tabs">
+          <TabsList variant="line" aria-label="Project views">
+            <TabsTrigger value="board">
+              <Columns3 /> Board
+              {activeTasks.length > 0 && (
+                <span className="nav-count">{activeTasks.length}</span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="inbox">
+              <Inbox /> Needs you
+              {board.needs_you_count > 0 && (
+                <span className="nav-count needs-attention">
+                  {board.needs_you_count}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="milestones">
+              <Flag /> Milestones
+              {board.milestones.length > 0 && (
+                <span className="nav-count">{board.milestones.length}</span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="decisions">
+              <ListChecks /> Decisions
+            </TabsTrigger>
+            <TabsTrigger value="archive">
+              <Archive /> Archive
+              {board.tasks.length > activeTasks.length && (
+                <span className="nav-count">
+                  {board.tasks.length - activeTasks.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value={view} className="workspace-work-content">
+          <div className="board-toolbar">
+            {decisionsView && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  navigate(() =>
+                    changeLocation(projectHref(projectId) + "/decisions/new"),
+                  )
+                }
+              >
+                New decision
+              </Button>
+            )}
+            {milestonesView && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => choose({ kind: "milestone" })}
+              >
+                New milestone
+              </Button>
+            )}
+            {!decisionsView && !showInbox && !milestonesView && (
+              <div className="actions">
+                <Label className="field filter-label">
+                  <span className="sr-only">Filter by milestone</span>
+                  <NativeSelect
                     size="sm"
-                    variant="outline"
-                    onClick={() => setRetry((v) => v + 1)}
+                    aria-label="Filter by milestone"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
                   >
-                    Refresh board
-                  </Button>
-                </ContentStack>
-              </AlertDescription>
-            </Alert>
-          )}
-          <div className={archive ? "collection-layout" : "board-layout"}>
-            {archive ? (
-              <ArchiveList
-                projectId={projectId}
-                tasks={visible}
-                milestones={board.milestones}
-                selection={selection}
-                filtered={!!filter}
-                choose={choose}
-              />
-            ) : (
-              <div className="board" aria-label="Task board">
-                {columns.map((column) => {
-                  const tasks = visible
-                    .filter((t) => t.status === column)
-                    .sort(compareTasks);
-                  return (
-                    <section
-                      className={`column ${column} ${dropTarget?.status === column && dropTarget.before === null ? "drop-at-end" : ""}`}
-                      aria-label={label(column)}
-                      key={column}
-                      onDragOver={(e) => {
-                        if (
-                          !dragged ||
-                          archive ||
-                          !isUpcoming(column) ||
-                          prioritizing
-                        )
-                          return;
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                        setDropTarget({ status: column, before: null });
-                      }}
-                      onDrop={(e) => {
-                        if (!dragged || archive || !isUpcoming(column)) return;
-                        e.preventDefault();
-                        if (dropTarget?.before === dragged.id) {
-                          setDragged(null);
-                          setDropTarget(null);
-                          return;
-                        }
-                        void prioritize(
-                          dragged,
-                          column,
-                          dropTarget?.status === column
-                            ? dropTarget.before
-                            : null,
-                        );
-                        setDragged(null);
-                        setDropTarget(null);
-                      }}
-                    >
-                      <h2>
-                        {label(column)}
-                        <span className="count">{tasks.length}</span>
-                      </h2>
-                      {column === "up_next" && (
-                        <QueueControls
-                          projectId={projectId}
-                          refresh={refresh}
-                        />
-                      )}
-                      {tasks.map((task) => (
-                        <div
-                          className={`card-shell ${dragged?.id === task.id ? "dragging" : ""} ${dropTarget?.before === task.id ? "drop-before" : ""}`}
-                          key={task.id}
-                          draggable={
-                            !archive && isUpcoming(column) && !prioritizing
-                          }
-                          onDragStart={(e) => {
-                            setDragged(task);
-                            e.dataTransfer.effectAllowed = "move";
-                            e.dataTransfer.setData("text/plain", task.id);
-                          }}
-                          onDragEnd={() => {
-                            setDragged(null);
-                            setDropTarget(null);
-                          }}
+                    <option value="">All work</option>
+                    <option value="none">Without a milestone</option>
+                    {board.milestones.map((milestone) => (
+                      <option key={milestone.id} value={milestone.id}>
+                        {milestone.key} · {milestone.title}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Label>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="quiet"
+                  onClick={() =>
+                    choose(
+                      filter && filter !== "none"
+                        ? { kind: "milestone", id: filter }
+                        : { kind: "milestone" },
+                    )
+                  }
+                >
+                  {filter && filter !== "none"
+                    ? "Edit milestone"
+                    : "New milestone"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => choose({ kind: "task" })}
+                >
+                  New task
+                </Button>
+              </div>
+            )}
+          </div>
+          {milestonesView ? (
+            <section className="collection-view" aria-label="Milestones">
+              <CollectionLayout>
+                <MilestoneList
+                  board={board}
+                  selected={selection?.id}
+                  open={(id) => choose({ kind: "milestone", id })}
+                />
+              </CollectionLayout>
+            </section>
+          ) : showInbox ? (
+            <AttentionBoard
+              projectId={projectId}
+              identity={params.questionId}
+              refresh={refresh}
+            />
+          ) : decisionsView ? (
+            <Decisions
+              projectId={projectId}
+              identity={params.decisionId}
+              refresh={refresh}
+              open={(url) => navigate(() => changeLocation(url))}
+            />
+          ) : (
+            <ContentStack space="section">
+              {error && (
+                <Alert variant="destructive">
+                  <CircleAlert aria-hidden="true" />
+                  <AlertTitle>Could not refresh the board</AlertTitle>
+                  <AlertDescription>
+                    <ContentStack>
+                      <p>{error}</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRetry((v) => v + 1)}
+                      >
+                        Refresh board
+                      </Button>
+                    </ContentStack>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className={archive ? "collection-layout" : "board-layout"}>
+                {archive ? (
+                  <ArchiveList
+                    projectId={projectId}
+                    tasks={visible}
+                    milestones={board.milestones}
+                    selection={selection}
+                    filtered={!!filter}
+                    choose={choose}
+                  />
+                ) : (
+                  <div className="board" aria-label="Task board">
+                    {columns.map((column) => {
+                      const tasks = visible
+                        .filter((t) => t.status === column)
+                        .sort(compareTasks);
+                      return (
+                        <section
+                          className={`column ${column} ${dropTarget?.status === column && dropTarget.before === null ? "drop-at-end" : ""}`}
+                          aria-label={label(column)}
+                          key={column}
                           onDragOver={(e) => {
                             if (
                               !dragged ||
@@ -885,105 +768,167 @@ function ProjectBoard({
                             )
                               return;
                             e.preventDefault();
-                            e.stopPropagation();
                             e.dataTransfer.dropEffect = "move";
-                            const bounds =
-                              e.currentTarget.getBoundingClientRect();
-                            const upcoming = activeTasks
-                              .filter((t) => t.status === column)
-                              .sort(compareTasks);
-                            const index = upcoming.findIndex(
-                              (t) => t.id === task.id,
+                            setDropTarget({ status: column, before: null });
+                          }}
+                          onDrop={(e) => {
+                            if (!dragged || archive || !isUpcoming(column))
+                              return;
+                            e.preventDefault();
+                            if (dropTarget?.before === dragged.id) {
+                              setDragged(null);
+                              setDropTarget(null);
+                              return;
+                            }
+                            void prioritize(
+                              dragged,
+                              column,
+                              dropTarget?.status === column
+                                ? dropTarget.before
+                                : null,
                             );
-                            const before =
-                              e.clientY < bounds.top + bounds.height / 2
-                                ? task.id
-                                : (upcoming[index + 1]?.id ?? null);
-                            setDropTarget({ status: column, before });
+                            setDragged(null);
+                            setDropTarget(null);
                           }}
                         >
-                          <Card
-                            className={
-                              selection?.id === task.id &&
-                              selection.kind === "task"
-                                ? "task-card picked gap-1 p-3"
-                                : "task-card gap-1 p-3"
-                            }
-                          >
-                            <TaskIdentity
-                              task={task}
-                              title={
-                                <a
-                                  className="task-card-link"
-                                  aria-label={`${task.key} ${task.title}`}
-                                  href={taskHref(projectId, task)}
-                                  draggable={false}
-                                  onClick={(event) =>
-                                    followLink(event, () =>
-                                      choose({ kind: "task", id: task.id }),
-                                    )
-                                  }
-                                >
-                                  {task.title}
-                                </a>
-                              }
-                              labels={
-                                <>
-                                  <TaskTypeBadge type={task.task_type} />
-                                  <DraftBadge
-                                    publicationStatus={task.publication_status}
-                                  />
-                                  <MilestoneBadge
-                                    milestone={board.milestones.find(
-                                      (m) => m.id === task.milestone_id,
-                                    )}
-                                  />
-                                </>
-                              }
+                          <h2>
+                            {label(column)}
+                            <span className="count">{tasks.length}</span>
+                          </h2>
+                          {column === "up_next" && (
+                            <QueueControls
+                              projectId={projectId}
+                              refresh={refresh}
                             />
-                            {task.state?.tone !== "idle" && (
-                              <TaskState
-                                task={task}
-                                projectId={projectId}
-                                open={(id) => choose({ kind: "task", id })}
-                                linked
-                              />
-                            )}
-                            {hasTaskNeeds(
-                              task,
-                              board.pending_code[task.id],
-                              !task.state,
-                            ) && (
-                              <TaskNeeds
-                                task={task}
-                                projectId={projectId}
-                                pendingCode={board.pending_code[task.id]}
-                                showQuestions={!task.state}
-                                open={(id) => choose({ kind: "task", id })}
-                              />
-                            )}
-                          </Card>
-                        </div>
-                      ))}
-                      {!tasks.length && (
-                        <p className="empty-column">
-                          {column === "backlog"
-                            ? "Ideas and future work"
-                            : column === "up_next"
-                              ? "Choose what matters next"
-                              : column === "done"
-                                ? "Finished outcomes"
-                                : "No work here yet"}
-                        </p>
-                      )}
-                    </section>
-                  );
-                })}
+                          )}
+                          {tasks.map((task) => (
+                            <div
+                              className={`card-shell ${dragged?.id === task.id ? "dragging" : ""} ${dropTarget?.before === task.id ? "drop-before" : ""}`}
+                              key={task.id}
+                              draggable={
+                                !archive && isUpcoming(column) && !prioritizing
+                              }
+                              onDragStart={(e) => {
+                                setDragged(task);
+                                e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData("text/plain", task.id);
+                              }}
+                              onDragEnd={() => {
+                                setDragged(null);
+                                setDropTarget(null);
+                              }}
+                              onDragOver={(e) => {
+                                if (
+                                  !dragged ||
+                                  archive ||
+                                  !isUpcoming(column) ||
+                                  prioritizing
+                                )
+                                  return;
+                                e.preventDefault();
+                                e.stopPropagation();
+                                e.dataTransfer.dropEffect = "move";
+                                const bounds =
+                                  e.currentTarget.getBoundingClientRect();
+                                const upcoming = activeTasks
+                                  .filter((t) => t.status === column)
+                                  .sort(compareTasks);
+                                const index = upcoming.findIndex(
+                                  (t) => t.id === task.id,
+                                );
+                                const before =
+                                  e.clientY < bounds.top + bounds.height / 2
+                                    ? task.id
+                                    : (upcoming[index + 1]?.id ?? null);
+                                setDropTarget({ status: column, before });
+                              }}
+                            >
+                              <Card
+                                className={
+                                  selection?.id === task.id &&
+                                  selection.kind === "task"
+                                    ? "task-card picked gap-1 p-3"
+                                    : "task-card gap-1 p-3"
+                                }
+                              >
+                                <TaskIdentity
+                                  task={task}
+                                  title={
+                                    <a
+                                      className="task-card-link"
+                                      aria-label={`${task.key} ${task.title}`}
+                                      href={taskHref(projectId, task)}
+                                      draggable={false}
+                                      onClick={(event) =>
+                                        followLink(event, () =>
+                                          choose({ kind: "task", id: task.id }),
+                                        )
+                                      }
+                                    >
+                                      {task.title}
+                                    </a>
+                                  }
+                                  labels={
+                                    <>
+                                      <TaskTypeBadge type={task.task_type} />
+                                      <DraftBadge
+                                        publicationStatus={
+                                          task.publication_status
+                                        }
+                                      />
+                                      <MilestoneBadge
+                                        milestone={board.milestones.find(
+                                          (m) => m.id === task.milestone_id,
+                                        )}
+                                      />
+                                    </>
+                                  }
+                                />
+                                {task.state?.tone !== "idle" && (
+                                  <TaskState
+                                    task={task}
+                                    projectId={projectId}
+                                    open={(id) => choose({ kind: "task", id })}
+                                    linked
+                                  />
+                                )}
+                                {hasTaskNeeds(
+                                  task,
+                                  board.pending_code[task.id],
+                                  !task.state,
+                                ) && (
+                                  <TaskNeeds
+                                    task={task}
+                                    projectId={projectId}
+                                    pendingCode={board.pending_code[task.id]}
+                                    showQuestions={!task.state}
+                                    open={(id) => choose({ kind: "task", id })}
+                                  />
+                                )}
+                              </Card>
+                            </div>
+                          ))}
+                          {!tasks.length && (
+                            <p className="empty-column">
+                              {column === "backlog"
+                                ? "Ideas and future work"
+                                : column === "up_next"
+                                  ? "Choose what matters next"
+                                  : column === "done"
+                                    ? "Finished outcomes"
+                                    : "No work here yet"}
+                            </p>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </ContentStack>
-      )}
+            </ContentStack>
+          )}
+        </TabsContent>
+      </Tabs>
       {selection && (
         <EntityOverlay
           identity={`${selection.kind}:${selection.id ?? "new"}`}

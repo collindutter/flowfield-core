@@ -106,3 +106,28 @@ test("mobile drawer, surface tabs and viewport changes keep the composer usable"
     page.getByRole("heading", { name: "Atlas", exact: true }),
   ).toBeVisible();
 });
+
+test("pane headers align and columns retain separation in both themes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  const headers = page.locator(".workspace-pane-header");
+  const coordinator = await headers.nth(0).boundingBox();
+  const project = await headers.nth(1).boundingBox();
+  expect(coordinator?.height).toBe(project?.height);
+  expect(coordinator?.y).toBe(project?.y);
+  await expect(page.locator(".fixture-composer")).not.toContainText("Harbor");
+  for (const theme of ["Dark", "Light"]) {
+    await page.getByRole("button", { name: /^Appearance:/ }).click();
+    await page.getByRole("menuitemradio", { name: theme, exact: true }).click();
+    const columnColor = await page
+      .locator(".fixture-column")
+      .first()
+      .evaluate((node) => getComputedStyle(node).backgroundColor);
+    const cardColor = await page
+      .locator(".fixture-task")
+      .first()
+      .evaluate((node) => getComputedStyle(node).backgroundColor);
+    expect(columnColor).not.toBe(cardColor);
+  }
+});

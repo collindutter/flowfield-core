@@ -33,8 +33,12 @@ function TooltipContent({
   className,
   sideOffset = 0,
   children,
+  hidden,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+  // An invisible content element still participates in Radix's pointer grace area.
+  // Omit it so a suppressed tooltip cannot prevent the next trigger from opening.
+  if (hidden) return null;
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content

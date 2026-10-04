@@ -49,12 +49,12 @@
   min-height: 92px;
   max-height: 180px;
   resize: vertical;
-  background: white;
+  background: var(--background);
 }
 .fixture-composer-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 .fixture-work-navigation {
   flex-shrink: 0;
@@ -71,6 +71,11 @@
   background: var(--chrome);
 }
 .fixture-column {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 355px;
   display: grid;
   align-content: start;
   gap: 12px;

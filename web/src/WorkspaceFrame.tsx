@@ -1,5 +1,7 @@
 import {
   useState,
+  useEffect,
+  useRef,
   useSyncExternalStore,
   type CSSProperties,
   type ReactNode,
@@ -23,6 +25,11 @@ import {
 } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectBadge } from "./ProjectBadge";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import "./workspace-frame.css";
 
 export type WorkspaceProject = { id: string; name: string; href: string };
@@ -33,24 +40,103 @@ function subscribeCompact(callback: () => void) {
   return () => query.removeEventListener("change", callback);
 }
 
+function ProjectItem({
+  project,
+  active,
+  select,
+}: {
+  project: WorkspaceProject;
+  active: boolean;
+  select: () => void;
+}) {
+  const text = useRef<HTMLSpanElement>(null);
+  const [truncated, setTruncated] = useState(false);
+  const { state, isMobile } = useSidebar();
+  useEffect(() => {
+    const node = text.current;
+    if (!node) return;
+    const measure = () => setTruncated(node.scrollWidth > node.clientWidth);
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    measure();
+    return () => observer.disconnect();
+  }, [project.name]);
+  return (
+    <SidebarMenuItem>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SidebarMenuButton asChild size="lg" isActive={active}>
+            <a
+              href={project.href}
+              aria-label={project.name}
+              aria-current={active ? "page" : undefined}
+              onClick={(event) => {
+                if (
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                )
+                  return;
+                event.preventDefault();
+                select();
+              }}
+            >
+              <ProjectBadge id={project.id} name={project.name} />
+              <span ref={text} className="group-data-[collapsible=icon]:hidden">
+                {project.name}
+              </span>
+            </a>
+          </SidebarMenuButton>
+        </TooltipTrigger>
+        {(truncated || (state === "collapsed" && !isMobile)) && (
+          <TooltipContent side="right" className="max-w-xs">
+            {project.name}
+          </TooltipContent>
+        )}
+      </Tooltip>
+    </SidebarMenuItem>
+  );
+}
+
 function ProjectNavigation({
   projects,
   activeProjectId,
   onProjectSelect,
   footer,
+  onHome,
 }: {
   projects: WorkspaceProject[];
   activeProjectId: string;
   onProjectSelect: (project: WorkspaceProject) => void;
   footer?: ReactNode;
+  onHome?: () => void;
 }) {
   const { setOpenMobile, state, isMobile } = useSidebar();
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="workspace-sidebar-header">
-        <span className="workspace-wordmark group-data-[collapsible=icon]:hidden">
+        <a
+          href="/"
+          onClick={(event) => {
+            if (
+              !onHome ||
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            )
+              return;
+            event.preventDefault();
+            onHome();
+            setOpenMobile(false);
+          }}
+          className="workspace-wordmark group-data-[collapsible=icon]:hidden"
+        >
           Flowfield
-        </span>
+        </a>
         <SidebarTrigger
           aria-label={
             isMobile
@@ -62,47 +148,22 @@ function ProjectNavigation({
           aria-expanded={isMobile || state === "expanded"}
         />
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="group-data-[collapsible=icon]:overflow-y-auto">
         <nav aria-label="Projects" className="workspace-projects">
           <p className="workspace-projects-label group-data-[collapsible=icon]:hidden">
             Projects
           </p>
           <SidebarMenu className="gap-2">
             {projects.map((project) => (
-              <SidebarMenuItem key={project.id}>
-                <SidebarMenuButton
-                  asChild
-                  size="lg"
-                  isActive={project.id === activeProjectId}
-                  tooltip={project.name}
-                >
-                  <a
-                    href={project.href}
-                    aria-label={project.name}
-                    aria-current={
-                      project.id === activeProjectId ? "page" : undefined
-                    }
-                    onClick={(event) => {
-                      if (
-                        event.button !== 0 ||
-                        event.metaKey ||
-                        event.ctrlKey ||
-                        event.shiftKey ||
-                        event.altKey
-                      )
-                        return;
-                      event.preventDefault();
-                      onProjectSelect(project);
-                      setOpenMobile(false);
-                    }}
-                  >
-                    <ProjectBadge id={project.id} name={project.name} />
-                    <span className="group-data-[collapsible=icon]:hidden">
-                      {project.name}
-                    </span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <ProjectItem
+                key={project.id}
+                project={project}
+                active={project.id === activeProjectId}
+                select={() => {
+                  onProjectSelect(project);
+                  setOpenMobile(false);
+                }}
+              />
             ))}
           </SidebarMenu>
         </nav>
@@ -120,13 +181,15 @@ export function WorkspaceFrame({
   coordinator,
   work,
   footer,
+  onHome,
 }: {
   projects: WorkspaceProject[];
   activeProjectId: string;
   onProjectSelect: (project: WorkspaceProject) => void;
-  coordinator: ReactNode;
+  coordinator?: ReactNode;
   work: ReactNode;
   footer?: ReactNode;
+  onHome?: () => void;
 }) {
   const compact = useSyncExternalStore(
     subscribeCompact,
@@ -157,79 +220,96 @@ export function WorkspaceFrame({
         activeProjectId={activeProjectId}
         onProjectSelect={onProjectSelect}
         footer={footer}
+        onHome={onHome}
       />
       <main className="workspace-main">
-        <Tabs
-          value={surface}
-          onValueChange={setSurface}
-          className="workspace-surfaces"
-        >
-          {compact && (
-            <div className="workspace-surface-switch">
-              <SidebarTrigger
-                className="md:hidden"
-                aria-label="Open projects"
-              />
-              <TabsList aria-label="Workspace surface">
-                <TabsTrigger value="coordinator">Coordinator</TabsTrigger>
-                <TabsTrigger value="work">Work</TabsTrigger>
-              </TabsList>
+        {coordinator == null ? (
+          <div className="workspace-pane workspace-work-only">
+            <div className="workspace-mobile-bar md:hidden">
+              <SidebarTrigger aria-label="Open projects" />
+              <span>Flowfield</span>
             </div>
-          )}
-          <ResizablePanelGroup
-            orientation="horizontal"
-            disabled={compact}
-            className="workspace-panels"
+            {work}
+          </div>
+        ) : (
+          <Tabs
+            value={surface}
+            onValueChange={setSurface}
+            className="workspace-surfaces"
           >
-            <ResizablePanel
-              id="coordinator"
-              defaultSize="440px"
-              minSize={
-                compact ? (surface === "coordinator" ? "100%" : "0%") : "360px"
-              }
-              maxSize={
-                compact
-                  ? surface === "coordinator"
-                    ? "100%"
-                    : "0%"
-                  : undefined
-              }
+            {compact && (
+              <div className="workspace-surface-switch">
+                <SidebarTrigger
+                  className="md:hidden"
+                  aria-label="Open projects"
+                />
+                <TabsList aria-label="Workspace surface">
+                  <TabsTrigger value="coordinator">Coordinator</TabsTrigger>
+                  <TabsTrigger value="work">Work</TabsTrigger>
+                </TabsList>
+              </div>
+            )}
+            <ResizablePanelGroup
+              orientation="horizontal"
+              disabled={compact}
+              className="workspace-panels"
             >
-              <TabsContent
-                forceMount
-                value="coordinator"
-                aria-label="Coordinator"
-                className="workspace-pane"
-                inert={compact && surface !== "coordinator"}
-                aria-hidden={compact && surface !== "coordinator"}
+              <ResizablePanel
+                id="coordinator"
+                defaultSize="440px"
+                minSize={
+                  compact
+                    ? surface === "coordinator"
+                      ? "100%"
+                      : "0%"
+                    : "360px"
+                }
+                maxSize={
+                  compact
+                    ? surface === "coordinator"
+                      ? "100%"
+                      : "0%"
+                    : undefined
+                }
               >
-                {coordinator}
-              </TabsContent>
-            </ResizablePanel>
-            <ResizableHandle
-              aria-label="Resize coordinator and work"
-              className={compact ? "hidden" : "workspace-divider"}
-            />
-            <ResizablePanel
-              id="work"
-              minSize={compact ? (surface === "work" ? "100%" : "0%") : "320px"}
-              maxSize={
-                compact ? (surface === "work" ? "100%" : "0%") : undefined
-              }
-            >
-              <TabsContent
-                forceMount
-                value="work"
-                aria-label="Project work"
-                className="workspace-pane"
-                inert={compact && surface !== "work"}
-                aria-hidden={compact && surface !== "work"}
+                <TabsContent
+                  forceMount
+                  value="coordinator"
+                  aria-label="Coordinator"
+                  className="workspace-pane"
+                  inert={compact && surface !== "coordinator"}
+                  aria-hidden={compact && surface !== "coordinator"}
+                >
+                  {coordinator}
+                </TabsContent>
+              </ResizablePanel>
+              <ResizableHandle
+                aria-label="Resize coordinator and work"
+                className={compact ? "hidden" : "workspace-divider"}
+              />
+              <ResizablePanel
+                id="work"
+                minSize={
+                  compact ? (surface === "work" ? "100%" : "0%") : "320px"
+                }
+                maxSize={
+                  compact ? (surface === "work" ? "100%" : "0%") : undefined
+                }
               >
-                {work}
-              </TabsContent>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </Tabs>
+                <TabsContent
+                  forceMount
+                  value="work"
+                  aria-label="Project work"
+                  className="workspace-pane"
+                  inert={compact && surface !== "work"}
+                  aria-hidden={compact && surface !== "work"}
+                >
+                  {work}
+                </TabsContent>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </Tabs>
+        )}
       </main>
     </SidebarProvider>
   );

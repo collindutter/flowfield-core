@@ -1,6 +1,7 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ArrowUp, Bell, Settings } from "lucide-react";
+import { ThemeMenu } from "../../../src/ThemeMenu";
 import { WorkspaceFrame } from "../../../src/WorkspaceFrame";
 import { TaskIdentity } from "../../../src/Presentation";
 import { ContentStack, DetailSection } from "../../../src/DetailLayout";
@@ -100,17 +101,20 @@ function Fixture() {
           window.history.replaceState(null, "", next.href);
         }}
         footer={
-          <Button
-            variant="ghost"
-            className="justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0"
-            aria-label="Notifications"
-            onClick={() => setUtility("Notifications")}
-          >
-            <Bell />
-            <span className="group-data-[collapsible=icon]:hidden">
-              Notifications
-            </span>
-          </Button>
+          <>
+            <ThemeMenu />
+            <Button
+              variant="ghost"
+              className="justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0"
+              aria-label="Notifications"
+              onClick={() => setUtility("Notifications")}
+            >
+              <Bell />
+              <span className="group-data-[collapsible=icon]:hidden">
+                Notifications
+              </span>
+            </Button>
+          </>
         }
         coordinator={
           <>
@@ -184,7 +188,6 @@ function Fixture() {
                 placeholder="Discuss the next step…"
               />
               <div className="fixture-composer-actions">
-                <span>{project.name}</span>
                 <Button size="icon-sm" aria-label="Send message" disabled>
                   <ArrowUp />
                 </Button>

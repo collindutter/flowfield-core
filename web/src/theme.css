@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @custom-variant dark (&:is(.dark *));
 :root {
+  color-scheme: light;
+  --warning-background: #fff4e4;
+  --warning-foreground: #805019;
+  --warning-border: #d4b075;
+  --success-foreground: #288354;
+  --syntax-comment: #64735e;
+  --syntax-keyword: #a13b75;
+  --syntax-string: #287557;
+  --syntax-number: #315ba5;
   --radius: 0.5rem;
   --background: oklch(1 0 0);
   --foreground: #20262d;
@@ -34,6 +43,37 @@
   --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
+}
+.dark {
+  color-scheme: dark;
+  --background: #191c20;
+  --foreground: #e3e7ec;
+  --card: #202429;
+  --card-foreground: var(--foreground);
+  --popover: #252a30;
+  --popover-foreground: var(--foreground);
+  --primary: #8cbfe3;
+  --primary-foreground: #152635;
+  --secondary: #2b3037;
+  --secondary-foreground: var(--foreground);
+  --muted: #23272d;
+  --chrome: #2b3037;
+  --muted-foreground: #a5aeb9;
+  --accent: #303741;
+  --accent-foreground: var(--foreground);
+  --destructive: #ff8390;
+  --border: #3a424c;
+  --input: #46505c;
+  --ring: #8cbfe3;
+  --sidebar: #202429;
+  --warning-background: #382e20;
+  --warning-foreground: #edc788;
+  --warning-border: #8d713f;
+  --success-foreground: #7ed7a5;
+  --syntax-comment: #a2b39a;
+  --syntax-keyword: #eaa1ce;
+  --syntax-string: #8dd7b9;
+  --syntax-number: #a6c4fc;
 }
 @theme inline {
   --font-sans: ui-sans-serif, system-ui, sans-serif;

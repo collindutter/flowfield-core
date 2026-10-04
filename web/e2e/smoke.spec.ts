@@ -376,7 +376,7 @@ test("three-task board across CLI, browser and MCP, with archive and mobile read
     "up_next",
   );
   await closeOverlay(page);
-  await page.getByRole("button", { name: /^Archive \d/ }).click();
+  await page.getByRole("tab", { name: /^Archive \d/ }).click();
   await expect(
     page.getByRole("link", { name: /Add download button/ }),
   ).toBeVisible();
@@ -384,7 +384,7 @@ test("three-task board across CLI, browser and MCP, with archive and mobile read
   await page.getByRole("link", { name: /Add download button/ }).click();
   await page.getByRole("button", { name: "Restore", exact: true }).click();
   await closeOverlay(page);
-  await page.getByRole("button", { name: /^Board \d/ }).click();
+  await page.getByRole("tab", { name: /^Board \d/ }).click();
   await page.getByLabel("Filter by milestone").selectOption("csv");
   await expect(page.locator(".task-card")).toHaveCount(2);
   await page
@@ -397,7 +397,7 @@ test("three-task board across CLI, browser and MCP, with archive and mobile read
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page.getByRole("button", { name: "Close editor" }).click();
   await closeOverlay(page);
-  await page.getByRole("button", { name: /^Board / }).click();
+  await page.getByRole("tab", { name: /^Board / }).click();
   await page.getByLabel("Filter by milestone").selectOption("");
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -738,7 +738,7 @@ test("archive preserves dated records and supports restore and mobile archiving"
     page.getByRole("button", { name: "New task", exact: true }),
   ).toBeVisible();
   await closeOverlay(page);
-  await page.getByRole("button", { name: /^Archive \d/ }).click();
+  await page.getByRole("tab", { name: /^Archive \d/ }).click();
   const archive = page.getByRole("region", {
     name: "Archived tasks",
     exact: true,
@@ -778,7 +778,7 @@ test("archive preserves dated records and supports restore and mobile archiving"
       .status,
   ).toBe("up_next");
   await closeOverlay(page);
-  await page.getByRole("button", { name: /^Board \d/ }).click();
+  await page.getByRole("tab", { name: /^Board \d/ }).click();
   await page.getByRole("link", { name: /older task/ }).click();
   await page.setViewportSize({ width: 390, height: 844 });
 
@@ -788,7 +788,7 @@ test("archive preserves dated records and supports restore and mobile archiving"
     .getByRole("button", { name: "Archive", exact: true })
     .click();
   await closeOverlay(page);
-  await page.getByRole("button", { name: /^Archive \d/ }).click();
+  await page.getByRole("tab", { name: /^Archive \d/ }).click();
   await expect(archive.getByRole("listitem").first()).toContainText(
     "older task",
   );
@@ -1275,7 +1275,7 @@ test("task activity, Markdown and independently retrievable decisions preserve t
     "--body",
     "All exports must work **offline**.",
   ]);
-  await page.getByRole("button", { name: "Decisions", exact: true }).click();
+  await page.getByRole("tab", { name: "Decisions", exact: true }).click();
   const projectView = page.getByRole("region", {
     name: "Project decisions",
     exact: true,
@@ -1584,7 +1584,7 @@ test("Needs you carries a free-text answer from browser to coordinator applicati
   await page.getByLabel("Your answer", { exact: true }).focus();
   await page.keyboard.press("Escape");
   await closeOverlay(page);
-  await page.getByRole("button", { name: /^Needs you(?: \d+)?$/ }).click();
+  await page.getByRole("tab", { name: /^Needs you(?: \d+)?$/ }).click();
   await page
     .getByRole("link", { name: /What should the export include/ })
     .click();
@@ -2411,7 +2411,7 @@ test("project questions link affected tasks and reconcile through CLI and MCP", 
     },
   });
   await closeOverlay(page);
-  await page.getByRole("button", { name: "Decisions", exact: true }).click();
+  await page.getByRole("tab", { name: "Decisions", exact: true }).click();
   await expect(
     page.getByText("Target personal use.", { exact: true }),
   ).toBeVisible();
@@ -2727,7 +2727,7 @@ test("related questions preserve the page, drafts, focus and router history", as
     }),
   ).toBeVisible();
   await closeOverlay(page);
-  await page.getByRole("button", { name: /^Needs you(?: \d+)?$/ }).click();
+  await page.getByRole("tab", { name: /^Needs you(?: \d+)?$/ }).click();
   for (const name of ["Needs your action", "Waiting", "History"])
     await expect(page.getByRole("region", { name, exact: true })).toBeVisible();
   await expect(page.getByLabel("Show resolved")).toHaveCount(0);
@@ -3045,7 +3045,7 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
   await expect(board).toBeVisible();
 
   await expect(
-    page.getByRole("navigation", { name: "Project views", exact: true }),
+    page.getByRole("tablist", { name: "Project views", exact: true }),
   ).toContainText("Needs you");
   await expect(page.locator(".up_next .queue-controls")).toContainText(
     "Run queue",
@@ -3072,7 +3072,7 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
   await expect(dialog).toHaveCount(0);
   await expect(card).toBeFocused();
   await expect(page.getByLabel("Filter by milestone")).toHaveValue("group");
-  await page.getByRole("button", { name: /^Milestones(?: \d+)?$/ }).click();
+  await page.getByRole("tab", { name: /^Milestones(?: \d+)?$/ }).click();
   const row = page.locator(".milestone-list .collection-row");
   await row.click();
   await expect(page.getByRole("tab")).toHaveCount(0);
@@ -3094,7 +3094,7 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(`/projects/${id}`);
-  await page.getByRole("button", { name: /^Milestones(?: \d+)?$/ }).click();
+  await page.getByRole("tab", { name: /^Milestones(?: \d+)?$/ }).click();
   await expect(page.locator(".milestone-list")).toBeVisible();
   await page
     .getByRole("button", { name: "New milestone", exact: true })
@@ -3127,7 +3127,7 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
   await expect(
     page.getByRole("button", { name: "Add project", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Decisions", exact: true }).click();
+  await page.getByRole("tab", { name: "Decisions", exact: true }).click();
   await page.getByRole("button", { name: "New decision", exact: true }).click();
   await page
     .getByLabel("Decision and rationale")
@@ -3145,7 +3145,7 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
   await expect(
     page.locator("[data-slot=dialog-content][data-state=open]"),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: /^Board / }).click();
+  await page.getByRole("tab", { name: /^Board / }).click();
   await page.getByRole("button", { name: "New task", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   const create = page.getByRole("dialog", { name: "New task", exact: true });
@@ -3900,7 +3900,7 @@ test("closing entity overlays returns through history without duplicate collecti
   const board = `/projects/${id}`;
   const inbox = `${board}/inbox`;
   await page.goto(board);
-  await page.getByRole("button", { name: /^Needs you(?: \d+)?$/ }).click();
+  await page.getByRole("tab", { name: /^Needs you(?: \d+)?$/ }).click();
   await page.locator(".attention-card").first().click();
   await page.getByRole("button", { name: "Close editor", exact: true }).click();
   await expect(page).toHaveURL(inbox);
@@ -4154,8 +4154,8 @@ test("entity identity and drafts persist across task and project tabs", async ({
     data: { id: "first", title: "First task", milestone_id: "first" },
   });
   await page.goto("/");
-  const sidebar = page.locator(".sidebar");
-  const logo = sidebar.getByRole("link", { name: "f flowfield", exact: true });
+  const sidebar = page.locator('[data-slot="sidebar"]');
+  const logo = sidebar.getByRole("link", { name: "Flowfield", exact: true });
   const projectLink = sidebar.getByRole("link", { name: project, exact: true });
   await expect(projectLink).toBeVisible();
   await expect(
@@ -5710,20 +5710,23 @@ test("sidebar names disclose only clipped text and idle input opens deliberately
   await short.hover();
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   const long = sidebar.getByRole("link", { name, exact: true });
+  await long.scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise(requestAnimationFrame));
   await long.hover();
   await expect(page.getByRole("tooltip")).toHaveText(name);
   await page.keyboard.press("Escape");
   await long.focus();
   await expect(page.getByRole("tooltip")).toHaveText(name);
   await page.keyboard.press("Escape");
-  // A wider mobile sidebar fits this name: the redundant tooltip disappears.
+  // Mobile uses a conventional project drawer; project views remain above work.
   await page.setViewportSize({ width: 650, height: 844 });
-  await short.hover();
-  await long.hover();
-  await expect(page.getByRole("tooltip")).toHaveCount(0);
-  await expect(
-    sidebar.getByRole("button", { name: /^Needs you 1$/ }),
-  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Open projects", exact: true })
+    .click();
+  await expect(long).toBeVisible();
+  await long.click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: /^Needs you 1$/ })).toBeVisible();
   await expect(
     page.getByRole("link", { name: /item needs your attention/ }),
   ).toHaveCount(0);
@@ -5839,6 +5842,9 @@ test("update notifications persist, dismiss across browsers and share manual dis
   await expect.poll(() => manualChecks).toBe(1);
   await expect(notice).toHaveCount(0);
   await page.reload();
+  await page
+    .getByRole("button", { name: "Open projects", exact: true })
+    .click();
   await page.getByRole("button", { name: /Notifications/ }).click();
   await expect(notice).toHaveCount(0);
   const secondContext = await browser.newContext();
@@ -5865,4 +5871,96 @@ test("update notifications persist, dismiss across browsers and share manual dis
     second.getByRole("heading", { name: "Flowfield 9.9.2 is available" }),
   ).toHaveCount(0);
   await secondContext.close();
+});
+
+test("workspace navigation, mobile board and appearance work without a coordinator pane", async ({
+  page,
+  request,
+}) => {
+  await request.post("/api/projects/initialize", {
+    data: {
+      path: existingDirectory(join(state, "workspace-frame")),
+      name: "Workspace frame",
+      task_prefix: "WSF",
+    },
+  });
+  await request.post("/api/projects/workspace-frame/tasks", {
+    data: { title: "Review the workspace layout" },
+  });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/projects/workspace-frame");
+  await expect(page.locator("html")).toHaveClass("dark");
+  await expect(
+    page.getByRole("heading", { name: "Workspace frame", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("separator", { name: "Resize coordinator and work" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("tab", { name: "Coordinator", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Collapse projects", exact: true })
+    .click();
+  await page.getByRole("button", { name: /^Appearance:/ }).click();
+  await page.getByRole("menuitemradio", { name: "Light", exact: true }).click();
+  await expect(page.locator("html")).not.toHaveClass("dark");
+  await page.reload();
+  await expect(page.locator("html")).not.toHaveClass("dark");
+  await expect(
+    page.getByRole("button", { name: "Expand projects", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /^Appearance:/ }).click();
+  await page
+    .getByRole("menuitemradio", { name: "System", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveClass("dark");
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.locator("html")).not.toHaveClass("dark");
+  await page.getByRole("tab", { name: /^Board/ }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: /^Needs you/ })).toBeFocused();
+  await expect(page).toHaveURL(/\/projects\/workspace-frame$/);
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/inbox$/);
+  await page.goBack();
+  await page.getByRole("tab", { name: /^Milestones/ }).click();
+  await expect(page).toHaveURL(/\/milestones$/);
+  await page.goBack();
+  await expect(page.getByRole("tab", { name: /^Board/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", { name: "Open projects", exact: true })
+    .click();
+  await page
+    .getByRole("link", { name: "Workspace frame", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const board = page.locator(".board");
+  expect(
+    await board.evaluate((node) => node.scrollWidth > node.clientWidth),
+  ).toBe(true);
+  expect(
+    await page
+      .locator(".column")
+      .first()
+      .evaluate((node) => node.getBoundingClientRect().width),
+  ).toBeGreaterThanOrEqual(280);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole("link", { name: /Review the workspace layout/ }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Task details", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tab", { name: /^Board/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
 });
