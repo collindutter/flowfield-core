@@ -12,7 +12,8 @@
     "build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit && eslint . && prettier --check .",
     "format": "prettier --write .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test && pnpm test:workspace",
+    "test:workspace": "playwright test --config playwright.workspace.config.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -23,6 +24,7 @@
     "react-diff-view": "^3.3.3",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
+    "react-resizable-panels": "4.14.2",
     "react-router": "^8.4.0",
     "react-time-ago": "^7.4.4",
     "refractor": "^3.6.0",

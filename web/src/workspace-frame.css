@@ -1,0 +1,131 @@
+.workspace-frame {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.workspace-sidebar-header {
+  height: 60px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+}
+.workspace-wordmark {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.workspace-projects {
+  padding: 8px 12px;
+}
+.workspace-projects a {
+  text-decoration: none;
+  color: inherit;
+}
+.workspace-projects li:has([aria-current="page"])::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 25%;
+  height: 50%;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+.workspace-projects-label {
+  padding: 4px 8px 12px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.project-badge {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+}
+.workspace-main,
+.workspace-surfaces,
+.workspace-panels,
+.workspace-pane {
+  min-width: 0;
+  min-height: 0;
+}
+.workspace-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+.workspace-surfaces {
+  flex: 1;
+  gap: 0;
+}
+.workspace-panels {
+  flex: 1;
+}
+.workspace-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+}
+.workspace-divider {
+  width: 1px;
+  background: var(--border);
+}
+.workspace-surface-switch {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.workspace-surface-switch [role="tablist"] {
+  flex: 1;
+}
+.workspace-pane-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 60px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.workspace-pane-header h1,
+.workspace-pane-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.workspace-board-scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+}
+.workspace-board-columns {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 1fr);
+  align-items: start;
+  gap: 16px;
+  min-height: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-frame [data-slot="sidebar-gap"],
+  .workspace-frame [data-slot="sidebar-container"] {
+    transition: none;
+  }
+}

@@ -15,3 +15,7 @@ responsive layout; sheet support remains an upstream sidebar dependency.
 Application-specific layout, colors for task types, router integration, and retained
 editor drafts live outside this directory. The `cn` utility package is the official
 registry's current generated import. Do not fork controls independently per view.
+
+Resizable was added from the official `new-york-v4` registry on 2026-10-04,
+using react-resizable-panels 4.14.2 (MIT). It uses the current Group/Separator API;
+the legacy new-york wrapper targets an older library API.

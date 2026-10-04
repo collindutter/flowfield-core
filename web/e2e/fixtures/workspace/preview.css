@@ -1,0 +1,113 @@
+.fixture-agent-name,
+.fixture-composer-actions,
+.fixture-queue,
+.fixture-column header > span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.fixture-conversation {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 24px 32px;
+}
+.fixture-message {
+  margin-bottom: 28px;
+}
+.fixture-message:last-child {
+  margin-bottom: 0;
+}
+.fixture-author {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.fixture-message p {
+  margin: 0 0 12px;
+}
+.fixture-message p:last-child {
+  margin-bottom: 0;
+}
+.fixture-message ul {
+  padding-left: 20px;
+  margin: 0 0 12px;
+  list-style: disc;
+}
+.fixture-message li {
+  margin: 6px 0;
+}
+.fixture-composer {
+  flex-shrink: 0;
+  display: grid;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--chrome);
+}
+.fixture-composer textarea {
+  min-height: 92px;
+  max-height: 180px;
+  resize: vertical;
+  background: white;
+}
+.fixture-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fixture-work-navigation {
+  flex-shrink: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.fixture-work-navigation [role="tablist"] {
+  height: 46px;
+}
+.fixture-count {
+  border-radius: 4px;
+  padding: 0 5px;
+  font-size: 11px;
+  background: var(--chrome);
+}
+.fixture-column {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+.fixture-column > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fixture-column h2 {
+  margin: 0;
+  font-size: 13px;
+}
+.fixture-task {
+  display: block;
+  text-decoration: none;
+  color: var(--foreground);
+  border-radius: 8px;
+}
+.fixture-task:hover {
+  color: var(--primary);
+}
+.fixture-task:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.fixture-task p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin: 0;
+}
+.fixture-queue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fixture-work-list {
+  padding: 24px;
+  overflow: auto;
+}
