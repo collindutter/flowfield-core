@@ -17,7 +17,13 @@ flowfield --help
 ```
 
 Global `--port` selects the service. `--data-dir` or `FLOWFIELD_DATA_DIR` selects storage;
-`FLOWFIELD_PORT` selects the client port.
+`FLOWFIELD_PORT` sets the default port for the service and CLI. A command-line port
+overrides it. For example:
+
+```sh
+flowfield --port 8770 serve
+flowfield --port 8770 project list
+```
 
 ## Updates
 
@@ -98,6 +104,10 @@ running. `task runs stop ATTEMPT_ID` targets one attempt. Inspect `task results 
 --help` for exact-candidate approval and request-changes options; a result revision and
 candidate commit are required. `task results retry-delivery --help` describes recovery
 when approved code is blocked from reaching the checkout.
+
+Use `project workers models` to read model IDs and supported reasoning efforts, then
+`project workers configure --help` for explicit model, effort and parallel-worker settings.
+Saving worker settings does not enable the queue.
 
 Questions and replies preserve their task, attempt and result bindings. Answering does
 not enable a paused queue; inspecting a result does not approve it.

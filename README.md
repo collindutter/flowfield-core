@@ -1,6 +1,6 @@
 <h1 align="center">Flowfield</h1>
 
-<p align="center"><strong>Plan with your coding agent. Follow every task in one shared feed.</strong></p>
+<p align="center"><strong>A workspace for you and your coding agents.</strong></p>
 
 <p align="center">
   <a href="https://pypi.org/project/flowfield-core/"><img src="https://img.shields.io/pypi/v/flowfield-core?logo=pypi&amp;logoColor=white&amp;color=2563eb" alt="PyPI version"></a>
@@ -10,13 +10,13 @@
 
 ![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-overview.png)
 
-Flowfield runs agreed work in parallel and brings progress, questions, answers and results
-together for your review. Keep talking to your coordinator while workers implement tasks;
-use the board to see what matters and what needs you.
+Plan work, run tasks in parallel, and review results in one workspace. Keep planning with
+your coordinator while workers implement tasks; use the board to see progress and what
+needs your judgment.
 
-- **Shared task feeds.** Intent, worker activity, questions, testing and results stay together.
+- **Task feeds.** Each task keeps its intent, progress, questions, feedback and results together.
 - **Parallel work.** Independent tasks run in separate checkouts; dependencies hold work until it's ready.
-- **Explicit review.** Inspect or try an exact result, request changes, then approve its delivery to your project.
+- **Explicit review.** Review an exact result, request changes when needed, and approve delivery to your project.
 
 ## Install
 
@@ -44,7 +44,7 @@ model. Codex is the first supported harness; further integrations are planned.
 ## Documentation
 
 [Getting Started](https://docs.flowfield.sh/getting-started) · [Concepts](https://docs.flowfield.sh/concepts) ·
-[CLI](https://docs.flowfield.sh/cli) · [Agent integrations](https://docs.flowfield.sh/integrations/overview)
+[CLI](https://docs.flowfield.sh/cli) · [Integrations](https://docs.flowfield.sh/integrations/overview)
 
 ## Build from source
 

@@ -7,7 +7,7 @@
     "groups": [
       { "group": "Start here", "pages": ["getting-started", "concepts"] },
       { "group": "Reference", "pages": ["cli", "installation", "storage"] },
-      { "group": "Agent integrations", "pages": ["integrations/overview", "integrations/codex"] }
+      { "group": "Integrations", "pages": ["integrations/overview", "integrations/codex"] }
     ]
   },
   "navbar": {
