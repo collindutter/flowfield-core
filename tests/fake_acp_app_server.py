@@ -42,7 +42,10 @@ def main():
         elif method == "account/read":
             result = {"account": {"type": "apiKey"}, "requiresOpenaiAuth": False}
         elif method == "config/read":
-            result = {"config": {}, "layers": []}
+            result = {
+                "config": {"mcp_servers": {"flowfield": {"url": "http://127.0.0.1:1/standalone"}}},
+                "layers": [],
+            }
         elif method == "model/list":
             result = {"data": [model], "nextCursor": None}
         elif method == "skills/list":

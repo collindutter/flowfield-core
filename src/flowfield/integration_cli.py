@@ -56,6 +56,11 @@ def register(project_app: typer.Typer) -> None:
         setup: Annotated[list[str] | None, typer.Option(help="Trusted setup commands.")] = None,
         setup_timeout: int = typer.Option(120, min=1, max=900),
         check_timeout: int = typer.Option(60, min=1, max=900),
+        local: bool = typer.Option(
+            False,
+            help="Explicitly adopt service-host tools, credentials "
+            "and native harness settings for future execution.",
+        ),
         create_from: str | None = typer.Option(
             None, help="Explicitly create the target from this commit/branch."
         ),
@@ -71,6 +76,7 @@ def register(project_app: typer.Typer) -> None:
                 {
                     "expected_revision": current["revision"],
                     "target_branch": target,
+                    "runtime": "local" if local else None,
                     "environment": current["environment"],
                     "create_from": create_from,
                     "checks": check,

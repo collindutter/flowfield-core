@@ -202,7 +202,14 @@ def add_execution_tools(
         settings = supervisor().integrations.settings(project_id)
         return {
             **settings.model_dump(),
-            "environment_info": describe_environment(settings.environment),
+            "environment_info": {
+                "runtime": "local",
+                "description": "Service host tools, credentials and native harness settings; "
+                "per-attempt "
+                "checkout and temporary/output paths. Legacy inventory is not applied.",
+            }
+            if settings.runtime == "local"
+            else describe_environment(settings.environment),
         }
 
     @mcp.tool(annotations=write)

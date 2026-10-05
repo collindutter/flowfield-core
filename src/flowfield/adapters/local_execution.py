@@ -3,16 +3,18 @@
 The caller supplies the intended host environment explicitly (not a login shell
 command or a persisted bag of credentials). Each attempt owns its checkout and
 scratch directories. Native harness configuration controls access to host resources.
-This foundation is not yet selected by the production scheduler.
+Projects select this behavior explicitly; saved legacy attempts retain their meaning.
 """
 
 import re
+import shlex
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 
 from flowfield.adapters.git_workspace import GitWorkspace
+from flowfield.execution_models import RunLocation
 
 
 @dataclass(frozen=True)
@@ -26,6 +28,34 @@ class LocalAttempt:
     def launch_environment(self) -> dict[str, str]:
         """Independent copy for launch; retain the selected host's HOME/PATH/config."""
         return dict(self._environment)
+
+    @property
+    def root(self) -> Path:
+        return self.workspace.root
+
+    @property
+    def checkout(self) -> Path:
+        return self.workspace.checkout
+
+    @property
+    def common_git(self) -> Path:
+        return self.workspace.common_git
+
+    def snapshot(self, parent: str) -> tuple[str, list[str]]:
+        return self.workspace.snapshot(parent, allow_local_commits=True)
+
+    def shell_environment(self) -> dict[str, str]:
+        return self.launch_environment()
+
+    def location(self, base: str, result: str | None) -> RunLocation:
+        prefix = f"git -C {shlex.quote(str(self.checkout))}"
+        return RunLocation(
+            workspace=str(self.checkout),
+            diff_command=f"{prefix} diff --no-ext-diff --no-textconv {base} {result}"
+            if result
+            else f"{prefix} status --short",
+            try_command=f"cd {shlex.quote(str(self.checkout))}",
+        )
 
 
 class LocalHost:
@@ -48,6 +78,10 @@ class LocalHost:
         runtime = workspace.root / "runtime"
         for name in ("tmp", "output"):
             (runtime / name).mkdir(parents=True)
+        return self.restore(run_id, workspace, runtime)
+
+    def restore(self, run_id: str, workspace: GitWorkspace, runtime: Path) -> LocalAttempt:
+        """Rebuild launch variables from the current host without persisting credentials."""
         # Git location variables from a parent process must not redirect commands to
         # another checkout/index. Keep native Git configuration and credential helpers.
         variables = {

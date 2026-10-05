@@ -40,6 +40,7 @@ class Inspection(Record):
     command: str = ""
     launcher: str | None = None
     environment: EnvironmentConfig = Field(default_factory=EnvironmentConfig)
+    runtime: Literal["legacy", "local"] = "legacy"
     setup_commands: list[str] = Field(default_factory=list)
     run_command: str = ""
     problem: str | None = None

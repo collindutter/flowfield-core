@@ -64,6 +64,7 @@ export function IntegrationSettings({
   const resource = useResource<Settings>(path, projectId);
   const [draft, setDraft] = useState<{
     target: string;
+    local: boolean;
     checks: string;
     setup: string;
     setupTimeout: number;
@@ -75,6 +76,7 @@ export function IntegrationSettings({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const inspection = useInspectionSettings(projectId, refresh);
+  const local = draft?.local ?? resource.data?.runtime === "local";
   const target = draft?.target ?? resource.data?.target_branch ?? "";
   const checks = draft?.checks ?? resource.data?.checks.join("\n") ?? "";
   const setup = draft?.setup ?? resource.data?.setup_commands.join("\n") ?? "";
@@ -88,6 +90,7 @@ export function IntegrationSettings({
   const variables =
     draft?.variables ?? entries(resource.data?.environment.variables);
   const fields = {
+    local,
     target,
     checks,
     setup,
@@ -102,6 +105,7 @@ export function IntegrationSettings({
     readPaths !== (resource.data?.environment.read_paths?.join("\n") ?? "") ||
     variables !== entries(resource.data?.environment.variables);
   const dirty =
+    local !== (resource.data?.runtime === "local") ||
     target !== (resource.data?.target_branch ?? "") ||
     checks !== (resource.data?.checks.join("\n") ?? "") ||
     setup !== (resource.data?.setup_commands.join("\n") ?? "") ||
@@ -140,6 +144,7 @@ export function IntegrationSettings({
               const value = await request<Settings>(path, "PUT", {
                 expected_revision: resource.data.revision,
                 target_branch: target,
+                runtime: local ? "local" : null,
                 environment: {
                   tools: assignments(tools),
                   read_paths: lines(readPaths),
@@ -262,54 +267,86 @@ export function IntegrationSettings({
               </p>
             )}
           </ContentStack>
-          <DetailSection title="Machine tools and environment">
-            <ContentStack space="section">
+          <DetailSection title="Execution environment">
+            <Label className="field">
+              <input
+                type="checkbox"
+                checked={local}
+                disabled={resource.data?.runtime === "local"}
+                onChange={(event) =>
+                  setDraft({ ...fields, local: event.target.checked })
+                }
+              />
+              Use Local host
+            </Label>
+            <p>
+              Use tools, credentials and native harness configuration available
+              to the Flowfield service. Each attempt gets its own checkout and
+              temporary files. Project setup must keep databases, ports and
+              other shared resources separate, or use one worker at a time.
+            </p>
+            <p>
+              Saving Local applies to future workers, checks and inspection
+              copies. Existing attempts keep their recorded environment. Native
+              access mode is selected in Workers settings.
+            </p>
+            {local && (
               <p>
-                Expose installed tools and read-only support files. Your login
-                shell and credentials are not imported.
+                Legacy executable paths, read paths and variables are retained
+                as history and are not applied.
               </p>
-              <Label className="field block">
-                Executable paths
-                <Textarea
-                  aria-label="Executable paths"
-                  rows={3}
-                  value={tools}
-                  placeholder="command=/absolute/path/to/executable"
-                  onChange={(e) =>
-                    setDraft({ ...fields, tools: e.target.value })
-                  }
-                />
-              </Label>
-              <Label className="field block">
-                Read-only support paths
-                <Textarea
-                  aria-label="Read-only support paths"
-                  rows={3}
-                  value={readPaths}
-                  placeholder="One absolute path per line"
-                  onChange={(e) =>
-                    setDraft({ ...fields, readPaths: e.target.value })
-                  }
-                />
-              </Label>
-              <Label className="field block">
-                Environment variables
-                <Textarea
-                  aria-label="Environment variables"
-                  rows={3}
-                  value={variables}
-                  placeholder="NAME=value"
-                  onChange={(e) =>
-                    setDraft({ ...fields, variables: e.target.value })
-                  }
-                />
-              </Label>
-              <p>
-                No secrets. $RUNTIME and $CHECKOUT identify each private copy;
-                HOME, PATH and permissions are managed.
-              </p>
-            </ContentStack>
+            )}
           </DetailSection>
+          {!local && (
+            <DetailSection title="Legacy environment">
+              <ContentStack space="section">
+                <p>
+                  Expose installed tools and read-only support files. Your login
+                  shell and credentials are not imported.
+                </p>
+                <Label className="field block">
+                  Executable paths
+                  <Textarea
+                    aria-label="Executable paths"
+                    rows={3}
+                    value={tools}
+                    placeholder="command=/absolute/path/to/executable"
+                    onChange={(e) =>
+                      setDraft({ ...fields, tools: e.target.value })
+                    }
+                  />
+                </Label>
+                <Label className="field block">
+                  Read-only support paths
+                  <Textarea
+                    aria-label="Read-only support paths"
+                    rows={3}
+                    value={readPaths}
+                    placeholder="One absolute path per line"
+                    onChange={(e) =>
+                      setDraft({ ...fields, readPaths: e.target.value })
+                    }
+                  />
+                </Label>
+                <Label className="field block">
+                  Environment variables
+                  <Textarea
+                    aria-label="Environment variables"
+                    rows={3}
+                    value={variables}
+                    placeholder="NAME=value"
+                    onChange={(e) =>
+                      setDraft({ ...fields, variables: e.target.value })
+                    }
+                  />
+                </Label>
+                <p>
+                  No secrets. $RUNTIME and $CHECKOUT identify each private copy;
+                  HOME, PATH and permissions are managed.
+                </p>
+              </ContentStack>
+            </DetailSection>
+          )}
           <DetailSection title="Time limits">
             <ContentStack space="section">
               <Label className="field block">

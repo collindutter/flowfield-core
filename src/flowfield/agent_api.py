@@ -34,7 +34,7 @@ def agent_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     ) -> AgentSettingsView:
         service = supervisor()
         if request.selection:
-            await service.validate_agent_choice(request.selection)
+            await service.validate_agent_choice(request.selection, project_id)
         return AgentSettings(service.workspace).edit(project_id, "worker", request, task_id)
 
     @router.get("/permissions")

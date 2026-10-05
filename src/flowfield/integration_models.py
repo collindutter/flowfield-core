@@ -31,6 +31,7 @@ class CheckoutBinding(Record):
 class IntegrationSettings(Record):
     project_id: str
     revision: int = 1
+    runtime: Literal["legacy", "local"] = "legacy"
     target_branch: str | None = None
     checks: list[str] = Field(default_factory=list)
     environment: EnvironmentConfig = Field(default_factory=EnvironmentConfig)
@@ -41,6 +42,7 @@ class IntegrationSettings(Record):
 
 class IntegrationConfig(Record):
     expected_revision: int = Field(ge=1)
+    runtime: Literal["local"] | None = None
     target_branch: str = Field(min_length=1, max_length=200)
     create_from: str | None = Field(default=None, min_length=1, max_length=200)
     checks: list[str] = Field(min_length=1, max_length=10)

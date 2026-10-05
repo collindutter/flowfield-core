@@ -207,6 +207,7 @@ export function ProjectEditor({
         >
           {coordinatorOpened && (
             <AgentSettingsEditor
+              projectId={incoming.id}
               coordinator
               path={`projects/${incoming.id}/coordinator-settings`}
               refresh={incoming}

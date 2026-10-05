@@ -37,17 +37,17 @@ Repository instructions govern development conventions and permission to commit/
   the registered checkout's current branch. Choose paid worker model/effort only with human
   authorization; no implicit fallback or account changes. Capacity defaults to one; configure
   the agreed maximum for parallel work. Lowering it limits new starts without stopping active work.
-- Read integration settings and their `environment_info` before configuring them. Tool names
-  map to installed executable paths; include helpers the worker needs, such as `rg`. Declare
-  only necessary read-only tool support paths and non-secret variables. No login-shell PATH,
-  supported-stack catalog or whole-home grant. `$RUNTIME` and `$CHECKOUT` expand per private
-  copy. The schema lists reserved variables; do not guess overrides or probe writes with
-  empty payloads. Host availability does not prove access inside the worker boundary.
-- Python, pip and uv project operations share a private environment. Flowfield owns its paths,
-  caches and download policy; do not override VIRTUAL_ENV or UV_PROJECT_ENVIRONMENT. Workers
-  can install project dependencies with declared tools and public downloads. Keep reproducible
-  manifests/lockfiles/setup scripts: temporary installed packages alone do not deliver an
-  environment task. Missing global tools, private credentials and desktop services need setup.
+- Read integration settings before configuring them. Local adoption is explicit human authority:
+  it uses the service host's installed tools, credentials and native harness configuration.
+  Set runtime to local only when agreed; omitted settings preserve the current selection.
+  Select supported model/effort/native mode, never invent a universal permission policy or
+  silently broaden access. Existing legacy settings retain their original meaning until adoption.
+- Local gives each attempt a checkout, temporary/output directories and FLOWFIELD_WORKSPACE /
+  FLOWFIELD_RUNTIME_DIR. Project setup chooses its dependency tooling; no forced Python runtime
+  or executable inventory. Keep manifests, lockfiles and setup reproducible. Use separate
+  databases, ports and service names for parallel work, or serialize affected work. Worktrees
+  do not contain arbitrary daemons or isolate the host. Native tools stay with the harness;
+  Flowfield owns scoped task operations and exact result delivery.
 - Save agreed integration/inspection settings, then use `validate_project_setup` before the
   first worker. It runs saved setup/check commands in a separate worker environment without
   a model call, queue change or preview process. Inspect observed output, fix failures, and

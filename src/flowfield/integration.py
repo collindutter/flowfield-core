@@ -1,6 +1,7 @@
 """Explicit integration orchestration. Git and SQLite retain separate durable evidence."""
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
@@ -8,6 +9,7 @@ from uuid import uuid4
 from flowfield.adapters import git_checkout
 from flowfield.adapters import git_integration as gitops
 from flowfield.adapters.local_environment import LocalEnvironment, contains, git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.adapters.toolchain import validate_tools
 from flowfield.application import Workspace, now
 from flowfield.errors import ApplicationError
@@ -54,14 +56,6 @@ class Integrations:
 
     def configure(self, project_id: str, request: IntegrationConfig) -> IntegrationSettings:
         repository = Path(self.workspace.project(project_id).path)
-        validate_tools(
-            request.environment,
-            [
-                self.workspace.directory,
-                repository,
-                *[Path(p.path) for p in self.workspace.projects()],
-            ],
-        )
         if any(
             not command.strip() or len(command) > 4000
             for command in [*request.checks, *request.setup_commands]
@@ -75,6 +69,16 @@ class Integrations:
             with self.workspace.connection(write=True, project_id=project_id) as db:
                 current = self._settings(db, project_id)
                 self.workspace._current(current.revision, request.expected_revision)
+                runtime = request.runtime or current.runtime
+                if runtime == "legacy":
+                    validate_tools(
+                        request.environment,
+                        [
+                            self.workspace.directory,
+                            repository,
+                            *[Path(p.path) for p in self.workspace.projects()],
+                        ],
+                    )
                 if request.create_from:
                     base = gitops.resolve(repository, request.create_from)
                     # Creation is explicit and never resets an existing branch.
@@ -91,9 +95,10 @@ class Integrations:
                 value = IntegrationSettings(
                     project_id=project_id,
                     revision=current.revision + 1,
+                    runtime=runtime,
                     target_branch=request.target_branch,
                     checks=request.checks,
-                    environment=request.environment,
+                    environment=current.environment if runtime == "local" else request.environment,
                     setup_commands=request.setup_commands,
                     setup_timeout_seconds=request.setup_timeout_seconds,
                     check_timeout_seconds=request.check_timeout_seconds,
@@ -295,13 +300,25 @@ class Integrations:
                 record.candidate_commit = gitops.candidate(
                     repository, before, record.result_commit, record.id
                 )
-                environment = LocalEnvironment.prepare(
-                    self.workspace.directory / "integration-work",
-                    repository,
-                    record.id,
-                    record.candidate_commit,
-                    settings.environment,
-                    [self.workspace.directory, *[Path(p.path) for p in self.workspace.projects()]],
+                environment = (
+                    LocalHost(os.environ).prepare(
+                        self.workspace.directory / "integration-work",
+                        repository,
+                        record.id,
+                        record.candidate_commit,
+                    )
+                    if settings.runtime == "local"
+                    else LocalEnvironment.prepare(
+                        self.workspace.directory / "integration-work",
+                        repository,
+                        record.id,
+                        record.candidate_commit,
+                        settings.environment,
+                        [
+                            self.workspace.directory,
+                            *[Path(p.path) for p in self.workspace.projects()],
+                        ],
+                    )
                 )
                 record.workspace = str(environment.checkout)
                 self._save(record)

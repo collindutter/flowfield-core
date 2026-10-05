@@ -137,15 +137,22 @@ export function WorkerSettings({
   const resource = useResource<Settings>(path, refresh);
   const [modelRetry, setModelRetry] = useState(0);
   const catalog = useResource<Model[]>("worker-models", modelRetry);
+  const runtime = useResource<components["schemas"]["IntegrationSettings"]>(
+    `projects/${projectId}/integration`,
+    refresh,
+  );
+  const local = runtime.data?.runtime === "local";
   const models = catalog.data ?? [];
   const [draft, setDraft] = useState<{
     model: string;
     effort: string;
+    mode: string;
     cap: number;
     revision: number;
   } | null>(null);
   const model = draft?.model ?? resource.data?.model ?? "";
   const effort = draft?.effort ?? resource.data?.effort ?? "";
+  const mode = draft?.mode ?? resource.data?.mode ?? "";
   const cap = draft?.cap ?? resource.data?.max_parallel ?? 1;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -153,6 +160,7 @@ export function WorkerSettings({
     !!resource.data &&
     (model !== (resource.data.model ?? "") ||
       effort !== (resource.data.effort ?? "") ||
+      mode !== (resource.data.mode ?? "") ||
       cap !== resource.data.max_parallel);
   useEffect(() => {
     onDirty(dirty);
@@ -175,8 +183,10 @@ export function WorkerSettings({
         project dependencies in their separate workspaces.
       </p>
       <p className="detail-metadata">
-        Harness: Codex. Tool approvals are disabled in the current worker
-        runtime.
+        Harness: Codex.{" "}
+        {local
+          ? "Native tool decisions never approve code delivery."
+          : "Legacy workers retain disabled tool approvals. Select Local in Integration settings to use native modes."}
       </p>
       {catalog.loading && <p role="status">Loading available models…</p>}
       {!catalog.loading && (catalog.error || !models.length) && (
@@ -205,6 +215,7 @@ export function WorkerSettings({
               expected_revision: draft?.revision ?? resource.data.revision,
               model,
               effort,
+              mode: mode || null,
               max_parallel: cap,
             });
             resource.invalidate();
@@ -225,12 +236,15 @@ export function WorkerSettings({
           <AgentModelFields
             model={model}
             effort={effort}
+            mode={mode}
+            modesEnabled={local}
             models={models}
             loading={catalog.loading}
-            change={(model, effort) =>
+            change={(model, effort, mode) =>
               setDraft({
                 model,
                 effort,
+                mode,
                 cap,
                 revision: draft?.revision ?? resource.data!.revision,
               })
@@ -247,6 +261,7 @@ export function WorkerSettings({
                 setDraft({
                   model,
                   effort,
+                  mode,
                   cap: Number(event.target.value),
                   revision: draft?.revision ?? resource.data!.revision,
                 })

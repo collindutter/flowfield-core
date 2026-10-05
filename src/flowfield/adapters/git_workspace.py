@@ -85,14 +85,21 @@ class GitWorkspace:
         ).resolve()
         return cls(root, checkout, common)
 
-    def snapshot(self, parent: str) -> tuple[str, list[str]]:
+    def snapshot(self, parent: str, *, allow_local_commits: bool = False) -> tuple[str, list[str]]:
         """Hash bytes without clean filters/hooks; include nonignored untracked code."""
         observed = Path(
             git(self.checkout, "rev-parse", "--path-format=absolute", "--git-common-dir")
             .decode()
             .strip()
         ).resolve()
-        if observed != self.common_git or baseline(self.checkout) != parent:
+        head = baseline(self.checkout)
+        valid_head = head == parent
+        if allow_local_commits:
+            detached = not git(
+                self.checkout, "symbolic-ref", "-q", "HEAD", allowed_returncodes=(0, 1)
+            ).strip()
+            valid_head = detached and contains(self.checkout, parent, head)
+        if observed != self.common_git or not valid_head:
             raise ApplicationError(
                 "result_repository_changed",
                 "The worker changed its Git checkout metadata or baseline. "

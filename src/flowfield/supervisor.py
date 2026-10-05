@@ -8,22 +8,25 @@ import signal
 import subprocess
 from functools import partial
 from pathlib import Path
-from typing import Any, BinaryIO, Protocol
-
-from pydantic import Field
+from typing import Any, BinaryIO
 
 from flowfield.adapters import git_integration as gitops
+from flowfield.adapters import local_checks
+from flowfield.adapters.acp_session import PermissionRequest
+from flowfield.adapters.codex_agent import CodexAgent, model_options
 from flowfield.adapters.codex_environment import configuration, preflight, run_checks
 from flowfield.adapters.codex_worker import CodexWorker
+from flowfield.adapters.git_workspace import GitWorkspace
 from flowfield.adapters.local_environment import LocalEnvironment, contains, git
+from flowfield.adapters.local_execution import LocalAttempt, LocalHost
 from flowfield.adapters.toolchain import toolchain
 from flowfield.agent_models import AgentChoice
 from flowfield.application import Workspace
 from flowfield.errors import ApplicationError
 from flowfield.execution import Execution
 from flowfield.execution_models import (
+    CheckResult,
     ModelOption,
-    Record,
     Run,
     RunAction,
     RunLocation,
@@ -31,108 +34,16 @@ from flowfield.execution_models import (
     SettingsEdit,
     WorkerResult,
     WorkerSettings,
-    WorkerSubmission,
 )
 from flowfield.integration import Integrations
+from flowfield.permission_models import PermissionOption
 from flowfield.permissions import Permissions
-from flowfield.questions import QuestionCreate
 from flowfield.results import Results
 from flowfield.run_activity import ActivityRecorder, ActivityUpdate
 from flowfield.setup_validation import SetupValidation
-from flowfield.stage_models import StageUpdate
-from flowfield.stages import Stages
 from flowfield.storage import acquire_lock
 from flowfield.worker_context import brief_context
-
-
-class Command(Record):
-    command: str = Field(min_length=1, max_length=30000)
-    timeout_seconds: int = Field(default=120, ge=1, le=900)
-
-
-class ReadContext(Record):
-    section: str
-    offset: int = Field(default=0, ge=0)
-
-
-class SearchContext(Record):
-    query: str = Field(min_length=1, max_length=500)
-    limit: int = Field(default=5, ge=1, le=10)
-
-
-class WorkerQuestion(Record):
-    question: str = Field(min_length=1, max_length=200)
-    context: str = Field(min_length=1, max_length=8000)
-    recommendation: str = Field(min_length=1, max_length=8000)
-
-
-def worker_tools() -> list[dict[str, Any]]:
-    return [
-        {
-            "type": "function",
-            "name": name,
-            "description": description,
-            "inputSchema": model.model_json_schema(),
-        }
-        for name, description, model in (
-            (
-                "run_command",
-                (
-                    "Run a shell command in this attempt's prepared environment. "
-                    "Inspect files here. Only when your assignment authorizes changes, "
-                    "edit files, install project dependencies and run tests. "
-                    "Public network is available; private/local services and unrelated "
-                    "state remain inaccessible. Returns bounded output."
-                ),
-                Command,
-            ),
-            (
-                "read_context",
-                (
-                    "Read a 6000-character page of the frozen assignment section. "
-                    "Available sections are listed in the initial brief."
-                ),
-                ReadContext,
-            ),
-            (
-                "search_context",
-                "Search only the frozen assignment. Returns snippets and section references; "
-                "read_context retrieves complete evidence. Cannot discover later project changes.",
-                SearchContext,
-            ),
-            (
-                "update_stages",
-                "Report broad work phases, not file edits or implementation checklists. "
-                "Keep human approval/integration outside agent stages. Copy every existing "
-                "stage id and outcome verbatim; change status and put evidence in reason. "
-                "You may add stages, but cannot reword or remove existing outcomes. "
-                "Stages never grant approval or complete the task. "
-                "Use the frozen stages revision first, then the revision returned by this tool.",
-                StageUpdate,
-            ),
-            (
-                "ask_question",
-                (
-                    "Ask a blocking human question on this task, then end your turn. "
-                    "The service preserves your work and continues with the saved answer "
-                    "in a fresh attempt when the queue and assignment allow it."
-                ),
-                WorkerQuestion,
-            ),
-            (
-                "submit_result",
-                (
-                    "Submit this attempt's summary, checks actually run and "
-                    "limitations. Explicitly choose complete or partial against the entire "
-                    "agreed outcome and name remaining_work for partial progress. Before a "
-                    "complete result, update any unfinished stages to reflect actual progress. "
-                    "Code still requires human approval; complete unchanged-tree reports finish "
-                    "on delivery."
-                ),
-                WorkerSubmission,
-            ),
-        )
-    ]
+from flowfield.worker_tools import WorkerBridge, worker_tools
 
 
 def process_stamp(pid: int) -> str:
@@ -142,119 +53,6 @@ def process_stamp(pid: int) -> str:
     return value.stdout.strip() if value.returncode == 0 else ""
 
 
-class WorkerCommands(Protocol):
-    async def command(self, script: str, *, timeout_ms: int) -> dict[str, Any]: ...
-
-
-class WorkerBridge:
-    """Fixed server-side run identity; worker input cannot select another task/project."""
-
-    def __init__(self, execution: Execution, run: Run, client: WorkerCommands):
-        self.execution, self.run, self.client = execution, run, client
-        self.result: WorkerResult | None = None
-        self.question_id: str | None = None
-
-    async def call(self, name: str, arguments: dict[str, Any]) -> str:
-        self.execution.worker_access(self.run.project_id, self.run.id)
-        if self.question_id or self.result:
-            raise ApplicationError(
-                "report_closed",
-                "The report is saved; end this turn. Further work needs a new attempt.",
-            )
-        activity = getattr(self.client, "on_activity", None)
-        titles = {
-            "read_context": "Reading task context",
-            "search_context": "Searching task context",
-            "update_stages": "Updating progress",
-            "ask_question": "Asking a question",
-            "submit_result": "Submitting an outcome",
-        }
-        if activity and name in titles:
-            from uuid import uuid4
-
-            activity(ActivityUpdate(key=uuid4().hex, kind="tool", text=titles[name]))
-        if name == "run_command":
-            command = Command.model_validate(arguments)
-            return json.dumps(
-                await self.client.command(
-                    command.command, timeout_ms=command.timeout_seconds * 1000
-                )
-            )
-        if name == "update_stages":
-            if self.run.purpose == "discussion":
-                raise ApplicationError(
-                    "discussion_readonly", "This turn can only answer the message."
-                )
-            return (
-                Stages(self.execution.workspace)
-                .update(
-                    self.run.project_id,
-                    self.run.task_id,
-                    StageUpdate.model_validate(arguments),
-                    run_id=self.run.id,
-                )
-                .model_dump_json()
-            )
-        if name == "read_context":
-            request = ReadContext.model_validate(arguments)
-            text = self.execution.context_section(self.run.project_id, self.run.id, request.section)
-            if request.offset > len(text):
-                raise ApplicationError("invalid_offset", "Offset exceeds source length.")
-            end = min(len(text), request.offset + 6000)
-            return json.dumps(
-                {
-                    "text": text[request.offset : end],
-                    "total_chars": len(text),
-                    "next_offset": end if end < len(text) else None,
-                }
-            )
-        if name == "search_context":
-            from flowfield.search import assignment_search
-
-            query = SearchContext.model_validate(arguments)
-            return json.dumps(
-                assignment_search(
-                    self.execution.assignment(self.run.project_id, self.run.id),
-                    query.query,
-                    query.limit,
-                )
-            )
-        if name == "ask_question":
-            if self.run.purpose == "discussion":
-                raise ApplicationError(
-                    "discussion_readonly", "Return your clarification in the reply."
-                )
-            request_question = WorkerQuestion.model_validate(arguments)
-            question = self.execution.ask_question(
-                self.run.project_id,
-                self.run.id,
-                QuestionCreate(
-                    **request_question.model_dump(),
-                    task_id=self.run.task_id,
-                    blocking_scope=("The worker needs this answer before continuing the task."),
-                    author=f"worker:{self.run.id[:8]}",
-                ),
-            )
-            self.question_id = question.id
-            return (
-                "Question recorded in Needs you. End your turn so the service can preserve "
-                "your work. A saved answer will be supplied to an eligible fresh attempt."
-            )
-        if name == "submit_result":
-            result = WorkerSubmission.model_validate(arguments)
-            self.execution.report_result(self.run.project_id, self.run.id, result)
-            self.result = result
-            if self.run.purpose == "discussion":
-                return "Reply received. End your turn so the service can deliver your answer."
-            return (
-                "Result received for this attempt. End your turn so the service "
-                "can stop execution and capture code for review."
-            )
-        raise ApplicationError(
-            "worker_operation_denied", "This operation is outside the worker's task scope.", 403
-        )
-
-
 class Supervisor:
     def __init__(self, workspace: Workspace):
         self.workspace, self.execution = workspace, Execution(workspace)
@@ -262,9 +60,11 @@ class Supervisor:
         self.results = Results(workspace)
         self.setup_validation = SetupValidation(workspace)
         self.delivery_jobs: dict[str, asyncio.Task[None]] = {}
-        self.clients: dict[str, CodexWorker] = {}
+        self.clients: dict[str, CodexWorker | CodexAgent] = {}
         self.permissions = Permissions(workspace)
         self.jobs: dict[str, asyncio.Task[None]] = {}
+        self.setup_jobs: dict[str, asyncio.Task[list[CheckResult]]] = {}
+        self.catalog_job: asyncio.Task[list[ModelOption]] | None = None
         self.loop_task: asyncio.Task[None] | None = None
         self.lock: BinaryIO | None = None
         self.closing = False
@@ -297,20 +97,34 @@ class Supervisor:
             raise
 
     async def model_options(self) -> list[ModelOption]:
-        client = CodexWorker(self.workspace.directory)
-        try:
-            await client.start()
-            return await client.models()
-        finally:
-            await client.close()
+        if self.closing:
+            raise ApplicationError("service_stopping", "The service is stopping.", 409)
+        if self.catalog_job is None or self.catalog_job.done():
+            self.catalog_job = asyncio.create_task(model_options(self.workspace.directory))
+        return await asyncio.shield(self.catalog_job)
 
     async def configure(self, project_id: str, request: SettingsEdit) -> WorkerSettings:
-        await self.validate_agent_choice(AgentChoice(model=request.model, effort=request.effort))
+        await self.validate_agent_choice(
+            AgentChoice(model=request.model, effort=request.effort, mode=request.mode), project_id
+        )
         return self.execution.configure(project_id, request)
 
-    async def validate_agent_choice(self, choice: AgentChoice) -> None:
+    async def validate_agent_choice(
+        self, choice: AgentChoice, project_id: str | None = None
+    ) -> None:
+        if choice.mode and project_id and self.integrations.settings(project_id).runtime != "local":
+            raise ApplicationError(
+                "local_adoption_required",
+                "Select Local in Integration settings before choosing a native worker mode.",
+                409,
+            )
         models = await self.model_options()
-        if not any(item.id == choice.model and choice.effort in item.efforts for item in models):
+        if not any(
+            item.id == choice.model
+            and choice.effort in item.efforts
+            and (choice.mode is None or choice.mode in {mode.id for mode in item.modes})
+            for item in models
+        ):
             raise ApplicationError(
                 "model_unavailable",
                 "Choose a model and effort returned by this Codex installation.",
@@ -394,8 +208,11 @@ class Supervisor:
             )
 
     async def _execute(self, run: Run, repository: Path) -> None:
-        client: CodexWorker | None = None
+        client: CodexWorker | CodexAgent | None = None
+        environment: LocalEnvironment | LocalAttempt | None = None
+        scope_stack = contextlib.AsyncExitStack()
         activity: ActivityRecorder | None = None
+        applied_agent: AgentChoice | None = None
         terminal: RunStatus = "failed"
         problem: str | None = None
         result: WorkerResult | None = None
@@ -413,59 +230,124 @@ class Supervisor:
                         "This retry's code baseline lacks a prerequisite result. "
                         "Integrate the required code before starting a fresh attempt.",
                     )
-            environment = await asyncio.to_thread(
-                LocalEnvironment.prepare,
-                self.workspace.directory,
-                repository,
-                run.id,
-                starting_commit,
-                run.environment,
-                [self.workspace.directory, *[Path(p.path) for p in self.workspace.projects()]],
-            )
-            self.execution.save_local(
-                run.id,
-                {
+            if run.runtime == "local":
+                from flowfield.adapters.agent_mcp import serve_scope
+                from flowfield.agent_tools import worker_scope
+
+                environment = await asyncio.to_thread(
+                    LocalHost(os.environ).prepare,
+                    self.workspace.directory,
+                    repository,
+                    run.id,
+                    starting_commit,
+                )
+                metadata: dict[str, Any] = {
+                    "runtime_kind": "local",
                     "root": str(environment.root),
                     "checkout": str(environment.checkout),
                     "runtime": str(environment.runtime),
                     "common_git": str(environment.common_git),
-                    "python_runtime": str(environment.python_runtime),
-                },
-            )
-            provisional = CodexWorker(environment.checkout)
-            config = configuration(environment, provisional.binary)
-            client = CodexWorker(environment.checkout, config)
-            self.clients[run.id] = client
-            await client.start()
-            assert client.process
-            self.execution.save_local(
-                run.id,
-                {
-                    "root": str(environment.root),
-                    "checkout": str(environment.checkout),
-                    "runtime": str(environment.runtime),
-                    "common_git": str(environment.common_git),
-                    "python_runtime": str(environment.python_runtime),
-                    "pid": client.process.pid,
-                    "process_stamp": await asyncio.to_thread(process_stamp, client.process.pid),
-                },
-            )
-            client.on_commands = lambda commands: self.execution.save_local(
-                run.id, {**self.execution.local(run.id), "commands": commands}
-            )
-            await preflight(
-                client,
-                environment,
-                self.workspace.directory,
-                [Path(p.path) for p in self.workspace.projects()],
-            )
+                }
+                self.execution.save_local(run.id, metadata)
+                client = CodexAgent(
+                    self.workspace.directory, environment.checkout, environment.launch_environment()
+                )
+                self.clients[run.id] = client
+                bridge = WorkerBridge(self.execution, run, client)
+                server = await scope_stack.enter_async_context(serve_scope(worker_scope(bridge)))
+                # Persist before launch: after a crash, missing PID is not a cleanup receipt.
+                metadata["native_launch_started"] = True
+                self.execution.save_local(run.id, metadata)
+                await client.start([server])
+                assert client.process
+                metadata.update(
+                    pid=client.process.pid,
+                    process_stamp=await asyncio.to_thread(process_stamp, client.process.pid),
+                )
+                self.execution.save_local(run.id, metadata)
+                choice = (
+                    run.agent_settings.choice
+                    if run.agent_settings
+                    else AgentChoice(model=run.model, effort=run.effort)
+                )
+                applied_agent = await client.configure(
+                    choice, discussion=run.purpose == "discussion"
+                )
+            else:
+                environment = await asyncio.to_thread(
+                    LocalEnvironment.prepare,
+                    self.workspace.directory,
+                    repository,
+                    run.id,
+                    starting_commit,
+                    run.environment,
+                    [self.workspace.directory, *[Path(p.path) for p in self.workspace.projects()]],
+                )
+                self.execution.save_local(
+                    run.id,
+                    {
+                        "root": str(environment.root),
+                        "checkout": str(environment.checkout),
+                        "runtime": str(environment.runtime),
+                        "common_git": str(environment.common_git),
+                        "python_runtime": str(environment.python_runtime),
+                    },
+                )
+                provisional = CodexWorker(environment.checkout)
+                config = configuration(environment, provisional.binary)
+                client = CodexWorker(environment.checkout, config)
+                assert isinstance(client, CodexWorker)
+                self.clients[run.id] = client
+                await client.start()
+                assert client.process
+                self.execution.save_local(
+                    run.id,
+                    {
+                        "root": str(environment.root),
+                        "checkout": str(environment.checkout),
+                        "runtime": str(environment.runtime),
+                        "common_git": str(environment.common_git),
+                        "python_runtime": str(environment.python_runtime),
+                        "pid": client.process.pid,
+                        "process_stamp": await asyncio.to_thread(process_stamp, client.process.pid),
+                    },
+                )
+                client.on_commands = lambda commands: self.execution.save_local(
+                    run.id, {**self.execution.local(run.id), "commands": commands}
+                )
+                await preflight(
+                    client,
+                    environment,
+                    self.workspace.directory,
+                    [Path(p.path) for p in self.workspace.projects()],
+                )
             if getattr(client, "supports_activity", False):
                 activity = ActivityRecorder(self.workspace, run.project_id, run.id)
                 client.on_activity = activity.emit
                 activity.emit(
                     ActivityUpdate(key="started", kind="status", text="Worker environment ready.")
                 )
-            setup = await run_checks(client, run.setup_commands, run.setup_timeout_seconds)
+            if self.execution.get(run.project_id, run.id).status == "stopping":
+                raise ApplicationError("worker_stopping", "Stop requested; work preserved.", 409)
+            if isinstance(environment, LocalAttempt):
+                setup_job = asyncio.create_task(
+                    local_checks.run_checks(
+                        environment,
+                        run.setup_commands,
+                        run.setup_timeout_seconds,
+                        lambda pid: self.execution.save_local(
+                            run.id, {**self.execution.local(run.id), "setup_process": pid}
+                        ),
+                    )
+                )
+                self.setup_jobs[run.id] = setup_job
+                try:
+                    setup = await setup_job
+                finally:
+                    self.setup_jobs.pop(run.id, None)
+            else:
+                assert isinstance(client, CodexWorker)
+                setup = await run_checks(client, run.setup_commands, run.setup_timeout_seconds)
             self.execution.record_setup(run.project_id, run.id, setup)
             if any(check.exit_code for check in setup):
                 raise ApplicationError(
@@ -479,12 +361,13 @@ class Supervisor:
                     "runtime_changed_source",
                     "Setup changed source files. Fix setup commands; inspect preserved changes.",
                 )
-            self.execution.started(run.project_id, run.id)
-            bridge = WorkerBridge(self.execution, run, client)
-            client.on_tool = bridge.call
-            client.on_usage = lambda usage: self.execution.usage(run.project_id, run.id, usage)
+            self.execution.started(run.project_id, run.id, applied_agent=applied_agent)
+            if isinstance(client, CodexWorker):
+                bridge = WorkerBridge(self.execution, run, client)
+                client.on_tool = bridge.call
+                client.on_usage = lambda usage: self.execution.usage(run.project_id, run.id, usage)
             sections = self.execution.assignment(run.project_id, run.id)
-            brief = {
+            brief: dict[str, Any] = {
                 "task": sections["title"],
                 "task_type": sections.get("task_type", "feature"),
                 "base_commit": run.base_commit,
@@ -492,7 +375,9 @@ class Supervisor:
                 "decision_sequence": run.decision_sequence,
                 "completion": run.completion,
                 "target_branch": run.target_branch,
-                "configured_tools": toolchain(environment.runtime)["tools"],
+                "configured_tools": toolchain(environment.runtime)["tools"]
+                if isinstance(environment, LocalEnvironment)
+                else None,
                 **brief_context(sections, discussion=run.purpose == "discussion"),
                 "instructions": (
                     "Read complete description/feedback pages when listed as truncated. "
@@ -567,21 +452,75 @@ class Supervisor:
                     "an unavailable interactive test. Reassess the whole agreed outcome and retain "
                     "other unfinished requirements. Human test evidence is never code approval."
                 )
-            try:
-                outcome = await asyncio.wait_for(
-                    client.run(
-                        run.model,
-                        run.effort,
-                        json.dumps(brief, ensure_ascii=False),
-                        [
-                            tool
-                            for tool in worker_tools()
-                            if run.purpose == "work"
-                            or tool["name"] not in ("update_stages", "ask_question")
-                        ],
-                    ),
-                    900,
+            if isinstance(client, CodexAgent):
+                brief.pop("configured_tools", None)
+                brief["flowfield_connection"] = server.name
+                brief["instructions"] = (
+                    f"Use only the {server.name} MCP connection for Flowfield operations; "
+                    "it is bound to this worker attempt. Other Flowfield connections and the "
+                    "Flowfield CLI belong to standalone coordination; do not use them. "
+                    "Keep your assigned worker role when reading repository guidance. "
+                    + str(brief["instructions"])
+                    .replace(
+                        "Configured tools supplement the private Python runtime "
+                        "and system utilities. ",
+                        "Use the local host's installed tools and native harness permissions. ",
+                    )
+                    .replace(
+                        "Use run_command to inspect AGENTS.md and source files. "
+                        "Python is on PATH in your private runtime. ",
+                        "Use your native tools to inspect AGENTS.md and source files. ",
+                    )
+                    .replace(
+                        "Do not commit; the service will capture every tracked/nonignored file ",
+                        "Keep work on this detached checkout; do not switch branches or change "
+                        "shared refs. Local commits are allowed; the service captures the final "
+                        "tree against the assigned baseline ",
+                    )
                 )
+            try:
+                if isinstance(client, CodexAgent):
+                    assert client.session.session_id
+                    async with self.permissions.turn(
+                        run.project_id,
+                        "worker",
+                        session_id=client.session.session_id,
+                        turn_id=run.id,
+                        run_id=run.id,
+                    ) as turn:
+
+                        async def request_permission(request: PermissionRequest) -> str | None:
+                            return await turn.request(
+                                request.tool_id,
+                                request.title,
+                                [
+                                    PermissionOption.model_validate(
+                                        {"id": i, "label": label, "kind": kind}
+                                    )
+                                    for i, label, kind in request.options
+                                ],
+                                details=request.details,
+                            )
+
+                        outcome = await client.prompt(
+                            json.dumps(brief, ensure_ascii=False),
+                            None if run.purpose == "discussion" else request_permission,
+                        )
+                else:
+                    outcome = await asyncio.wait_for(
+                        client.run(
+                            run.model,
+                            run.effort,
+                            json.dumps(brief, ensure_ascii=False),
+                            [
+                                tool
+                                for tool in worker_tools()
+                                if run.purpose == "work"
+                                or tool["name"] not in ("update_stages", "ask_question")
+                            ],
+                        ),
+                        900,
+                    )
             except TimeoutError as error:
                 raise ApplicationError(
                     "worker_timeout",
@@ -638,6 +577,10 @@ class Supervisor:
                     "Worker ended without a submitted result. Inspect preserved work "
                     "and explicitly retry."
                 )
+        except asyncio.CancelledError:
+            terminal, problem = "stopped", "Execution stopped; work preserved."
+            if client and not await client.stop():
+                terminal, problem = "uncertain", "Native cleanup could not be confirmed."
         except Exception as error:
             problem = (
                 error.message
@@ -647,6 +590,10 @@ class Supervisor:
                     "Work is preserved."
                 )
             )
+            if isinstance(error, ApplicationError) and error.code == "command_cleanup_uncertain":
+                terminal = "uncertain"
+            elif self.execution.get(run.project_id, run.id).status == "stopping":
+                terminal = "stopped"
             if client and not await client.stop():
                 terminal, problem = (
                     "uncertain",
@@ -655,6 +602,18 @@ class Supervisor:
         finally:
             if client:
                 await client.close()
+                if isinstance(client, CodexAgent):
+                    self.execution.save_local(
+                        run.id,
+                        {
+                            **self.execution.local(run.id),
+                            "native_cleanup_confirmed": client.cleanup_confirmed,
+                        },
+                    )
+            try:
+                await scope_stack.aclose()
+            except (Exception, asyncio.CancelledError):
+                terminal, problem = "uncertain", "Scoped tool shutdown could not be confirmed."
             if activity:
                 captured = commit or input_checkpoint
                 if environment and captured:
@@ -687,6 +646,10 @@ class Supervisor:
         if run.status == "stopped":
             return run
         client = self.clients.get(run_id)
+        setup = self.setup_jobs.get(run_id)
+        if setup:
+            setup.cancel()
+            await asyncio.gather(setup, return_exceptions=True)
         if client:
             confirmed = await client.stop()
             task = self.jobs.get(run_id)
@@ -705,6 +668,20 @@ class Supervisor:
         if run_id in self.jobs:
             return run  # Preparation sees the stop before starting a model turn.
         metadata = self.execution.local(run_id)
+        if metadata.get("runtime_kind") == "local" and metadata.get("native_launch_started"):
+            confirmed = metadata.get("native_cleanup_confirmed") is True and not metadata.get(
+                "setup_process"
+            )
+            return self.execution.finish(
+                project_id,
+                run_id,
+                "stopped" if confirmed else "uncertain",
+                problem="Recorded native cleanup confirmed; work preserved."
+                if confirmed
+                else "The service lost the live native owner. Harness absence does not prove "
+                "its tools stopped. Work and capacity remain reserved; inspect the local "
+                "processes before recovery. No process was signalled from a saved PID.",
+            )
         pid = metadata.get("pid")
         if pid:
             stamp = await asyncio.to_thread(process_stamp, pid)
@@ -732,7 +709,14 @@ class Supervisor:
                             "inspection required."
                         ),
                     )
-        if metadata.get("commands"):
+        if (
+            metadata.get("commands")
+            or metadata.get("setup_process")
+            or (
+                metadata.get("native_launch_started")
+                and not metadata.get("native_cleanup_confirmed")
+            )
+        ):
             return self.execution.finish(
                 project_id,
                 run_id,
@@ -750,10 +734,16 @@ class Supervisor:
             ),
         )
 
-    def environment(self, run_id: str) -> LocalEnvironment | None:
+    def environment(self, run_id: str) -> LocalEnvironment | LocalAttempt | None:
         data = self.execution.local(run_id)
         if not data:
             return None
+        if data.get("runtime_kind") == "local":
+            return LocalHost(os.environ).restore(
+                run_id,
+                GitWorkspace(Path(data["root"]), Path(data["checkout"]), Path(data["common_git"])),
+                Path(data["runtime"]),
+            )
         return LocalEnvironment(
             *[
                 Path(data[key])
@@ -787,6 +777,9 @@ class Supervisor:
     async def close(self) -> None:
         self.permissions.close()
         self.closing = True
+        if self.catalog_job and not self.catalog_job.done():
+            self.catalog_job.cancel()
+            await asyncio.gather(self.catalog_job, return_exceptions=True)
         await self.setup_validation.close()
         if self.loop_task:
             self.loop_task.cancel()

@@ -4,7 +4,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from flowfield.agent_models import EffectiveAgent
+from flowfield.agent_models import AgentChoice, EffectiveAgent
 from flowfield.environment_models import EnvironmentConfig
 
 ACTIVE = ("preparing", "running", "stopping", "uncertain")
@@ -31,6 +31,7 @@ class WorkerSettings(Record):
     revision: int = 1
     model: str | None = None
     effort: str | None = None
+    mode: str | None = None
     max_parallel: int = 1
     enabled: bool = False
     problem: str | None = None
@@ -45,6 +46,7 @@ class SettingsEdit(Record):
     expected_revision: int = Field(ge=1)
     model: str = Field(min_length=1, max_length=200)
     effort: str = Field(min_length=1, max_length=40)
+    mode: str | None = Field(default=None, min_length=1, max_length=200)
     max_parallel: int = Field(default=1, ge=1, le=16)
 
 
@@ -91,10 +93,17 @@ class WorkerSubmission(WorkerResult):
     outcome: Literal["complete", "partial"]
 
 
+class NativeMode(Record):
+    id: str
+    name: str
+    description: str = ""
+
+
 class ModelOption(Record):
     id: str
     name: str
     efforts: list[str]
+    modes: list[NativeMode] = Field(default_factory=list)
 
 
 class Usage(Record):
@@ -125,6 +134,7 @@ class Correction(Record):
 
 class Run(Record):
     agent_settings: EffectiveAgent | None = None
+    applied_agent: AgentChoice | None = None
     id: str
     project_id: str
     task_id: str
@@ -142,6 +152,7 @@ class Run(Record):
     correction: Correction | None = None
     next_correction: Correction | None = None
     environment: EnvironmentConfig = Field(default_factory=EnvironmentConfig)
+    runtime: Literal["legacy", "local"] = "legacy"
     setup_commands: list[str] = Field(default_factory=list)
     setup_timeout_seconds: int = 120
     setup_checks: list[CheckResult] = Field(default_factory=list)

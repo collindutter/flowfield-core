@@ -206,7 +206,10 @@ class Replies:
                 "SELECT data FROM integration_settings WHERE project_id=?", (project_id,)
             ).fetchone()
             config_data = json.loads(config[0]) if config else {}
+            if config_data.get("runtime") == "local":
+                config_data.pop("environment", None)
             run.environment = EnvironmentConfig.model_validate(config_data.get("environment", {}))
+            run.runtime = config_data.get("runtime", "legacy")
             run.setup_commands = []  # Read-only conversations need no project installation.
             run.setup_timeout_seconds = config_data.get("setup_timeout_seconds", 120)
             # Discussions get current intent and exact selected evidence, not authority to edit it.

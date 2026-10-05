@@ -17,6 +17,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from acp.schema import HttpMcpServer
+
 from flowfield.adapters.acp_session import AcpSession
 from flowfield.adapters.codex_cleanup import quiesce, require_cleanup
 from flowfield.adapters.codex_install import install
@@ -90,7 +92,14 @@ async def probe(
     await client.start(
         [node, str(bridge)] if node else [str(bridge)],
         cwd=attempt.workspace.checkout,
-        mcp_servers=[],
+        mcp_servers=[
+            HttpMcpServer(
+                name="flowfield_probe_session",
+                type="http",
+                url="http://127.0.0.1:1/scoped-probe",
+                headers=[],
+            )
+        ],
         env=attempt.launch_environment(),
     )
     try:
@@ -112,6 +121,13 @@ async def probe(
         raise AssertionError("The runtime loaded project dotenv settings")
     messages = [json.loads(line) for line in record.read_text().splitlines()]
     thread = next(item["params"] for item in messages if item.get("method") == "thread/start")
+    configured_scope = (
+        thread.get("config", {}).get("mcp_servers", {}).get("flowfield_probe_session")
+    )
+    if not configured_scope or configured_scope.get("url") != "http://127.0.0.1:1/scoped-probe":
+        raise AssertionError(
+            "The bridge omitted the scoped endpoint beside an inherited Flowfield connection"
+        )
     turn = next(item["params"] for item in messages if item.get("method") == "turn/start")
     return {
         "prompt_stop_reason": result,
@@ -138,6 +154,7 @@ async def probe(
         "scenario": scenario,
         "selected_mode": mode,
         "attempt_cwd_forwarded": thread.get("cwd") == str(attempt.workspace.checkout),
+        "scoped_endpoint_forwarded": True,
         "native_tools_disabled": thread.get("environments") == [],
         "turn_sandbox_policy": turn.get("sandboxPolicy"),
         "turn_approval_policy": turn.get("approvalPolicy"),

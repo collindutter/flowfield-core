@@ -39,6 +39,7 @@ class PermissionRequest:
     tool_id: str
     title: str
     options: tuple[tuple[str, str, str], ...]  # id, label, kind
+    details: str = ""
 
 
 @dataclass(frozen=True)
@@ -64,11 +65,14 @@ class AcpSession:
         *,
         on_permission: PermissionHandler | None = None,
         cleanup: CleanupHandler | None = None,
+        permission_projection: Callable[[BaseModel], str] | None = None,
         request_timeout: float = 30,
         turn_timeout: float = 3600,
     ):
         self.on_event, self.on_permission = on_event, on_permission
         self.cleanup = cleanup
+        self.permission_projection = permission_projection or permission_details
+        self._tool_details: dict[str, str] = {}
         self.request_timeout, self.turn_timeout = request_timeout, turn_timeout
         self.state = "new"
         self.session_id: str | None = None
@@ -201,6 +205,7 @@ class AcpSession:
             raise ValueError("Prompt must contain text and fit the session input limit")
         assert self.transport
         self.transport.reset_budget()
+        self._tool_details.clear()
         self.state = "running"
         self._turn = asyncio.create_task(
             connection.prompt(session_id=session_id, prompt=[text_block(text)])
@@ -220,6 +225,7 @@ class AcpSession:
             raise
         finally:
             await self._cancel_permission()
+            self._tool_details.clear()
 
     async def _cancel_permission(self) -> None:
         if self._permission:
@@ -239,6 +245,15 @@ class AcpSession:
             if content.get("type") == "text":
                 self._emit(AgentEvent("text", {"text": content["text"]}))
         elif kind in {"tool_call", "tool_call_update"} and self.state == "running":
+            detail = self.permission_projection(update)
+            if detail and (
+                data["toolCallId"] not in self._tool_details
+                or data.get("content")
+                or data.get("rawInput")
+            ):
+                self._tool_details[data["toolCallId"]] = detail
+                while len(self._tool_details) > 32:
+                    del self._tool_details[next(iter(self._tool_details))]
             self._emit(
                 AgentEvent(
                     "tool",
@@ -285,6 +300,19 @@ class AcpSession:
             tool_call.tool_call_id,
             tool_call.title or "Tool permission",
             tuple((item.option_id, item.name, item.kind) for item in options),
+            bounded_details(
+                "\n\n".join(
+                    dict.fromkeys(
+                        filter(
+                            None,
+                            [
+                                self._tool_details.get(tool_call.tool_call_id, ""),
+                                self.permission_projection(tool_call),
+                            ],
+                        )
+                    )
+                )
+            ),
         )
         task = self._permission = asyncio.create_task(self.on_permission(request))
         try:
@@ -379,3 +407,29 @@ class AcpSession:
             else "interrupted"
         )
         return StopReceipt(turn_finished, exited, session_closed, graceful_exit, owned_work_stopped)
+
+
+def bounded_details(value: str) -> str:
+    from flowfield.run_activity import clean
+
+    value = clean(value)
+    return value if len(value) <= 16000 else value[:15970] + "\n[Details truncated]"
+
+
+def permission_details(tool: BaseModel) -> str:
+    """Public ACP text/diff content only; never rawInput, metadata or resource bodies."""
+    data = tool.model_dump(by_alias=True, exclude_none=True)
+    parts = [
+        f"Path: {location['path']}"
+        for location in data.get("locations", [])
+        if isinstance(location.get("path"), str)
+    ]
+    for item in data.get("content", []):
+        if item.get("type") == "content" and item.get("content", {}).get("type") == "text":
+            parts.append(item["content"]["text"])
+        elif item.get("type") == "diff":
+            parts.append(
+                f"File: {item.get('path', '')}\nBefore:\n{item.get('oldText', '')}\n"
+                f"After:\n{item.get('newText', '')}"
+            )
+    return bounded_details("\n\n".join(parts))

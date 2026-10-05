@@ -59,10 +59,20 @@ def agent_preferences_and_permissions(db: sqlite3.Connection) -> None:
     db.execute("CREATE INDEX permissions_binding ON agent_permissions(binding,status)")
 
 
+def explicit_local_runtime(db: sqlite3.Connection) -> None:
+    # Existing settings and attempts never imply consent to host inheritance.
+    for table in ("integration_settings", "runs", "inspections"):
+        db.execute(
+            f"UPDATE {table} SET data=json_set(data,'$.runtime','legacy') "
+            "WHERE json_type(data,'$.runtime') IS NULL"
+        )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
     Migration(32, agent_preferences_and_permissions),
+    Migration(33, explicit_local_runtime),
 )
 
 

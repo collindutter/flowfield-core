@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 
 import httpx
 from mcp import ClientSession
@@ -19,6 +20,27 @@ CONFIG = [
         "options": [{"value": "first", "name": "First"}, {"value": "second", "name": "Second"}],
     }
 ]
+if "managed" in sys.argv:
+    CONFIG[0]["options"] = [{"value": "test-model", "name": "Test model"}]
+    CONFIG[0]["currentValue"] = "test-model"
+    CONFIG.extend(
+        [
+            {
+                "id": "reasoning_effort",
+                "name": "Effort",
+                "type": "select",
+                "currentValue": "low",
+                "options": [{"value": "low", "name": "Low"}],
+            },
+            {
+                "id": "mode",
+                "name": "Mode",
+                "type": "select",
+                "currentValue": "read-only",
+                "options": [{"value": v, "name": v} for v in ("workspace-write", "read-only")],
+            },
+        ]
+    )
 
 
 def send(message):
@@ -50,6 +72,38 @@ async def main():
 
     async def prompt(request):
         control = json.loads(request["params"]["prompt"][0]["text"])
+        if "managed" in sys.argv:
+            assert control["flowfield_connection"] == servers[0]["name"]
+            assert control["flowfield_connection"] in control["instructions"]
+            assert "run_command" not in control["instructions"]
+            assert "private Python runtime" not in control["instructions"]
+            scenario = os.environ.get("FLOWFIELD_TEST_SCENARIO", "normal")
+            if scenario != "discussion":
+                Path("result.txt").write_text(os.environ["FLOWFIELD_RUN_ID"])
+            control = {
+                "mode": scenario,
+                "calls": [
+                    {
+                        "name": "submit_result",
+                        "arguments": {
+                            "outcome": "complete",
+                            "summary": "ACP result",
+                            "checks": "Deterministic native-tool substitute",
+                        },
+                    },
+                ],
+            }
+            if scenario == "question":
+                control["calls"] = [
+                    {
+                        "name": "ask_question",
+                        "arguments": {
+                            "question": "Which behavior?",
+                            "context": "Two options remain.",
+                            "recommendation": "Use the first option.",
+                        },
+                    }
+                ]
         mode = control.get("mode", "normal")
         if mode == "disconnect":
             os._exit(2)
@@ -65,6 +119,22 @@ async def main():
         if mode == "ignore_cancel":
             await asyncio.Event().wait()
         if mode in {"permission", "permission_disconnect"}:
+            if "managed" in sys.argv:
+                update(
+                    "tool_call",
+                    toolCallId="tool-1",
+                    title="Edit files",
+                    kind="edit",
+                    status="pending",
+                    content=[
+                        {
+                            "type": "diff",
+                            "path": "/project/code.txt",
+                            "oldText": "before",
+                            "newText": "after",
+                        }
+                    ],
+                )
             future = asyncio.get_running_loop().create_future()
             pending["permission"] = future
             send(
@@ -73,7 +143,16 @@ async def main():
                     "method": "session/request_permission",
                     "params": {
                         "sessionId": "test-session",
-                        "toolCall": {"toolCallId": "tool-1", "title": "Check"},
+                        "toolCall": {
+                            "toolCallId": "tool-1",
+                            "title": "Check",
+                            "content": [
+                                {
+                                    "type": "content",
+                                    "content": {"type": "text", "text": "command: inspect project"},
+                                }
+                            ],
+                        },
                         "options": [
                             {"optionId": "allow", "name": "Allow once", "kind": "allow_once"},
                             {"optionId": "deny", "name": "Reject once", "kind": "reject_once"},
@@ -100,6 +179,8 @@ async def main():
                     async with ClientSession(read, write) as mcp:
                         await mcp.initialize()
                         catalog = await mcp.list_tools()
+                        if "managed" in sys.argv:
+                            assert "run_command" not in {tool.name for tool in catalog.tools}
                         update(
                             "agent_message_chunk",
                             content={
@@ -190,7 +271,9 @@ async def main():
                 reply(request, {"sessionId": "test-session", "configOptions": CONFIG})
         elif method == "session/set_config_option":
             if "fallback" not in sys.argv:
-                CONFIG[0]["currentValue"] = request["params"]["value"]
+                next(item for item in CONFIG if item["id"] == request["params"]["configId"])[
+                    "currentValue"
+                ] = request["params"]["value"]
             reply(request, {"configOptions": CONFIG})
         elif method == "session/prompt":
             stopped.clear()

@@ -36,7 +36,7 @@ class AgentSettings:
             )
             return AgentSettingsView(
                 revision=current.revision,
-                selection=AgentChoice(model=current.model, effort=current.effort)
+                selection=AgentChoice(model=current.model, effort=current.effort, mode=current.mode)
                 if current.model and current.effort
                 else None,
             )

@@ -40,7 +40,13 @@ class PermissionTurn:
     open: bool = True
 
     async def request(
-        self, tool_id: str, title: str, options: list[PermissionOption], *, timeout: float = 300
+        self,
+        tool_id: str,
+        title: str,
+        options: list[PermissionOption],
+        *,
+        timeout: float = 300,
+        details: str = "",
     ) -> str | None:
         if not self.open or self.pending or not 0 < timeout <= 3600:
             raise ApplicationError("permission_unavailable", "Permission turn is unavailable.", 409)
@@ -58,6 +64,7 @@ class PermissionTurn:
             turn_id=self.turn_id,
             tool_id=tool_id,
             title=title,
+            details=details,
             options=options,
             created_at=created,
             updated_at=created,

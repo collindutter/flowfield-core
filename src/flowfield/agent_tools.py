@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from flowfield.application import Workspace
 from flowfield.errors import ApplicationError
 from flowfield.mcp import create_mcp
-from flowfield.supervisor import WorkerBridge, worker_tools
+from flowfield.worker_tools import WorkerBridge, worker_tools
 
 # Explicit authority, not "anything with a project_id argument". Human answer,
 # result approval, settings, queue, project adoption and filesystem setup are absent.
@@ -119,6 +119,11 @@ def worker_scope(bridge: WorkerBridge) -> ScopedTools:
                 name=item["name"], description=item["description"], inputSchema=item["inputSchema"]
             )
             for item in worker_tools()
+            if item["name"] != "run_command"
+            and (
+                bridge.run.purpose == "work"
+                or item["name"] not in {"ask_question", "update_stages"}
+            )
         ],
         call,
     )

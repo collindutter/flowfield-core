@@ -20,7 +20,24 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
       data: { title: "Check project behavior" },
     })
   ).json();
-  const first = { harness: "codex", model: "first", effort: "low" };
+  const first = {
+    harness: "codex",
+    model: "first",
+    effort: "low",
+    mode: "workspace-write",
+  };
+  const modes = [
+    {
+      id: "workspace-write",
+      name: "Workspace access",
+      description: "Ask before accessing the network.",
+    },
+    {
+      id: "read-only",
+      name: "Read-only",
+      description: "Ask before editing files.",
+    },
+  ];
   let settings = {
     revision: 1,
     selection: null as typeof first | null,
@@ -31,11 +48,20 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
       override_revision: 1,
     },
   };
+  await page.route(
+    "**/api/projects/agent-settings/integration",
+    async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({
+        json: { ...(await response.json()), runtime: "local" },
+      });
+    },
+  );
   await page.route("**/api/worker-models", (route) =>
     route.fulfill({
       json: [
-        { id: "first", name: "First", efforts: ["low", "high"] },
-        { id: "second", name: "Second", efforts: ["medium"] },
+        { id: "first", name: "First", efforts: ["low", "high"], modes },
+        { id: "second", name: "Second", efforts: ["medium"], modes },
       ],
     }),
   );
@@ -68,6 +94,7 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
     turn_id: "turn",
     tool_id: "check",
     title: "Run the project checks",
+    details: "command: pnpm test\ncwd: /project/worktree",
     options: [
       { id: "allow", label: "Allow once", kind: "allow_once" },
       { id: "deny", label: "Reject once", kind: "reject_once" },
@@ -110,10 +137,14 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await detail.getByLabel("Model", { exact: true }).selectOption("second");
   await expect(detail.getByLabel("Reasoning effort")).toHaveValue("");
   await detail.getByLabel("Reasoning effort").selectOption("medium");
+  await detail.getByLabel("Native access mode").selectOption("read-only");
+  await detail.getByLabel("Native access mode").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "/tmp/flowfield-slice3-native-modes.png" });
   await detail.getByRole("button", { name: "Save agent settings" }).click();
   await expect(
     detail.getByText(/Task override · Codex · second/),
   ).toBeVisible();
+  expect(settings.selection?.mode).toBe("read-only");
   await detail.getByLabel("Model", { exact: true }).selectOption("first");
   await detail.getByLabel("Reasoning effort").selectOption("high");
   settings = { ...settings, revision: 3 };
@@ -141,7 +172,10 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await detail
     .getByText("Run the project checks", { exact: true })
     .scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "/tmp/flowfield-slice2-settings.png" });
+  await expect(
+    detail.getByText("command: pnpm test", { exact: false }),
+  ).toBeVisible();
+  await page.screenshot({ path: "/tmp/flowfield-slice3-settings.png" });
   await detail.getByRole("button", { name: "Reject once" }).click();
   await expect(detail.getByRole("button", { name: "Allow once" })).toHaveCount(
     0,
@@ -243,4 +277,68 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await page.screenshot({ path: "/tmp/flowfield-slice2-attention.png" });
   await action.getByRole("button", { name: "Allow once" }).click();
   await expect(action.getByText(/Allow once · Answer recorded/)).toBeVisible();
+});
+
+test("Local adoption is explicit and preserves drafts across project tabs", async ({
+  page,
+  request,
+}) => {
+  const path = join(process.env.FLOWFIELD_SMOKE_STATE!, "local-adoption");
+  mkdirSync(path, { recursive: true });
+  expect(
+    (
+      await request.post("/api/projects/initialize", {
+        data: { path, task_prefix: "LOC" },
+      })
+    ).ok(),
+  ).toBe(true);
+  let settings = {
+    project_id: "local-adoption",
+    revision: 1,
+    runtime: "legacy",
+    target_branch: "main",
+    checks: ["pnpm test"],
+    setup_commands: ["pnpm install --frozen-lockfile"],
+    setup_timeout_seconds: 120,
+    check_timeout_seconds: 60,
+    environment: {
+      tools: { pnpm: "/old/pnpm" },
+      read_paths: [],
+      variables: { OLD: "retained" },
+    },
+  };
+  await page.route(
+    "**/api/projects/local-adoption/integration",
+    async (route) => {
+      if (route.request().method() === "PUT") {
+        expect(route.request().postDataJSON().runtime).toBe("local");
+        settings = { ...settings, revision: 2, runtime: "local" };
+      }
+      await route.fulfill({ json: settings });
+    },
+  );
+  await page.goto("/projects/local-adoption/edit/integration");
+  const selection = page.getByLabel("Use Local host");
+  await expect(selection).not.toBeChecked();
+  await expect(page.getByLabel("Executable paths")).toHaveValue(
+    "pnpm=/old/pnpm",
+  );
+  await selection.check();
+  await expect(page.getByLabel("Executable paths")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Info", exact: true }).click();
+  await page.getByRole("tab", { name: "Integration", exact: true }).click();
+  await expect(selection).toBeChecked();
+  await page.getByRole("button", { name: "Save integration settings" }).click();
+  await expect(selection).toBeDisabled();
+  await page.reload();
+  await expect(selection).toBeChecked();
+  await selection.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "/tmp/flowfield-slice3-local.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "/tmp/flowfield-slice3-local-mobile.png" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

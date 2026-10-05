@@ -167,6 +167,10 @@ def register(project_app: typer.Typer, task_app: typer.Typer) -> None:
         ctx: typer.Context,
         model: str = typer.Option(...),
         effort: str = typer.Option(...),
+        mode: str | None = typer.Option(
+            None,
+            help="Native mode ID from `worker models --json`. Omission preserves the current mode.",
+        ),
         max_parallel: int = typer.Option(1, min=1, max=16),
         project: ProjectOption = None,
         json_output: Json = False,
@@ -181,6 +185,7 @@ def register(project_app: typer.Typer, task_app: typer.Typer) -> None:
                     "expected_revision": current["revision"],
                     "model": model,
                     "effort": effort,
+                    "mode": mode if mode is not None else current.get("mode"),
                     "max_parallel": max_parallel,
                 },
             )

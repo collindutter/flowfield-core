@@ -1,5 +1,6 @@
 """Prepare exact-result copies and read retained inspections without running project commands."""
 
+import os
 import shlex
 from pathlib import Path
 from uuid import uuid4
@@ -7,6 +8,7 @@ from uuid import uuid4
 from flowfield.adapters import git_integration as gitops
 from flowfield.adapters.inspection_launcher import write_launcher
 from flowfield.adapters.local_environment import LocalEnvironment, baseline, git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import Workspace, now
 from flowfield.errors import ApplicationError
 from flowfield.inspection_models import (
@@ -77,7 +79,8 @@ class Inspections:
     def _observe(self, value: Inspection) -> Inspection:
         settings = self.integrations.settings(value.project_id)
         value.instructions_changed = (
-            settings.environment != value.environment
+            settings.runtime != value.runtime
+            or settings.environment != value.environment
             or settings.setup_commands != value.setup_commands
             or self.settings(value.project_id).run_command != value.run_command
         )
@@ -172,18 +175,31 @@ class Inspections:
                 commit=commit,
                 created_at=now(),
                 environment=settings.environment,
+                runtime=settings.runtime,
                 setup_commands=settings.setup_commands,
                 run_command=instructions.run_command,
             )
             self._save(value, insert=True)
             try:
-                environment = LocalEnvironment.prepare(
-                    self.workspace.directory / "inspection-work",
-                    repository,
-                    value.id,
-                    commit,
-                    settings.environment,
-                    [self.workspace.directory, *[Path(p.path) for p in self.workspace.projects()]],
+                environment = (
+                    LocalHost(os.environ).prepare(
+                        self.workspace.directory / "inspection-work",
+                        repository,
+                        value.id,
+                        commit,
+                    )
+                    if settings.runtime == "local"
+                    else LocalEnvironment.prepare(
+                        self.workspace.directory / "inspection-work",
+                        repository,
+                        value.id,
+                        commit,
+                        settings.environment,
+                        [
+                            self.workspace.directory,
+                            *[Path(p.path) for p in self.workspace.projects()],
+                        ],
+                    )
                 )
                 value.workspace = str(environment.checkout)
                 if value.run_command:

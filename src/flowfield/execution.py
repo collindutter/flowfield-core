@@ -5,6 +5,7 @@ import sqlite3
 from typing import Any
 from uuid import uuid4
 
+from flowfield.agent_models import AgentChoice
 from flowfield.agent_settings import AgentSettings
 from flowfield.application import Task, TaskRevision, Workspace, now
 from flowfield.errors import ApplicationError
@@ -77,6 +78,7 @@ class Execution:
             settings = self._settings(db, project_id)
             self.workspace._current(settings.revision, request.expected_revision)
             settings.model, settings.effort = request.model, request.effort
+            settings.mode = request.mode
             settings.max_parallel, settings.problem = request.max_parallel, None
             self._save_settings(db, settings)
             return settings
@@ -412,6 +414,10 @@ class Execution:
                     "SELECT data FROM integration_settings WHERE project_id=?", (project_id,)
                 ).fetchone()
                 runtime_settings = json.loads(runtime_row[0]) if runtime_row else {}
+                if runtime_settings.get("runtime") == "local":
+                    runtime_settings.pop(
+                        "environment", None
+                    )  # Retained legacy inventory is inactive.
                 if (
                     (continuation or retrying_input)
                     and predecessor
@@ -446,6 +452,7 @@ class Execution:
                     input_base_commit=input_base,
                     correction=correction,
                     environment=runtime_settings.get("environment", {}),
+                    runtime=runtime_settings.get("runtime", "legacy"),
                     setup_commands=runtime_settings.get("setup_commands", []),
                     setup_timeout_seconds=runtime_settings.get("setup_timeout_seconds", 120),
                     model=effective.choice.model,
@@ -685,13 +692,16 @@ class Execution:
             self._save(db, run)
             return question
 
-    def started(self, project_id: str, run_id: str) -> Run:
+    def started(
+        self, project_id: str, run_id: str, *, applied_agent: AgentChoice | None = None
+    ) -> Run:
         with self.workspace.connection(write=True, project_id=project_id) as db:
             run = self._run(db, project_id, run_id)
             if run.status != "preparing":
                 raise ApplicationError("run_changed", "Attempt no longer awaits launch.", 409)
             task = self.workspace._task(db, project_id, run.task_id)
             self._current_assignment(run, task)
+            run.applied_agent = applied_agent
             run.status, run.started_at = "running", now()
             self._save(db, run)
             return run

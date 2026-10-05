@@ -27,6 +27,9 @@ export function PermissionControl({
         {record.role === "worker" ? "Worker" : "Coordinator"} tool permission ·{" "}
         <Timestamp date={record.created_at} />
       </p>
+      {record.details && (
+        <pre className="evidence-output">{record.details}</pre>
+      )}
       {record.status === "pending" ? (
         <>
           <p>

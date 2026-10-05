@@ -15,15 +15,19 @@ type Model = components["schemas"]["ModelOption"];
 export function AgentModelFields({
   model,
   effort,
+  mode,
+  modesEnabled = true,
   models,
   loading,
   change,
 }: {
   model: string;
   effort: string;
+  mode: string;
+  modesEnabled?: boolean;
   models: Model[];
   loading: boolean;
-  change: (model: string, effort: string) => void;
+  change: (model: string, effort: string, mode: string) => void;
 }) {
   const selected = models.find((item) => item.id === model);
   return (
@@ -35,7 +39,7 @@ export function AgentModelFields({
           value={model}
           required
           disabled={loading}
-          onChange={(event) => change(event.target.value, "")}
+          onChange={(event) => change(event.target.value, "", mode)}
         >
           <option value="">Choose a model</option>
           {model && !selected && (
@@ -55,7 +59,7 @@ export function AgentModelFields({
           value={effort}
           required
           disabled={loading || !model}
-          onChange={(event) => change(model, event.target.value)}
+          onChange={(event) => change(model, event.target.value, mode)}
         >
           <option value="">Choose an effort</option>
           {effort && !selected?.efforts.includes(effort) && (
@@ -68,22 +72,54 @@ export function AgentModelFields({
           ))}
         </NativeSelect>
       </Label>
+      {modesEnabled && !!selected?.modes?.length && (
+        <Label className="field block">
+          Native access mode
+          <NativeSelect
+            aria-label="Native access mode"
+            value={mode}
+            required
+            disabled={loading}
+            onChange={(event) => change(model, effort, event.target.value)}
+          >
+            <option value="">Choose a mode</option>
+            {mode && !selected.modes.some((item) => item.id === mode) && (
+              <option value={mode}>{mode} (unavailable)</option>
+            )}
+            {selected.modes.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </NativeSelect>
+          <span className="detail-metadata">
+            {selected.modes.find((item) => item.id === mode)?.description}
+          </span>
+        </Label>
+      )}
     </>
   );
 }
 
 export function AgentSettingsEditor({
+  projectId,
   path,
   refresh,
   onDirty,
   coordinator = false,
 }: {
+  projectId: string;
   path: string;
   refresh: unknown;
   onDirty: (value: boolean) => void;
   coordinator?: boolean;
 }) {
   const resource = useResource<Settings>(path, refresh);
+  const runtime = useResource<components["schemas"]["IntegrationSettings"]>(
+    coordinator ? null : `projects/${projectId}/integration`,
+    refresh,
+  );
+  const local = coordinator || runtime.data?.runtime === "local";
   const [retry, setRetry] = useState(0);
   const catalog = useResource<Model[]>("worker-models", retry);
   const [draft, setDraft] = useState<{
@@ -98,16 +134,17 @@ export function AgentSettingsEditor({
   const choice = selection ?? data?.effective?.choice;
   const model = choice?.model ?? "";
   const effort = choice?.effort ?? "";
+  const mode = choice?.mode ?? "";
   const stale = !!(draft && data && draft.revision !== data.revision);
   useEffect(() => {
     onDirty(!!draft);
     return () => onDirty(false);
   }, [draft, onDirty]);
-  function change(model: string, effort: string) {
+  function change(model: string, effort: string, mode: string) {
     if (data)
       setDraft({
         revision: draft?.revision ?? data.revision,
-        selection: { harness: "codex", model, effort },
+        selection: { harness: "codex", model, effort, mode: mode || null },
       });
   }
   async function save(reset = false) {
@@ -155,7 +192,9 @@ export function AgentSettingsEditor({
         Harness: Codex.{" "}
         {coordinator
           ? "Coordinator Chat is not active yet."
-          : "Tool approvals are disabled in the current worker runtime."}
+          : local
+            ? "Native tool decisions never approve code delivery. Replies use read-only access."
+            : "Legacy workers retain disabled tool approvals. Select Local in Integration settings to use native modes."}
       </p>
       {(catalog.error || (!catalog.loading && !catalog.data?.length)) && (
         <Alert>
@@ -186,6 +225,8 @@ export function AgentSettingsEditor({
           <AgentModelFields
             model={model}
             effort={effort}
+            mode={mode}
+            modesEnabled={local}
             models={catalog.data ?? []}
             loading={catalog.loading}
             change={change}
@@ -275,6 +316,7 @@ export function TaskAgentSettings({
     >
       {opened && (
         <AgentSettingsEditor
+          projectId={projectId}
           path={`projects/${projectId}/tasks/${taskId}/agent-settings`}
           refresh={refresh}
           onDirty={onDirty}

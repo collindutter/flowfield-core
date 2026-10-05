@@ -109,9 +109,10 @@ def test_worker_reads_runs_submits_and_closes_same_bridge(tmp_path):
             ],
         )
         results = [event["result"] for event in events[1:]]
-        assert all(not result["isError"] for result in results[:3]), results
+        assert not results[0]["isError"] and not results[2]["isError"], results
+        assert results[1]["isError"]
         assert results[3]["isError"]
-        assert (tmp_path / "executed").read_text() == "done"
+        assert not (tmp_path / "executed").exists()  # Native commands never pass through MCP.
         assert bridge.result.summary == "Checked"
         # Saving a report is not execution finish, code approval or delivery.
         assert execution.get("harbor", run.id).status == "running"
@@ -172,7 +173,7 @@ def test_no_silent_loss_of_tools_for_unsupported_harness(tmp_path):
     asyncio.run(exercise())
 
 
-def test_pending_command_blocks_report_and_revocation_prevents_late_work(tmp_path):
+def test_pending_workflow_operation_blocks_report_and_revocation_prevents_late_work(tmp_path):
     execution = fixture(tmp_path)
     run = execution.claim("harbor", BASE, {BASE: set()})
     assert run
@@ -181,15 +182,15 @@ def test_pending_command_blocks_report_and_revocation_prevents_late_work(tmp_pat
     async def exercise():
         started, release = asyncio.Event(), asyncio.Event()
 
-        class Commands:
-            async def command(self, script, *, timeout_ms):
+        class ControlledBridge(WorkerBridge):
+            async def call(self, name, arguments):
                 started.set()
                 await release.wait()
-                return {}
+                return await super().call(name, arguments)
 
-        grant = worker_scope(WorkerBridge(execution, run, Commands()))
-        command = asyncio.create_task(grant.call("run_command", {"command": "test"}))
-        await started.wait()
+        grant = worker_scope(ControlledBridge(execution, run, None))
+        command = asyncio.create_task(grant.call("read_context", {"section": "description"}))
+        await asyncio.wait_for(started.wait(), 2)
         result = await grant.call(
             "submit_result", {"outcome": "complete", "summary": "Late", "checks": "none"}
         )

@@ -110,6 +110,8 @@ function ExecutionDetail({
               <>
                 {" "}
                 · {run.data.model} · {run.data.effort}
+                {run.data.applied_agent?.mode &&
+                  ` · ${run.data.applied_agent.mode}`}
                 {run.data.agent_settings &&
                   ` · ${run.data.agent_settings.source === "override" ? "Task override" : "Project defaults"}`}
               </>

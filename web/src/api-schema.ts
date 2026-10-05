@@ -1900,6 +1900,8 @@ export interface components {
       model: string;
       /** Effort */
       effort: string;
+      /** Mode */
+      mode?: string | null;
     };
     /** AgentChoice */
     "AgentChoice-Output": {
@@ -1913,6 +1915,8 @@ export interface components {
       model: string;
       /** Effort */
       effort: string;
+      /** Mode */
+      mode: string | null;
     };
     /** AgentSettingsEdit */
     AgentSettingsEdit: {
@@ -2406,6 +2410,12 @@ export interface components {
       /** Launcher */
       launcher: string | null;
       environment: components["schemas"]["EnvironmentConfig"];
+      /**
+       * Runtime
+       * @default legacy
+       * @enum {string}
+       */
+      runtime: "legacy" | "local";
       /** Setup Commands */
       setup_commands: string[];
       /**
@@ -2547,6 +2557,8 @@ export interface components {
     IntegrationConfig: {
       /** Expected Revision */
       expected_revision: number;
+      /** Runtime */
+      runtime?: "local" | null;
       /** Target Branch */
       target_branch: string;
       /** Create From */
@@ -2593,6 +2605,12 @@ export interface components {
        * @default 1
        */
       revision: number;
+      /**
+       * Runtime
+       * @default legacy
+       * @enum {string}
+       */
+      runtime: "legacy" | "local";
       /** Target Branch */
       target_branch: string | null;
       /** Checks */
@@ -2733,6 +2751,20 @@ export interface components {
       name: string;
       /** Efforts */
       efforts: string[];
+      /** Modes */
+      modes: components["schemas"]["NativeMode"][];
+    };
+    /** NativeMode */
+    NativeMode: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /**
+       * Description
+       * @default
+       */
+      description: string;
     };
     /** NoticeAction */
     NoticeAction: {
@@ -2854,6 +2886,11 @@ export interface components {
       tool_id: string;
       /** Title */
       title: string;
+      /**
+       * Details
+       * @default
+       */
+      details: string;
       /** Options */
       options: components["schemas"]["PermissionOption"][];
       /**
@@ -3398,6 +3435,7 @@ export interface components {
     /** Run */
     Run: {
       agent_settings: components["schemas"]["EffectiveAgent"] | null;
+      applied_agent: components["schemas"]["AgentChoice-Output"] | null;
       /** Id */
       id: string;
       /** Project Id */
@@ -3450,6 +3488,12 @@ export interface components {
       correction: components["schemas"]["Correction"] | null;
       next_correction: components["schemas"]["Correction"] | null;
       environment: components["schemas"]["EnvironmentConfig"];
+      /**
+       * Runtime
+       * @default legacy
+       * @enum {string}
+       */
+      runtime: "legacy" | "local";
       /** Setup Commands */
       setup_commands: string[];
       /**
@@ -3606,6 +3650,8 @@ export interface components {
       model: string;
       /** Effort */
       effort: string;
+      /** Mode */
+      mode?: string | null;
       /**
        * Max Parallel
        * @default 1
@@ -4412,6 +4458,8 @@ export interface components {
       model: string | null;
       /** Effort */
       effort: string | null;
+      /** Mode */
+      mode: string | null;
       /**
        * Max Parallel
        * @default 1

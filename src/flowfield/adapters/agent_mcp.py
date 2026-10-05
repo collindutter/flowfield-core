@@ -6,6 +6,7 @@ import socket
 import time
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
+from uuid import uuid4
 
 import uvicorn
 from acp.schema import HttpMcpServer
@@ -35,6 +36,7 @@ async def serve_scope(
     require a separate transport adapter; never silently omit their Flowfield tools.
     """
     token = secrets.token_urlsafe(32)
+    name = "flowfield_" + uuid4().hex[:16]
     expires = time.monotonic() + lifetime
     manager = StreamableHTTPSessionManager(
         grant.server,
@@ -93,7 +95,7 @@ async def serve_scope(
                 yield HttpMcpServer.model_validate(
                     {
                         "type": "http",
-                        "name": "flowfield",
+                        "name": name,
                         "url": f"http://127.0.0.1:{sock.getsockname()[1]}/mcp",
                         "headers": [{"name": "Authorization", "value": f"Bearer {token}"}],
                     }

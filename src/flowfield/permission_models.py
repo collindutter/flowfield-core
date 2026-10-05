@@ -24,6 +24,7 @@ class PermissionRecord(AgentRecord):
     turn_id: str
     tool_id: str = Field(min_length=1, max_length=500)
     title: str = Field(min_length=1, max_length=1000)
+    details: str = Field(default="", max_length=16000)
     options: list[PermissionOption] = Field(min_length=1, max_length=16)
     revision: int = 1
     status: Literal["pending", "answered", "expired", "cancelled"] = "pending"

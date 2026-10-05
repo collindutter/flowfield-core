@@ -32,17 +32,30 @@ coordinator can actually use the connection and identify the correct project.
 
 ## Configure workers
 
+Install the managed runtime with `flowfield harness install codex` (see [runtime installation](/cli#managed-runtime-installation)).
+Native Codex must be installed and authenticated on the machine running Flowfield.
+
 Ask the coordinator to configure the project's target branch, dependency setup, verification
-and run commands, then validate setup. Choose a model and reasoning effort from the available
-catalog. You can also use the project's **Workers** and **Integration** settings in the browser.
+and run commands. In **Integration** settings, select **Use Local host** and save, then validate
+setup. In **Workers**, select a model, reasoning effort and native access mode from the
+connected harness. Project defaults can be overridden for individual tasks.
 
-Managed execution requires a usable committed Git baseline. Each worker receives an isolated
-checkout and runtime environment. Keep project and service state outside shared temporary
-directories for managed work. Workers can install project dependencies within the configured
-environment; machine-wide tools and credentials are configured separately.
+Local uses the tools, credentials and native harness configuration available to the Flowfield
+service. Each attempt gets a separate checkout, temporary directory and output directory.
+Setup chooses the project's dependency tooling; Flowfield does not create a Python environment.
+Use `FLOWFIELD_WORKSPACE` and `FLOWFIELD_RUNTIME_DIR` in reusable setup scripts. Keep databases,
+ports and other shared resources separate, or serialize work with one worker slot.
 
+Checks use the service's Local environment. Saved inspection launchers use the terminal's
+host environment plus the inspection copy's paths; credentials are never written into them.
+Native tool permission requests appear in the task and **Needs you**. Result delivery still
+requires explicit approval. Local workspaces protect ordinary parallel edits; they do not
+contain arbitrary daemons or isolate the whole machine.
+
+Existing projects retain their legacy restricted settings until Local is selected. Historical
+attempts and inspection copies retain their original configuration.
 If the service cannot find Codex, restart it from a terminal with the correct PATH, then use
-**Reload models**. A missing executable and a missing login are separate setup problems.
+**Reload models**. Installing a bridge does not enable queues or select Local for a project.
 
 ## Disconnect
 

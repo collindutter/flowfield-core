@@ -95,7 +95,7 @@ def test_schema31_upgrade_preserves_worker_settings_and_run(tmp_path, monkeypatc
         with execution.workspace.connection(write=True) as db:
             db.execute("UPDATE runs SET data=json_remove(data,'$.agent_settings')")
     upgraded = Workspace(execution.workspace.directory)
-    assert upgraded.schema_version == 32
+    assert upgraded.schema_version == migrations.current_version()
     assert Execution(upgraded).settings("harbor") == before
     saved = Execution(upgraded).get("harbor", run.id)
     assert saved.model == run.model and saved.agent_settings is None

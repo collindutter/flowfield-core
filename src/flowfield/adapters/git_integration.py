@@ -1,5 +1,6 @@
 """Local Git integration: isolated candidates, bounded checks, compare-and-swap refs."""
 
+import asyncio
 import fcntl
 import os
 import signal
@@ -9,8 +10,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from flowfield.adapters import git_checkout
+from flowfield.adapters import git_checkout, local_checks
 from flowfield.adapters.local_environment import LocalEnvironment, contains, git
+from flowfield.adapters.local_execution import LocalAttempt
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import CheckResult
 from flowfield.integration_models import CheckoutBinding
@@ -148,8 +150,10 @@ def correction_seed(repository: Path, before: str, source: str, identity: str) -
 
 
 def run_checks(
-    environment: LocalEnvironment, commands: list[str], timeout: int = 60
+    environment: LocalEnvironment | LocalAttempt, commands: list[str], timeout: int = 60
 ) -> list[CheckResult]:
+    if isinstance(environment, LocalAttempt):
+        return asyncio.run(local_checks.run_checks(environment, commands, timeout))
     reports = []
     for command in commands:
         # Explicit project check commands are trusted local code, not a security sandbox.
@@ -198,7 +202,7 @@ def run_checks(
     return reports
 
 
-def unchanged(environment: LocalEnvironment, commit: str) -> bool:
+def unchanged(environment: LocalEnvironment | LocalAttempt, commit: str) -> bool:
     snapshot, _ = environment.snapshot(commit)
     return git(environment.checkout, "rev-parse", snapshot + "^{tree}") == git(
         environment.checkout, "rev-parse", commit + "^{tree}"
