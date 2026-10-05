@@ -48,6 +48,23 @@ checkouts after you increase the maximum to two. Waiting for review frees the wo
 **Needs you** collects questions, reviews and interventions. The browser's Connected
 indicator describes its live update stream.
 
+## Agent settings and permissions
+
+Project worker defaults and task overrides select a model and reasoning effort together.
+Each attempt saves the choice it used. Changing defaults does not alter running attempts
+or explicit task overrides. Unavailable choices fail explicitly instead of selecting
+another model.
+
+Coordinator defaults are saved separately under **Project settings → Coordinator** for
+built-in Coordinator Chat. They do not configure your standalone coding agent.
+
+Current managed workers use their configured restricted environment without interactive
+tool approvals. Native permission modes and automated permission review are not yet
+selectable. Tool permission requests from connected harness sessions have durable answers
+and response controls in the task view and **Needs you**. Requests expire or close when
+their live turn ends; saved answers are never replayed into another session. A tool
+permission decision does not approve a result or authorize code delivery.
+
 ## Notifications
 
 Notifications collect task-attention alerts, operation errors and available updates.

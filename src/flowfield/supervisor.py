@@ -17,6 +17,7 @@ from flowfield.adapters.codex_environment import configuration, preflight, run_c
 from flowfield.adapters.codex_worker import CodexWorker
 from flowfield.adapters.local_environment import LocalEnvironment, contains, git
 from flowfield.adapters.toolchain import toolchain
+from flowfield.agent_models import AgentChoice
 from flowfield.application import Workspace
 from flowfield.errors import ApplicationError
 from flowfield.execution import Execution
@@ -33,6 +34,7 @@ from flowfield.execution_models import (
     WorkerSubmission,
 )
 from flowfield.integration import Integrations
+from flowfield.permissions import Permissions
 from flowfield.questions import QuestionCreate
 from flowfield.results import Results
 from flowfield.run_activity import ActivityRecorder, ActivityUpdate
@@ -261,6 +263,7 @@ class Supervisor:
         self.setup_validation = SetupValidation(workspace)
         self.delivery_jobs: dict[str, asyncio.Task[None]] = {}
         self.clients: dict[str, CodexWorker] = {}
+        self.permissions = Permissions(workspace)
         self.jobs: dict[str, asyncio.Task[None]] = {}
         self.loop_task: asyncio.Task[None] | None = None
         self.lock: BinaryIO | None = None
@@ -274,6 +277,7 @@ class Supervisor:
             with self.workspace.connection():
                 pass
             self.execution.restart()
+            self.permissions.restart()
             recovery = asyncio.create_task(asyncio.to_thread(self.integrations.restart))
             try:
                 await asyncio.shield(recovery)
@@ -301,14 +305,17 @@ class Supervisor:
             await client.close()
 
     async def configure(self, project_id: str, request: SettingsEdit) -> WorkerSettings:
+        await self.validate_agent_choice(AgentChoice(model=request.model, effort=request.effort))
+        return self.execution.configure(project_id, request)
+
+    async def validate_agent_choice(self, choice: AgentChoice) -> None:
         models = await self.model_options()
-        if not any(item.id == request.model and request.effort in item.efforts for item in models):
+        if not any(item.id == choice.model and choice.effort in item.efforts for item in models):
             raise ApplicationError(
                 "model_unavailable",
                 "Choose a model and effort returned by this Codex installation.",
                 409,
             )
-        return self.execution.configure(project_id, request)
 
     def _available(self, project_id: str, repository: Path, head: str) -> dict[str, set[str]]:
         with self.workspace.connection() as db:
@@ -676,6 +683,7 @@ class Supervisor:
 
     async def stop(self, project_id: str, run_id: str, request: RunAction) -> Run:
         run = self.execution.stop_requested(project_id, run_id, request)
+        self.permissions.close_run(project_id, run_id)
         if run.status == "stopped":
             return run
         client = self.clients.get(run_id)
@@ -777,6 +785,7 @@ class Supervisor:
         return self.execution.get(project_id, run_id)
 
     async def close(self) -> None:
+        self.permissions.close()
         self.closing = True
         await self.setup_validation.close()
         if self.loop_task:

@@ -1,7 +1,7 @@
 import { useNotifications } from "./Notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { AgentModelFields } from "./AgentSettings";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -127,12 +127,14 @@ export function QueueControls({
 export function WorkerSettings({
   projectId,
   onDirty,
+  refresh,
 }: {
+  refresh: unknown;
   projectId: string;
   onDirty: (value: boolean) => void;
 }) {
   const path = `projects/${projectId}/workers`;
-  const resource = useResource<Settings>(path, projectId);
+  const resource = useResource<Settings>(path, refresh);
   const [modelRetry, setModelRetry] = useState(0);
   const catalog = useResource<Model[]>("worker-models", modelRetry);
   const models = catalog.data ?? [];
@@ -140,6 +142,7 @@ export function WorkerSettings({
     model: string;
     effort: string;
     cap: number;
+    revision: number;
   } | null>(null);
   const model = draft?.model ?? resource.data?.model ?? "";
   const effort = draft?.effort ?? resource.data?.effort ?? "";
@@ -155,7 +158,11 @@ export function WorkerSettings({
     onDirty(dirty);
     return () => onDirty(false);
   }, [dirty, onDirty]);
-  const selected = models.find((item) => item.id === model);
+  const stale = !!(
+    draft &&
+    resource.data &&
+    draft.revision !== resource.data.revision
+  );
   return (
     <section
       className="worker-settings content-stack"
@@ -163,9 +170,13 @@ export function WorkerSettings({
       aria-label="Worker settings"
     >
       <p>
-        Choose the model for task workers. The coordinating conversation uses
-        its own model. Workers can download and install project dependencies in
-        their separate workspaces.
+        Choose the default model for task workers. Tasks can override it;
+        running attempts keep their settings. Workers can download and install
+        project dependencies in their separate workspaces.
+      </p>
+      <p className="detail-metadata">
+        Harness: Codex. Tool approvals are disabled in the current worker
+        runtime.
       </p>
       {catalog.loading && <p role="status">Loading available models…</p>}
       {!catalog.loading && (catalog.error || !models.length) && (
@@ -191,7 +202,7 @@ export function WorkerSettings({
           setError("");
           try {
             const updated = await request<Settings>(path, "PUT", {
-              expected_revision: resource.data.revision,
+              expected_revision: draft?.revision ?? resource.data.revision,
               model,
               effort,
               max_parallel: cap,
@@ -211,48 +222,20 @@ export function WorkerSettings({
           className="content-stack"
           data-space="section"
         >
-          <Label className="field block">
-            Model
-            <NativeSelect
-              aria-label="Model"
-              value={model}
-              required
-              disabled={catalog.loading}
-              onChange={(event) => {
-                setDraft({ model: event.target.value, effort: "", cap });
-              }}
-            >
-              <option value="">Choose a model</option>
-              {model && !selected && <option value={model}>{model}</option>}
-              {models.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </Label>
-          <Label className="field block">
-            Reasoning effort
-            <NativeSelect
-              aria-label="Reasoning effort"
-              value={effort}
-              required
-              disabled={catalog.loading || !model}
-              onChange={(event) =>
-                setDraft({ model, effort: event.target.value, cap })
-              }
-            >
-              <option value="">Choose an effort</option>
-              {effort && !selected?.efforts.includes(effort) && (
-                <option value={effort}>{effort}</option>
-              )}
-              {selected?.efforts.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </NativeSelect>
-          </Label>
+          <AgentModelFields
+            model={model}
+            effort={effort}
+            models={models}
+            loading={catalog.loading}
+            change={(model, effort) =>
+              setDraft({
+                model,
+                effort,
+                cap,
+                revision: draft?.revision ?? resource.data!.revision,
+              })
+            }
+          />
           <Label className="field block">
             Maximum parallel workers
             <Input
@@ -261,21 +244,39 @@ export function WorkerSettings({
               max={16}
               value={cap}
               onChange={(event) =>
-                setDraft({ model, effort, cap: Number(event.target.value) })
+                setDraft({
+                  model,
+                  effort,
+                  cap: Number(event.target.value),
+                  revision: draft?.revision ?? resource.data!.revision,
+                })
               }
             />
           </Label>
           <div className="actions editor-actions">
-            <Button size="sm" disabled={!dirty || !model || !effort}>
+            <Button
+              size="sm"
+              disabled={
+                !dirty ||
+                stale ||
+                !models.some(
+                  (item) => item.id === model && item.efforts.includes(effort),
+                )
+              }
+            >
               Save worker settings
             </Button>
           </div>
         </fieldset>
       </form>
-      {(error || resource.error) && (
+      {(error || resource.error || stale) && (
         <>
           <Alert variant="destructive">
-            <AlertDescription>{error || resource.error}</AlertDescription>
+            <AlertDescription>
+              {error ||
+                resource.error ||
+                "Settings changed elsewhere. Load the latest settings before saving."}
+            </AlertDescription>
           </Alert>
           <Button
             size="sm"

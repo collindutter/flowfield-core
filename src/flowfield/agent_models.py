@@ -1,0 +1,36 @@
+"""Shared agent preferences and immutable settings provenance."""
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class AgentRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", json_schema_serialization_defaults_required=True)
+
+
+class AgentChoice(AgentRecord):
+    harness: Literal["codex"] = "codex"
+    model: str = Field(min_length=1, max_length=200)
+    effort: str = Field(min_length=1, max_length=40)
+
+
+class EffectiveAgent(AgentRecord):
+    choice: AgentChoice
+    source: Literal["project", "override"]
+    default_revision: int
+    override_revision: int | None = None
+
+
+class AgentSettingsView(AgentRecord):
+    revision: int = 1
+    selection: AgentChoice | None = None
+    effective: EffectiveAgent | None = None
+
+
+class AgentSettingsEdit(AgentRecord):
+    expected_revision: int = Field(ge=1)
+    selection: AgentChoice | None = None
+
+
+AgentRole = Literal["worker", "coordinator"]

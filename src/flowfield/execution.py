@@ -5,6 +5,7 @@ import sqlite3
 from typing import Any
 from uuid import uuid4
 
+from flowfield.agent_settings import AgentSettings
 from flowfield.application import Task, TaskRevision, Workspace, now
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import (
@@ -424,6 +425,12 @@ class Execution:
                     )
                 ):
                     continue
+                effective = (
+                    AgentSettings(self.workspace)
+                    .resolve(db, project_id, "worker", task.id)
+                    .effective
+                )
+                assert effective
                 run = Run(
                     id=uuid4().hex,
                     project_id=project_id,
@@ -441,8 +448,9 @@ class Execution:
                     environment=runtime_settings.get("environment", {}),
                     setup_commands=runtime_settings.get("setup_commands", []),
                     setup_timeout_seconds=runtime_settings.get("setup_timeout_seconds", 120),
-                    model=settings.model,
-                    effort=settings.effort,
+                    model=effective.choice.model,
+                    effort=effective.choice.effort,
+                    agent_settings=effective,
                     agreement_revision=task.agreement_revision,
                     decision_sequence=task.decision_sequence,
                     base_commit=chosen_base,

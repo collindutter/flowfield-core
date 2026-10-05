@@ -8,6 +8,7 @@ import { taskHref } from "./navigation";
 import { questionHref } from "./Inbox";
 import { label } from "./workspace";
 import { WorkState } from "./WorkState";
+import { PermissionCard } from "./AgentPermissions";
 
 type Item = components["schemas"]["AttentionItem"];
 type Page = components["schemas"]["AttentionPage"];
@@ -124,29 +125,38 @@ function Column({
       <ul>
         {page.data?.items.map((item) => (
           <li key={`${item.kind}:${item.id}`}>
-            <AttentionCard
-              href={
-                item.state?.href ??
-                (item.kind === "question"
-                  ? questionHref(projectId, item.id)
-                  : item.kind === "result"
-                    ? `${taskHref(projectId, { key: item.task_key! }, "result")}/${item.id}`
-                    : `${taskHref(projectId, { key: item.task_key! }, "runs")}/${item.run_id ?? item.id}${item.kind === "integration" ? `/integrations/${item.id}` : ""}`)
-              }
-              kind={item.kind === "result" ? "Changes" : label(item.kind)}
-              reference={item.task_key ?? "Project"}
-              title={item.title}
-              selected={identity === item.id}
-              action={
-                item.state ? (
-                  <WorkState state={item.state} />
-                ) : column === "history" ? (
-                  label(item.status)
-                ) : (
-                  action(item)
-                )
-              }
-            />
+            {item.kind === "permission" ? (
+              <PermissionCard
+                projectId={projectId}
+                id={item.id}
+                taskKey={item.task_key}
+                refresh={refresh}
+              />
+            ) : (
+              <AttentionCard
+                href={
+                  item.state?.href ??
+                  (item.kind === "question"
+                    ? questionHref(projectId, item.id)
+                    : item.kind === "result"
+                      ? `${taskHref(projectId, { key: item.task_key! }, "result")}/${item.id}`
+                      : `${taskHref(projectId, { key: item.task_key! }, "runs")}/${item.run_id ?? item.id}${item.kind === "integration" ? `/integrations/${item.id}` : ""}`)
+                }
+                kind={item.kind === "result" ? "Changes" : label(item.kind)}
+                reference={item.task_key ?? "Project"}
+                title={item.title}
+                selected={identity === item.id}
+                action={
+                  item.state ? (
+                    <WorkState state={item.state} />
+                  ) : column === "history" ? (
+                    label(item.status)
+                  ) : (
+                    action(item)
+                  )
+                }
+              />
+            )}
           </li>
         ))}
       </ul>

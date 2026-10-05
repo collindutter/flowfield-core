@@ -8,6 +8,8 @@ import { TaskNeeds, TaskState, hasTaskNeeds } from "./TaskNeeds";
 import { TaskConversation, StageHeader } from "./TaskConversation";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "./ConfirmButton";
+import { TaskAgentSettings } from "./AgentSettings";
+import { AgentPermissions } from "./AgentPermissions";
 import { label, request, type Board, type Task } from "./workspace";
 export function TaskDetail({
   task,
@@ -36,15 +38,18 @@ export function TaskDetail({
     };
   }, []);
   const [dirty, setDirty] = useState(false);
+  const [settingsDirty, setSettingsDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    setUnsaved(dirty);
+    setUnsaved(dirty || settingsDirty);
     return () => setUnsaved(false);
-  }, [dirty, setUnsaved]);
+  }, [dirty, settingsDirty, setUnsaved]);
   const archiveReason = dirty
     ? "Send or discard your message before archiving."
-    : task.archive_blocker;
+    : settingsDirty
+      ? "Save or discard worker settings before archiving."
+      : task.archive_blocker;
   async function archive() {
     setBusy(true);
     setError("");
@@ -98,6 +103,11 @@ export function TaskDetail({
         </div>
       </DetailHeader>
       <ContentStack space="section" className="task-context">
+        <AgentPermissions
+          projectId={board.project.id}
+          taskId={task.id}
+          refresh={board}
+        />
         <div
           className="task-definition content-stack"
           aria-label="Current task definition"
@@ -105,6 +115,12 @@ export function TaskDetail({
           <strong>Definition</strong>
           <Markdown>{task.body}</Markdown>
         </div>
+        <TaskAgentSettings
+          projectId={board.project.id}
+          taskId={task.id}
+          refresh={board}
+          onDirty={setSettingsDirty}
+        />
         {hasTaskNeeds(task, board.pending_code[task.id], false) && (
           <DetailSection title="Waiting on">
             <TaskNeeds

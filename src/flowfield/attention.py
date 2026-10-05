@@ -15,7 +15,7 @@ AttentionColumn = Literal["action", "waiting", "history"]
 
 class AttentionItem(BaseModel):
     id: str
-    kind: Literal["question", "review", "intervention", "integration", "result"]
+    kind: Literal["question", "review", "intervention", "integration", "result", "permission"]
     task_key: str | None
     title: str
     status: str
@@ -74,6 +74,14 @@ WITH run_items AS (
     ) AS continuation
     FROM runs r WHERE r.project_id=:project
 ), items AS (
+    SELECT p.id, 'permission' AS kind, t.key AS task_key,
+        substr(json_extract(p.data,'$.title'),1,500) AS title, p.status,
+        json_extract(p.data,'$.updated_at') AS updated_at, NULL AS code_available,
+        CASE WHEN p.status='pending' THEN 'action' ELSE 'history' END AS bucket,
+        json_extract(p.data,'$.run_id') AS run_id, NULL AS result_version
+    FROM agent_permissions p LEFT JOIN tasks t ON t.project_id=p.project_id AND t.id=p.task_id
+    WHERE p.project_id=:project
+    UNION ALL
     SELECT q.id, 'question' AS kind, t.key AS task_key,
         substr(json_extract(q.data, '$.question'),1,500) AS title, q.status,
         json_extract(q.data, '$.updated_at') AS updated_at, NULL AS code_available,
@@ -178,7 +186,17 @@ def attention_page(
 
         items = [AttentionItem.model_validate(dict(row)) for row in rows]
         for item in items:
-            if column != "history" and item.kind == "question":
+            if item.kind == "permission":
+                item.state = WorkState(
+                    label="Review tool permission"
+                    if item.status == "pending"
+                    else "Permission " + item.status,
+                    tone="attention" if item.status == "pending" else "idle",
+                    href=f"/projects/{project_id}/tasks/{item.task_key}"
+                    if item.task_key
+                    else f"/projects/{project_id}/inbox",
+                )
+            elif column != "history" and item.kind == "question":
                 item.state = question_state(db, project_id, item.id)
             elif column != "history" and item.task_key:
                 item.state = task_state(workspace, db, project_id, item.task_key)

@@ -1188,6 +1188,93 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/{project_id}/coordinator-settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Coordinator Settings */
+    get: operations["coordinator_settings_api_projects__project_id__coordinator_settings_get"];
+    /** Coordinator Edit */
+    put: operations["coordinator_edit_api_projects__project_id__coordinator_settings_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/tasks/{task_id}/agent-settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Task Settings */
+    get: operations["task_settings_api_projects__project_id__tasks__task_id__agent_settings_get"];
+    /** Task Edit */
+    put: operations["task_edit_api_projects__project_id__tasks__task_id__agent_settings_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/permissions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Permissions */
+    get: operations["permissions_api_projects__project_id__permissions_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/permissions/{permission_id}/answer": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Answer */
+    post: operations["answer_api_projects__project_id__permissions__permission_id__answer_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/permissions/{permission_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Permission */
+    get: operations["permission_api_projects__project_id__permissions__permission_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/integration": {
     parameters: {
       query?: never;
@@ -1801,6 +1888,48 @@ export interface components {
       /** Identity */
       identity: string;
     };
+    /** AgentChoice */
+    "AgentChoice-Input": {
+      /**
+       * Harness
+       * @default codex
+       * @constant
+       */
+      harness: "codex";
+      /** Model */
+      model: string;
+      /** Effort */
+      effort: string;
+    };
+    /** AgentChoice */
+    "AgentChoice-Output": {
+      /**
+       * Harness
+       * @default codex
+       * @constant
+       */
+      harness: "codex";
+      /** Model */
+      model: string;
+      /** Effort */
+      effort: string;
+    };
+    /** AgentSettingsEdit */
+    AgentSettingsEdit: {
+      /** Expected Revision */
+      expected_revision: number;
+      selection?: components["schemas"]["AgentChoice-Input"] | null;
+    };
+    /** AgentSettingsView */
+    AgentSettingsView: {
+      /**
+       * Revision
+       * @default 1
+       */
+      revision: number;
+      selection: components["schemas"]["AgentChoice-Output"] | null;
+      effective: components["schemas"]["EffectiveAgent"] | null;
+    };
     /** AnswerRetract */
     AnswerRetract: {
       /** Expected Revision */
@@ -1819,7 +1948,13 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: "question" | "review" | "intervention" | "integration" | "result";
+      kind:
+        | "question"
+        | "review"
+        | "intervention"
+        | "integration"
+        | "result"
+        | "permission";
       /** Task Key */
       task_key: string | null;
       /** Title */
@@ -2035,6 +2170,19 @@ export interface components {
       ids?: number[];
       /** Through */
       through?: number | null;
+    };
+    /** EffectiveAgent */
+    EffectiveAgent: {
+      choice: components["schemas"]["AgentChoice-Output"];
+      /**
+       * Source
+       * @enum {string}
+       */
+      source: "project" | "override";
+      /** Default Revision */
+      default_revision: number;
+      /** Override Revision */
+      override_revision: number | null;
     };
     /** EnvironmentConfig */
     EnvironmentConfig: {
@@ -2653,6 +2801,83 @@ export interface components {
       /** Action */
       action?: string | null;
     };
+    /** PermissionAnswer */
+    PermissionAnswer: {
+      /** Expected Revision */
+      expected_revision: number;
+      /** Option Id */
+      option_id: string;
+    };
+    /** PermissionOption */
+    PermissionOption: {
+      /** Id */
+      id: string;
+      /** Label */
+      label: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "allow_once" | "allow_always" | "reject_once" | "reject_always";
+    };
+    /** PermissionPage */
+    PermissionPage: {
+      /** Pending */
+      pending: components["schemas"]["PermissionRecord"][];
+      /** Items */
+      items: components["schemas"]["PermissionRecord"][];
+      /** Next Before */
+      next_before: number | null;
+    };
+    /** PermissionRecord */
+    PermissionRecord: {
+      /** Id */
+      id: string;
+      /** Project Id */
+      project_id: string;
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: "worker" | "coordinator";
+      /** Task Id */
+      task_id: string | null;
+      /** Run Id */
+      run_id: string | null;
+      /** Conversation Id */
+      conversation_id: string | null;
+      /** Binding */
+      binding: string;
+      /** Turn Id */
+      turn_id: string;
+      /** Tool Id */
+      tool_id: string;
+      /** Title */
+      title: string;
+      /** Options */
+      options: components["schemas"]["PermissionOption"][];
+      /**
+       * Revision
+       * @default 1
+       */
+      revision: number;
+      /**
+       * Status
+       * @default pending
+       * @enum {string}
+       */
+      status: "pending" | "answered" | "expired" | "cancelled";
+      /** Answer */
+      answer: string | null;
+      /** Created At */
+      created_at: string;
+      /** Updated At */
+      updated_at: string;
+      /** Expires At */
+      expires_at: string;
+      /** Released At */
+      released_at: string | null;
+    };
     /** Project */
     Project: {
       /** Id */
@@ -3172,6 +3397,7 @@ export interface components {
     };
     /** Run */
     Run: {
+      agent_settings: components["schemas"]["EffectiveAgent"] | null;
       /** Id */
       id: string;
       /** Project Id */
@@ -6947,6 +7173,243 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Run"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  coordinator_settings_api_projects__project_id__coordinator_settings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentSettingsView"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  coordinator_edit_api_projects__project_id__coordinator_settings_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AgentSettingsEdit"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentSettingsView"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  task_settings_api_projects__project_id__tasks__task_id__agent_settings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        task_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentSettingsView"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  task_edit_api_projects__project_id__tasks__task_id__agent_settings_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        task_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AgentSettingsEdit"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentSettingsView"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  permissions_api_projects__project_id__permissions_get: {
+    parameters: {
+      query?: {
+        task_id?: string | null;
+        before?: number | null;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PermissionPage"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  answer_api_projects__project_id__permissions__permission_id__answer_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        permission_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PermissionAnswer"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PermissionRecord"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  permission_api_projects__project_id__permissions__permission_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        permission_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PermissionRecord"];
         };
       };
       /** @description Validation Error */

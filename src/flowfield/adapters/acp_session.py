@@ -211,6 +211,15 @@ class AcpSession:
                 self.state = "interrupted"
                 await self.close()
             raise
+        finally:
+            await self._cancel_permission()
+
+    async def _cancel_permission(self) -> None:
+        if self._permission:
+            task = self._permission
+            task.cancel()
+            with contextlib.suppress(Exception, asyncio.CancelledError):
+                await task
 
     async def session_update(self, session_id: str, update: BaseModel, **kwargs: Any) -> None:
         if session_id != self.session_id or self.state not in {"starting", "running"}:
@@ -297,18 +306,18 @@ class AcpSession:
         self.state = "stopping"
         async with self._spawn_lock:
             pass  # A concurrently starting process must acquire its owner first.
-        if self._permission:
-            self._permission.cancel()
         turn_finished = self._turn is None
         if self._turn is not None and self.connection is not None:
             try:
                 async with asyncio.timeout(timeout):
                     if not self._turn.done() and self.session_id:
                         await self.connection.cancel(session_id=self.session_id)
+                    await self._cancel_permission()
                     await asyncio.shield(self._turn)
                 turn_finished = True
             except (Exception, asyncio.CancelledError):
                 pass
+        await self._cancel_permission()
         if self.connection:
             with contextlib.suppress(Exception):
                 async with asyncio.timeout(timeout):

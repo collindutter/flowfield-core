@@ -96,6 +96,16 @@ def task_state(
     ).fetchone()
     if owner:
         status = owner["status"]
+        if (
+            status == "running"
+            and workspace.schema_version >= 32
+            and db.execute(
+                "SELECT 1 FROM agent_permissions WHERE project_id=? AND task_id=? "
+                "AND status='pending' LIMIT 1",
+                (project, task_id),
+            ).fetchone()
+        ):
+            return WorkState(label="Review tool permission", tone="attention", href=href)
         return WorkState(
             label={
                 "preparing": "Preparing worker",

@@ -178,14 +178,21 @@ class Replies:
                 return None
             assert task.publication
             source = selected.candidate_commit or selected.source_commit if selected else baseline
+            from flowfield.agent_settings import AgentSettings
+
+            effective = (
+                AgentSettings(self.workspace).resolve(db, project_id, "worker", task.id).effective
+            )
+            assert effective
             run = Run(
                 id=uuid4().hex,
                 project_id=project_id,
                 task_id=task.id,
                 task_key=task.key,
                 environment_id=uuid4().hex,
-                model=settings.model,
-                effort=settings.effort,
+                model=effective.choice.model,
+                effort=effective.choice.effort,
+                agent_settings=effective,
                 purpose="discussion",
                 reply_id=reply.id,
                 agreement_revision=task.agreement_revision,

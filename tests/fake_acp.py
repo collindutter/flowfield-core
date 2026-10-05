@@ -63,7 +63,7 @@ async def main():
             sys.stderr.flush()
         if mode == "ignore_cancel":
             await asyncio.Event().wait()
-        if mode == "permission":
+        if mode in {"permission", "permission_disconnect"}:
             future = asyncio.get_running_loop().create_future()
             pending["permission"] = future
             send(
@@ -80,6 +80,9 @@ async def main():
                     },
                 }
             )
+            if mode == "permission_disconnect":
+                await asyncio.sleep(0.15)
+                os._exit(2)
             value = await future
             update("agent_message_chunk", content={"type": "text", "text": json.dumps(value)})
         if mode == "wait":

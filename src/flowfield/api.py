@@ -242,7 +242,10 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
     app.include_router(context_router(workspace))
     app.include_router(conversation_router(workspace))
     app.include_router(question_router(workspace))
+    from flowfield.agent_api import agent_router
+
     app.include_router(execution_router(supervisor))
+    app.include_router(agent_router(supervisor))
     app.include_router(integration_router(supervisor))
     app.include_router(result_router(supervisor))
     app.include_router(inspection_router(lambda: supervisor().workspace))

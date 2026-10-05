@@ -4,6 +4,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from flowfield.agent_models import EffectiveAgent
 from flowfield.environment_models import EnvironmentConfig
 
 ACTIVE = ("preparing", "running", "stopping", "uncertain")
@@ -123,6 +124,7 @@ class Correction(Record):
 
 
 class Run(Record):
+    agent_settings: EffectiveAgent | None = None
     id: str
     project_id: str
     task_id: str

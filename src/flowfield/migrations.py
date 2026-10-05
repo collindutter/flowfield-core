@@ -43,7 +43,27 @@ def persistent_notifications(db: sqlite3.Connection) -> None:
     db.execute("CREATE TABLE notification_state (name TEXT PRIMARY KEY, data TEXT NOT NULL)")
 
 
-MIGRATIONS = (Migration(30, storage_identity), Migration(31, persistent_notifications))
+def agent_preferences_and_permissions(db: sqlite3.Connection) -> None:
+    db.execute(
+        "CREATE TABLE agent_settings (project_id TEXT NOT NULL REFERENCES projects(id), "
+        "role TEXT NOT NULL CHECK(role IN ('worker','coordinator')), scope TEXT NOT NULL, "
+        "revision INTEGER NOT NULL, selection TEXT, PRIMARY KEY(project_id,role,scope))"
+    )
+    db.execute(
+        "CREATE TABLE agent_permissions (number INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "id TEXT NOT NULL UNIQUE, project_id TEXT NOT NULL REFERENCES projects(id), "
+        "task_id TEXT, binding TEXT NOT NULL, status TEXT NOT NULL, data TEXT NOT NULL, "
+        "FOREIGN KEY(project_id,task_id) REFERENCES tasks(project_id,id))"
+    )
+    db.execute("CREATE INDEX permissions_project ON agent_permissions(project_id,task_id,number)")
+    db.execute("CREATE INDEX permissions_binding ON agent_permissions(binding,status)")
+
+
+MIGRATIONS = (
+    Migration(30, storage_identity),
+    Migration(31, persistent_notifications),
+    Migration(32, agent_preferences_and_permissions),
+)
 
 
 def current_version() -> int:
