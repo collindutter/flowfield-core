@@ -47,11 +47,14 @@ class StopReceipt:
     process_group_exited: bool
     session_closed: bool | None = None
     process_exited_gracefully: bool = False
-    # This deliberately does NOT assert that an agent's detached tools have stopped.
-    # A managed worker adapter must additionally verify its execution environment.
+    owned_work_stopped: bool | None = None
+    # Group exit alone does not establish detached-tool termination. The optional
+    # adapter receipt verifies only its declared native cleanup scope, not arbitrary
+    # daemons, external services, or containment of the local machine.
 
 
 PermissionHandler = Callable[[PermissionRequest], Coroutine[Any, Any, str | None]]
+CleanupHandler = Callable[[ClientSideConnection, str, dict[str, Any]], Coroutine[Any, Any, bool]]
 
 
 class AcpSession:
@@ -60,10 +63,12 @@ class AcpSession:
         on_event: Callable[[AgentEvent], None],
         *,
         on_permission: PermissionHandler | None = None,
+        cleanup: CleanupHandler | None = None,
         request_timeout: float = 30,
         turn_timeout: float = 3600,
     ):
         self.on_event, self.on_permission = on_event, on_permission
+        self.cleanup = cleanup
         self.request_timeout, self.turn_timeout = request_timeout, turn_timeout
         self.state = "new"
         self.session_id: str | None = None
@@ -320,6 +325,15 @@ class AcpSession:
             except (Exception, asyncio.CancelledError):
                 pass
         await self._cancel_permission()
+        owned_work_stopped = None
+        if self.cleanup is not None:
+            owned_work_stopped = False
+            if self.connection is not None and self.session_id is not None:
+                with contextlib.suppress(Exception, asyncio.CancelledError):
+                    async with asyncio.timeout(timeout):
+                        owned_work_stopped = await self.cleanup(
+                            self.connection, self.session_id, self.capabilities
+                        )
         session_closed = None
         if (
             self.connection
@@ -357,6 +371,11 @@ class AcpSession:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._stderr
         self.state = (
-            "closed" if exited and turn_finished and session_closed is not False else "interrupted"
+            "closed"
+            if exited
+            and turn_finished
+            and session_closed is not False
+            and owned_work_stopped is not False
+            else "interrupted"
         )
-        return StopReceipt(turn_finished, exited, session_closed, graceful_exit)
+        return StopReceipt(turn_finished, exited, session_closed, graceful_exit, owned_work_stopped)

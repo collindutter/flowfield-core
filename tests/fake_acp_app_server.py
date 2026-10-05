@@ -14,6 +14,8 @@ def emit(message):
 def main():
     record = Path(os.environ["FLOWFIELD_TEST_RPC_RECORD"])
     scenario = os.environ.get("FLOWFIELD_TEST_SCENARIO", "complete")
+    active = False
+    background = scenario in {"background", "cleanup-refused"}
     model = {
         "id": "test-model",
         "model": "test-model",
@@ -56,11 +58,35 @@ def main():
                 "approvalPolicy": "never",
             }
         elif method == "turn/start":
+            active = True
             result = {
                 "turn": {"id": "test-turn", "items": [], "status": "inProgress", "error": None}
             }
         elif method == "mcpServerStatus/list":
             result = {"data": [], "nextCursor": None}
+        elif method == "thread/loaded/list":
+            result = {"data": ["test-thread"], "nextCursor": None}
+        elif method == "thread/goal/get":
+            result = {"goal": None}
+        elif method == "thread/backgroundTerminals/list":
+            result = {
+                "data": [{"processId": "command-1"}] if background else [],
+                "nextCursor": None,
+            }
+        elif method == "thread/backgroundTerminals/terminate":
+            if scenario == "cleanup-refused":
+                result = {"terminated": False}
+            else:
+                background = False
+                result = {"terminated": True}
+        elif method == "thread/read":
+            result = {
+                "thread": {
+                    "id": "test-thread",
+                    "ephemeral": False,
+                    "status": {"type": "active" if active else "idle"},
+                }
+            }
         emit({"id": request["id"], "result": result})
         if method == "turn/start":
             emit(
@@ -82,6 +108,7 @@ def main():
             )
             if scenario == "cancel":
                 continue
+            active = False
             emit(
                 {
                     "method": "turn/completed",
@@ -97,6 +124,7 @@ def main():
                 }
             )
         elif method == "turn/interrupt":
+            active = False
             emit(
                 {
                     "method": "turn/completed",

@@ -67,6 +67,13 @@ jobs:
           uv run --no-sync mypy
           uv run --no-sync python scripts/generate-api-types.py --check
       - run: pnpm --dir web check
+      - run: node --test bridges/codex-acp/cleanup.test.mjs
+      - name: Build and check managed Codex bridge without models
+        run: |
+          node bridges/codex-acp/build.mjs
+          for scenario in complete cancel background cleanup-refused; do
+            uv run --no-sync python scripts/check_codex_acp.py bridges/codex-acp/.work/upstream/dist/index.js --cleanup --scenario "$scenario"
+          done
       - run: make docs
       - run: make build check-dist
       - run: uv publish --dry-run --trusted-publishing never dist/*.whl dist/*.tar.gz

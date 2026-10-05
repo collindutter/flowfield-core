@@ -18,12 +18,18 @@ import tempfile
 from pathlib import Path
 
 from flowfield.adapters.acp_session import AcpSession
+from flowfield.adapters.codex_cleanup import quiesce, require_cleanup
 from flowfield.adapters.git_workspace import baseline, git
 from flowfield.adapters.local_execution import LocalHost
 
 
 async def probe(
-    bridge: Path, scratch: Path, node: str, mode: str, scenario: str = "complete"
+    bridge: Path,
+    scratch: Path,
+    node: str,
+    mode: str,
+    scenario: str = "complete",
+    cleanup: bool = False,
 ) -> dict:
     fake = Path(__file__).resolve().parents[1] / "tests/fake_acp_app_server.py"
     launcher = scratch / "codex"
@@ -67,7 +73,9 @@ async def probe(
         if value.kind == "text":
             started.set()
 
-    client = AcpSession(event, request_timeout=10, turn_timeout=10)
+    client = AcpSession(
+        event, request_timeout=10, turn_timeout=10, cleanup=quiesce if cleanup else None
+    )
     await client.start(
         [node, str(bridge)],
         cwd=attempt.workspace.checkout,
@@ -75,16 +83,20 @@ async def probe(
         env=attempt.launch_environment(),
     )
     try:
+        if cleanup:
+            require_cleanup(client.capabilities)
         await client.select("model", "test-model")
         await client.select("reasoning_effort", "low")
         await client.select("mode", mode)
         prompt = asyncio.create_task(client.prompt("Offline conformance probe"))
         if scenario == "cancel":
             await asyncio.wait_for(started.wait(), 10)
-            await client.close()
+            await client.close(timeout=15)
         result = await prompt
     finally:
-        stopped = await client.close()
+        stopped = await client.close(timeout=15)
+    if cleanup and stopped.owned_work_stopped is not (scenario != "cleanup-refused"):
+        raise AssertionError("Unexpected managed cleanup receipt")
     messages = [json.loads(line) for line in record.read_text().splitlines()]
     thread = next(item["params"] for item in messages if item.get("method") == "thread/start")
     turn = next(item["params"] for item in messages if item.get("method") == "turn/start")
@@ -94,6 +106,7 @@ async def probe(
         "process_group_exited": stopped.process_group_exited,
         "session_closed": stopped.session_closed,
         "bridge_exited_gracefully": stopped.process_exited_gracefully,
+        "native_work_stopped": stopped.owned_work_stopped,
         "fake_native_cleanup_completed": any(
             item.get("probe_native_cleanup_completed") for item in messages
         ),
@@ -130,7 +143,12 @@ def main():
         "--mode", default="workspace-write", choices=["workspace-write", "read-only", "agent"]
     )
     parser.add_argument(
-        "--scenario", default="complete", choices=["complete", "cancel", "slow-shutdown"]
+        "--cleanup", action="store_true", help="Require the Flowfield native cleanup extension"
+    )
+    parser.add_argument(
+        "--scenario",
+        default="complete",
+        choices=["complete", "cancel", "slow-shutdown", "background", "cleanup-refused"],
     )
     args = parser.parse_args()
     node = shutil.which("node")
@@ -140,7 +158,14 @@ def main():
         print(
             json.dumps(
                 asyncio.run(
-                    probe(args.bridge.resolve(), Path(directory), node, args.mode, args.scenario)
+                    probe(
+                        args.bridge.resolve(),
+                        Path(directory),
+                        node,
+                        args.mode,
+                        args.scenario,
+                        args.cleanup,
+                    )
                 ),
                 indent=2,
             )

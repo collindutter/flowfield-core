@@ -39,7 +39,7 @@ make build
 ```
 
 `make check` runs Python formatting, lint, types and deterministic tests, generated API
-type validation, frontend checks/build, and Mintlify validation/link checks. `make smoke`
+type validation, bridge cleanup tests, frontend checks/build, and Mintlify validation/link checks. `make smoke`
 runs Chromium against the built application. `make build` produces a wheel and source
 archive with the compiled UI. Both install without Node, pnpm or a checkout at runtime.
 Use `scripts/check-install.py` from a clean installed environment to exercise the package.
