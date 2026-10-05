@@ -6,8 +6,6 @@ canonical Flowfield state before explicitly creating/loading another session.
 
 import asyncio
 import contextlib
-import os
-import signal
 from collections.abc import Callable, Coroutine, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +25,7 @@ from acp.schema import (
 from pydantic import BaseModel
 
 from flowfield.adapters.acp_transport import MAX_FRAME, StdioTransport
+from flowfield.adapters.local_process import LocalLaunchCancelled, LocalProcess
 
 
 @dataclass(frozen=True)
@@ -69,6 +68,7 @@ class AcpSession:
         self.config: list[dict[str, Any]] = []
         self.capabilities: dict[str, Any] = {}
         self.process: asyncio.subprocess.Process | None = None
+        self._local_process: LocalProcess | None = None
         self.connection: ClientSideConnection | None = None
         self.transport: StdioTransport | None = None
         self._turn: asyncio.Task[Any] | None = None
@@ -96,16 +96,15 @@ class AcpSession:
         self.state = "starting"
         try:
             async with self._spawn_lock:
-                self.process = await asyncio.create_subprocess_exec(
-                    *command,
-                    cwd=cwd,
-                    env=dict(env),
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    start_new_session=True,
-                    limit=MAX_FRAME,
-                )
+                try:
+                    self._local_process = await LocalProcess.start(
+                        command, cwd=cwd, env=env, limit=MAX_FRAME
+                    )
+                except LocalLaunchCancelled as error:
+                    self._local_process = error.owner
+                    self.process = error.owner.process
+                    raise
+                self.process = self._local_process.process
                 assert self.process.stdin and self.process.stdout and self.process.stderr
                 self._stderr = asyncio.create_task(self._drain_stderr(self.process.stderr))
                 self.transport = StdioTransport(self.process.stdout, self.process.stdin)
@@ -315,23 +314,8 @@ class AcpSession:
                 async with asyncio.timeout(timeout):
                     await self.connection.close()
         exited = True
-        if self.process is not None:
-            # Kill the owned group even if its leader exited before its children.
-            for signum in (signal.SIGTERM, signal.SIGKILL):
-                with contextlib.suppress(ProcessLookupError):
-                    os.killpg(self.process.pid, signum)
-                try:
-                    async with asyncio.timeout(timeout):
-                        await self.process.wait()
-                except TimeoutError:
-                    pass
-                await asyncio.sleep(0.02)
-                try:
-                    os.killpg(self.process.pid, 0)
-                except ProcessLookupError:
-                    break
-            else:
-                exited = False
+        if self._local_process is not None:
+            exited = await self._local_process.close(timeout=timeout)
         if self._turn:
             self._turn.cancel()
             with contextlib.suppress(Exception, asyncio.CancelledError):
