@@ -1,4 +1,4 @@
-"""Retired execution cannot silently inherit host access; saved evidence remains usable."""
+"""Current Local configuration migrates without rewriting historical execution evidence."""
 
 import asyncio
 import json
@@ -8,12 +8,9 @@ import pytest
 from test_managed_local import configured
 from test_results import current, fixture
 
-from flowfield.errors import ApplicationError
-from flowfield.execution_models import QueueEdit, RunAction
+from flowfield.execution_models import RunAction
 from flowfield.inspection import Inspections
 from flowfield.inspection_models import InspectionConfig, InspectionPrepare
-from flowfield.integration_models import IntegrationConfig
-from flowfield.setup_validation import SetupCheckRequest
 
 
 def make_legacy(service, *, inventory=False):
@@ -36,44 +33,78 @@ def make_legacy(service, *, inventory=False):
     return service.integrations.settings("harbor")
 
 
-def test_legacy_queue_and_setup_require_adoption_without_allocating_work(tmp_path, monkeypatch):
-    service, repo, _ = configured(tmp_path, monkeypatch)
-    old = make_legacy(service, inventory=True)
+@pytest.mark.parametrize("override", [True, False])
+def test_schema34_upgrades_local_and_unifies_chat_without_rewriting_history(
+    tmp_path, monkeypatch, override
+):
+    from flowfield import migrations
+    from flowfield.agent_models import AgentChoice, AgentSettingsEdit
+    from flowfield.agent_settings import AgentSettings
+    from flowfield.application import Workspace, now
+    from flowfield.coordinator_models import CoordinatorSend
+    from flowfield.coordinator_store import CoordinatorStore
+    from flowfield.execution import Execution
+    from flowfield.integration import Integrations
 
-    async def exercise():
-        with pytest.raises(ApplicationError, match="Select Local"):
-            await service.setup_validation.check(
-                "harbor", SetupCheckRequest(expected_revision=old.revision)
+    with monkeypatch.context() as older:
+        older.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:-1])
+        service, repo, run = fixture(tmp_path)
+        old = make_legacy(service, inventory=True)
+        settings = AgentSettings(service.workspace)
+        settings.edit(
+            "harbor",
+            "coordinator",
+            AgentSettingsEdit(
+                expected_revision=1, selection=AgentChoice(model="default", effort="low")
+            ),
+        )
+        store = CoordinatorStore(service.workspace)
+        first = store.new("harbor")
+        turn, _ = store.reserve(
+            "harbor", first.id, CoordinatorSend(id="old-message-123456", text="Keep this")
+        )
+        with service.workspace.connection(write=True) as db:
+            turn.status = "completed"
+            turn.native_started = True
+            store._save(db, turn)
+            db.execute(
+                "INSERT INTO coordinator_conversations(id,project_id,created_at) "
+                "VALUES ('second','harbor',?)",
+                (now(),),
             )
-        assert service.setup_validation.get("harbor") is None
-        await service.start()
-        try:
-            settings = service.execution.settings("harbor")
-            service.execution.queue(
-                "harbor", QueueEdit(expected_revision=settings.revision, enabled=True)
+            db.execute(
+                "INSERT INTO agent_settings VALUES ('harbor','coordinator','second',3,?)",
+                (
+                    AgentChoice(model="selected", effort="high").model_dump_json()
+                    if override
+                    else None,
+                ),
             )
-            async with asyncio.timeout(5):
-                while not service.execution.settings("harbor").problem:
-                    await asyncio.sleep(0.05)
-            assert "Select Local" in service.execution.settings("harbor").problem
-            assert service.execution.page("harbor").items == []
-            assert not (service.workspace.directory / "local-attempts").exists()
-        finally:
-            await service.close()
-
-    asyncio.run(exercise())
-    saved = service.integrations.configure(
-        "harbor",
-        IntegrationConfig(expected_revision=old.revision, target_branch="main", checks=["true"]),
+            db.execute(
+                "UPDATE runs SET data=json_set(data,'$.runtime','legacy') WHERE id=?", (run.id,)
+            )
+        second, _ = store.reserve(
+            "harbor", "second", CoordinatorSend(id="second-message-123456", text="Keep this too")
+        )
+        with service.workspace.connection(write=True) as db:
+            second.status = "completed"
+            store._save(db, second)
+        before = Execution(service.workspace).get("harbor", run.id)
+    upgraded = Workspace(service.workspace.directory)
+    current_settings = Integrations(upgraded).settings("harbor")
+    assert current_settings.runtime == "local" and current_settings.revision == old.revision + 1
+    assert current_settings.environment == old.environment
+    assert Execution(upgraded).get("harbor", run.id) == before
+    assert AgentSettings(upgraded).get("harbor", "coordinator").selection.model == (
+        "selected" if override else "default"
     )
-    assert saved.runtime == "legacy" and saved.environment == old.environment
-    adopted = service.integrations.configure(
-        "harbor",
-        IntegrationConfig(
-            runtime="local", expected_revision=saved.revision, target_branch="main", checks=["true"]
-        ),
-    )
-    assert adopted.runtime == "local" and adopted.environment == old.environment
+    restored = CoordinatorStore(upgraded)
+    assert restored.get("harbor", turn.id) == turn
+    assert [item.id for item in restored.page("harbor").items] == [turn.id, second.id]
+    assert restored.page("harbor").active is None
+    assert restored.new("harbor").id == "second"
+    # Reopening is idempotent; messages and original native/turn settings survive.
+    assert Integrations(Workspace(upgraded.directory)).settings("harbor") == current_settings
 
 
 def test_historical_workspaces_and_saved_inspections_remain_readable(tmp_path):
@@ -86,7 +117,7 @@ def test_historical_workspaces_and_saved_inspections_remain_readable(tmp_path):
         "harbor", InspectionPrepare(result_id=version.id, expected_revision=version.revision)
     )
     launcher = Path(copy.launcher).read_bytes()
-    old = make_legacy(service)
+    old = service.integrations.settings("harbor")
     # A historical record keeps its runtime meaning and already-created launcher.
     copy.runtime = "legacy"
     inspections._save(copy)
@@ -104,32 +135,23 @@ def test_historical_workspaces_and_saved_inspections_remain_readable(tmp_path):
     location = service.location("harbor", run.id)
     assert location.workspace == saved["checkout"] and "runtime/python/bin" in location.try_command
     assert inspections.get("harbor", copy.id).status == "ready"
-    assert (
-        inspections.prepare(
-            "harbor", InspectionPrepare(result_id=version.id, expected_revision=version.revision)
-        ).id
-        == copy.id
-    )
+    assert inspections.get("harbor", copy.id).instructions_changed
     assert Path(copy.launcher).read_bytes() == launcher
-    with pytest.raises(ApplicationError, match="Select Local"):
-        inspections.prepare(
-            "harbor",
-            InspectionPrepare(
-                result_id=version.id, expected_revision=version.revision, new_copy=True
-            ),
-        )
+    fresh = inspections.prepare(
+        "harbor",
+        InspectionPrepare(result_id=version.id, expected_revision=version.revision, new_copy=True),
+    )
+    assert fresh.runtime == "local" and fresh.id != copy.id
     assert service.integrations.settings("harbor") == old
     assert service.execution.local(run.id) == saved
 
 
-def test_new_validation_is_blocked_but_captured_result_survives(tmp_path):
+def test_new_validation_uses_local_and_captured_result_survives(tmp_path):
     service, repo, run = fixture(tmp_path)
-    make_legacy(service)
     service.results.process("harbor")
     result = current(service)
-    assert result.status == "blocked" and "Select Local" in result.problem
+    assert result.status == "ready", result.problem
     assert service.execution.get("harbor", run.id).result_commit == run.result_commit
-    assert not (service.workspace.directory / "integration-work/local-attempts").exists()
 
 
 def test_unconfirmed_historical_command_keeps_occupancy(tmp_path, monkeypatch):

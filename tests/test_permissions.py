@@ -9,7 +9,6 @@ from test_acp_session import start
 from test_execution import BASE, fixture
 
 from flowfield.adapters.acp_permissions import permission_handler
-from flowfield.agent_settings import AgentSettings
 from flowfield.attention import attention_page
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import RunAction
@@ -135,7 +134,9 @@ def test_stop_rejects_answer_and_new_turn_does_not_replay(tmp_path):
             with pytest.raises(asyncio.CancelledError):
                 await task
         assert owner.page("harbor").items[0].status == "cancelled"
-        conversation = AgentSettings(execution.workspace).new_conversation("harbor")
+        from flowfield.coordinator_store import CoordinatorStore
+
+        conversation = CoordinatorStore(execution.workspace).new("harbor").id
         async with owner.turn(
             "harbor",
             "coordinator",

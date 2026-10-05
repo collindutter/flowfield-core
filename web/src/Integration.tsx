@@ -47,7 +47,6 @@ export function IntegrationSettings({
   const resource = useResource<Settings>(path, projectId);
   const [draft, setDraft] = useState<{
     target: string;
-    local: boolean;
     checks: string;
     setup: string;
     setupTimeout: number;
@@ -56,7 +55,6 @@ export function IntegrationSettings({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const inspection = useInspectionSettings(projectId, refresh);
-  const local = draft?.local ?? resource.data?.runtime === "local";
   const target = draft?.target ?? resource.data?.target_branch ?? "";
   const checks = draft?.checks ?? resource.data?.checks.join("\n") ?? "";
   const setup = draft?.setup ?? resource.data?.setup_commands.join("\n") ?? "";
@@ -65,7 +63,6 @@ export function IntegrationSettings({
   const checkTimeout =
     draft?.checkTimeout ?? resource.data?.check_timeout_seconds ?? 60;
   const fields = {
-    local,
     target,
     checks,
     setup,
@@ -73,7 +70,6 @@ export function IntegrationSettings({
     checkTimeout,
   };
   const dirty =
-    local !== (resource.data?.runtime === "local") ||
     target !== (resource.data?.target_branch ?? "") ||
     checks !== (resource.data?.checks.join("\n") ?? "") ||
     setup !== (resource.data?.setup_commands.join("\n") ?? "") ||
@@ -90,8 +86,8 @@ export function IntegrationSettings({
       data-space="section"
     >
       <p>
-        Enable the Local environment for Coordinator Chat. Ask your coordinator
-        to help configure and validate worker delivery when you’re ready.
+        Configure worker setup, checks and code delivery. Workers use the local
+        machine.
       </p>
       {(error || resource.error || inspection.error) && (
         <Alert variant="destructive">
@@ -100,71 +96,6 @@ export function IntegrationSettings({
           </AlertDescription>
         </Alert>
       )}
-      <DetailSection title="Execution environment">
-        <Label className="field">
-          <input
-            type="checkbox"
-            checked={local}
-            disabled={
-              busy || !resource.data || resource.data.runtime === "local"
-            }
-            onChange={(event) =>
-              setDraft({ ...fields, local: event.target.checked })
-            }
-          />
-          Use Local host
-        </Label>
-        <p>
-          Use tools, credentials and native harness configuration available to
-          the Flowfield service. Each attempt gets its own checkout and
-          temporary files. Project setup must keep databases, ports and other
-          shared resources separate, or use one worker at a time.
-        </p>
-        <p>
-          Local enables Coordinator Chat and applies to future workers, checks
-          and inspection copies. Existing attempts keep their recorded
-          environment. Native access mode is selected in Workers settings.
-        </p>
-        {!local && (
-          <p>
-            Select Local before running workers, setup checks or new result
-            copies. Historical attempts and their settings remain available.
-          </p>
-        )}
-        {resource.data?.runtime !== "local" && (
-          <Button
-            type="button"
-            size="sm"
-            disabled={!local || busy || !resource.data}
-            onClick={async () => {
-              if (!resource.data) return;
-              setBusy(true);
-              setError("");
-              try {
-                const value = await request<Settings>(path + "/local", "POST", {
-                  expected_revision: resource.data.revision,
-                });
-                resource.invalidate();
-                resource.setData({
-                  ...value,
-                  target_branch:
-                    value.target_branch ?? resource.data.target_branch,
-                });
-              } catch (failure) {
-                setError((failure as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Enable Local host
-          </Button>
-        )}
-        <p>
-          Enable Local to start planning. Configure worker delivery below when
-          you’re ready to run tasks.
-        </p>
-      </DetailSection>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -176,7 +107,6 @@ export function IntegrationSettings({
               const value = await request<Settings>(path, "PUT", {
                 expected_revision: resource.data.revision,
                 target_branch: target,
-                runtime: local ? "local" : null,
                 checks: lines(checks),
                 setup_commands: setup
                   .split("\n")

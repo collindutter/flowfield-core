@@ -9,10 +9,9 @@ Make sure `codex` is available in the terminal where you start Flowfield.
 ## Coordinator Chat
 
 The built-in [Coordinator Chat](/coordinator) uses the same managed ACP runtime as workers.
-Install it with `flowfield harness install codex`, select Local for the project, and choose
-your coordinator model and effort. Enable Local with **Use Local host → Enable Local host**
-in Integration settings; worker delivery configuration can wait. The service supplies a scoped MCP connection per turn;
-you do not need to register the standalone connection below for built-in chat.
+Install it with `flowfield harness install codex` and choose your model and effort beside
+the chat input. Flowfield uses Local automatically; worker delivery configuration can wait.
+The service supplies a scoped MCP connection per turn; you do not need to register the standalone connection below for built-in chat.
 
 ## Connect a standalone coordinator
 
@@ -44,8 +43,7 @@ Install the managed runtime with `flowfield harness install codex` (see [runtime
 Native Codex must be installed and authenticated on the machine running Flowfield.
 
 Ask the coordinator to configure the project's target branch, dependency setup, verification
-and run commands. In **Integration** settings, select **Use Local host** and save, then validate
-setup. In **Workers**, select a model, reasoning effort and native access mode from the
+and run commands in **Integration** settings, then validate setup. In **Workers**, select a model, reasoning effort and native access mode from the
 connected harness. Project defaults can be overridden for individual tasks.
 
 Local uses the tools, credentials and native harness configuration available to the Flowfield
@@ -60,11 +58,9 @@ Native tool permission requests appear in the task and **Needs you**. Result del
 requires explicit approval. Local workspaces protect ordinary parallel edits; they do not
 contain arbitrary daemons or isolate the whole machine.
 
-Select Local explicitly before starting new managed work, setup checks or result copies.
-The previous restricted runtime is retired; historical settings, attempts and inspection
-copies remain available with their original configuration.
+Historical attempts and inspection copies retain their original configuration.
 If the service cannot find Codex, restart it from a terminal with the correct PATH, then use
-**Reload models**. Installing a bridge does not enable queues or select Local for a project.
+**Reload models**. Installing a bridge does not enable queues.
 
 ## Disconnect
 

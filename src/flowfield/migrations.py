@@ -88,12 +88,52 @@ def coordinator_chat(db: sqlite3.Connection) -> None:
     )
 
 
+def project_coordinator_and_local_default(db: sqlite3.Connection) -> None:
+    # Current configuration now uses the only supported environment automatically.
+    # Frozen runs/inspection copies keep their recorded runtime.
+    projects = db.execute(
+        "SELECT project_id FROM integration_settings "
+        "WHERE json_extract(data,'$.runtime') IS NOT 'local'"
+    ).fetchall()
+    for (project,) in projects:
+        db.execute(
+            "UPDATE integration_settings SET data=json_set(data,'$.runtime','local',"
+            "'$.revision',coalesce(json_extract(data,'$.revision'),1)+1) WHERE project_id=?",
+            (project,),
+        )
+        db.execute(
+            "UPDATE runs SET data=json_set(data,'$.code_available',json('false'),"
+            "'$.revision',json_extract(data,'$.revision')+1) WHERE project_id=? "
+            "AND status='accepted' AND json_extract(data,'$.code_available')=1",
+            (project,),
+        )
+    # Preserve every message, turn setting and original conversation identity.
+    # Only the mutable coordinator selection moves to its single project owner.
+    for (project,) in db.execute("SELECT id FROM projects").fetchall():
+        selected = db.execute(
+            "SELECT a.selection FROM coordinator_conversations c LEFT JOIN agent_settings a "
+            "ON c.id=a.scope AND c.project_id=a.project_id AND a.role='coordinator' "
+            "WHERE c.project_id=? "
+            "ORDER BY c.number DESC LIMIT 1",
+            (project,),
+        ).fetchone()
+        if selected and selected[0]:
+            db.execute(
+                "INSERT INTO agent_settings VALUES (?,'coordinator','',1,?) "
+                "ON CONFLICT(project_id,role,scope) DO UPDATE SET "
+                "selection=excluded.selection,revision=agent_settings.revision+1",
+                (project, selected[0]),
+            )
+    db.execute("CREATE INDEX coordinator_project_messages ON coordinator_turns(project_id,number)")
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
     Migration(32, agent_preferences_and_permissions),
     Migration(33, explicit_local_runtime),
     Migration(34, coordinator_chat),
+    Migration(35, project_coordinator_and_local_default),
 )
 
 

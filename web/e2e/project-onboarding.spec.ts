@@ -49,14 +49,7 @@ test("directory adoption keeps cancellation harmless and opens project chat", as
 
   await page.goto("/projects/native-directory-project/edit/integration");
   await expect(page.getByLabel("Validation commands")).toHaveValue("");
-  await page.getByLabel("Use Local host").check();
-  await page
-    .getByRole("button", { name: "Enable Local host", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Enable Local host", exact: true }),
-  ).toHaveCount(0);
-  await expect(page.getByLabel("Use Local host")).toBeDisabled();
+  await expect(page.getByLabel("Use Local host")).toHaveCount(0);
   const saved = await (
     await request.get("/api/projects/native-directory-project/integration")
   ).json();
@@ -64,7 +57,7 @@ test("directory adoption keeps cancellation harmless and opens project chat", as
   expect(saved.checks).toEqual([]);
   expect(saved.target_branch).toBeNull();
   await page.reload();
-  await expect(page.getByLabel("Use Local host")).toBeChecked();
+  await expect(page.getByLabel("Use Local host")).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath("local-before-worker-settings.png"),
   });

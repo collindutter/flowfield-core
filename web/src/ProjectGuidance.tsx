@@ -59,9 +59,8 @@ export function ProjectGuidance({
   return (
     <DetailSection title="Project guidance">
       <p>
-        Install guidance for standalone coding conversations and worker
-        preparation. Built-in Coordinator Chat supplies its own scoped MCP
-        connection; you do not need to connect a standalone session to use it.
+        Install project instructions for standalone agents and worker
+        preparation.
       </p>
       {(error || resource.error) && (
         <Alert variant="destructive">

@@ -96,3 +96,40 @@ def test_settings_validation_and_permission_http_journey(tmp_path, monkeypatch):
                 service.execution.finish("harbor", run.id, "stopped")
 
     asyncio.run(exercise())
+
+
+def test_model_catalog_coalesces_caches_refreshes_and_retries(tmp_path, monkeypatch):
+    calls = 0
+    fail = False
+
+    async def discover(directory):
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0)
+        if fail:
+            raise RuntimeError("discovery failed")
+        return [ModelOption(id="supported", name="Supported", efforts=["low"])]
+
+    monkeypatch.setattr("flowfield.supervisor.model_options", discover)
+    service = Supervisor(fixture(tmp_path).workspace)
+
+    async def exercise():
+        nonlocal fail
+        first, second = await asyncio.gather(service.model_options(), service.model_options())
+        assert first == second and calls == 1
+        assert await service.model_options() == first and calls == 1
+        assert await service.model_options(refresh=True) == first and calls == 2
+        service.catalog_at -= 301
+        assert await service.model_options() == first and calls == 3
+        fail = True
+        try:
+            await service.model_options(refresh=True)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Discovery failure was hidden")
+        fail = False
+        assert await service.model_options() == first and calls == 5
+        await service.close()
+
+    asyncio.run(exercise())

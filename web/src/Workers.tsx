@@ -136,12 +136,11 @@ export function WorkerSettings({
   const path = `projects/${projectId}/workers`;
   const resource = useResource<Settings>(path, refresh);
   const [modelRetry, setModelRetry] = useState(0);
-  const catalog = useResource<Model[]>("worker-models", modelRetry);
-  const runtime = useResource<components["schemas"]["IntegrationSettings"]>(
-    `projects/${projectId}/integration`,
-    refresh,
+  const catalog = useResource<Model[]>(
+    modelRetry ? "worker-models?refresh=true" : "worker-models",
+    modelRetry,
+    180000,
   );
-  const local = runtime.data?.runtime === "local";
   const models = catalog.data ?? [];
   const [draft, setDraft] = useState<{
     model: string;
@@ -183,10 +182,7 @@ export function WorkerSettings({
         project dependencies in their separate workspaces.
       </p>
       <p className="detail-metadata">
-        Harness: Codex.{" "}
-        {local
-          ? "Native tool decisions never approve code delivery."
-          : "Select Local in Integration settings before starting workers or choosing native modes."}
+        Harness: Codex. Native tool decisions never approve code delivery.
       </p>
       {catalog.loading && <p role="status">Loading available models…</p>}
       {!catalog.loading && (catalog.error || !models.length) && (
@@ -211,13 +207,19 @@ export function WorkerSettings({
           setBusy(true);
           setError("");
           try {
-            const updated = await request<Settings>(path, "PUT", {
-              expected_revision: draft?.revision ?? resource.data.revision,
-              model,
-              effort,
-              mode: mode || null,
-              max_parallel: cap,
-            });
+            const updated = await request<Settings>(
+              path,
+              "PUT",
+              {
+                expected_revision: draft?.revision ?? resource.data.revision,
+                model,
+                effort,
+                mode: mode || null,
+                max_parallel: cap,
+              },
+              undefined,
+              180000,
+            );
             resource.invalidate();
             resource.setData(updated);
             setDraft(null);
@@ -237,9 +239,8 @@ export function WorkerSettings({
             model={model}
             effort={effort}
             mode={mode}
-            modesEnabled={local}
             models={models}
-            loading={catalog.loading}
+            loading={catalog.loading || resource.loading}
             change={(model, effort, mode) =>
               setDraft({
                 model,

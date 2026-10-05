@@ -17,6 +17,7 @@ from flowfield.adapters.acp_session import (
     AcpSession,
     AgentEvent,
     PermissionHandler,
+    activity_locations,
     bounded_details,
     permission_details,
 )
@@ -48,6 +49,18 @@ def codex_permission_details(tool: BaseModel) -> str:
     return bounded_details("\n\n".join(filter(None, parts)))
 
 
+def codex_activity_details(tool: BaseModel) -> str:
+    """Execution facts only; never prompts, arbitrary tool inputs or private reasoning."""
+    data = tool.model_dump(by_alias=True, exclude_none=True)
+    parts = [activity_locations(tool)]
+    raw = data.get("rawInput")
+    if isinstance(raw, dict):
+        for key in ("command", "cwd", "path"):
+            if isinstance(raw.get(key), str):
+                parts.append(f"{key}: {raw[key]}")
+    return bounded_details("\n".join(filter(None, parts)))
+
+
 class CodexAgent:
     supports_activity = True
 
@@ -60,6 +73,7 @@ class CodexAgent:
             cleanup=quiesce,
             turn_timeout=900,
             permission_projection=codex_permission_details,
+            activity_projection=codex_activity_details,
         )
         self.cleanup_confirmed = True
         self.stopping = False
@@ -93,7 +107,17 @@ class CodexAgent:
             status = data.get("status")
             self.on_activity(
                 ActivityUpdate(
-                    key=key, kind="tool", text=f"{title} · {status}" if status else title
+                    key=key,
+                    kind="command" if data.get("kind") == "execute" else "tool",
+                    text="\n".join(
+                        filter(
+                            None,
+                            [
+                                f"{title} · {status}" if status else title,
+                                data.get("details"),
+                            ],
+                        )
+                    ),
                 )
             )
         # ACP context occupancy is not billable input/output usage. Keep unsupported

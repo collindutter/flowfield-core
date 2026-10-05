@@ -114,40 +114,7 @@ export function RunActivity({
                 Earlier activity omitted to keep this feed bounded.
               </p>
             )}
-            {page.items.map((item) => {
-              const Icon = activityIcons[item.kind];
-              return (
-                <div
-                  key={item.key}
-                  className="run-activity-entry"
-                  data-kind={item.kind}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        tabIndex={0}
-                        className="run-activity-icon"
-                        aria-label={label(item.kind)}
-                      >
-                        <Icon size={14} aria-hidden="true" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{label(item.kind)}</TooltipContent>
-                  </Tooltip>
-                  <div>
-                    {item.omitted && (
-                      <p className="muted">Some output omitted.</p>
-                    )}
-                    <pre>{item.preview ?? item.text}</pre>
-                    {item.abridged && (
-                      <Disclosure summary={<>Retained output</>}>
-                        <pre>{item.text}</pre>
-                      </Disclosure>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            <ActivityEntries items={page.items} />{" "}
           </div>
         </ActivityContainer>
       )}
@@ -176,5 +143,44 @@ function ActivityContainer({
     </Disclosure>
   ) : (
     <>{children}</>
+  );
+}
+
+export function ActivityEntries({ items }: { items: Page["items"] }) {
+  return (
+    <>
+      {items.map((item) => {
+        const Icon = activityIcons[item.kind];
+        return (
+          <div
+            key={item.key}
+            className="run-activity-entry"
+            data-kind={item.kind}
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  tabIndex={0}
+                  className="run-activity-icon"
+                  aria-label={label(item.kind)}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{label(item.kind)}</TooltipContent>
+            </Tooltip>
+            <div>
+              {item.omitted && <p className="muted">Some output omitted.</p>}
+              <pre>{item.preview || item.text}</pre>
+              {item.abridged && (
+                <Disclosure summary={<>Retained output</>}>
+                  <pre>{item.text}</pre>
+                </Disclosure>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 }

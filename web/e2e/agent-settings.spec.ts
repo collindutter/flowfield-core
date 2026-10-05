@@ -141,9 +141,7 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await detail.getByLabel("Native access mode").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/tmp/flowfield-slice3-native-modes.png" });
   await detail.getByRole("button", { name: "Save agent settings" }).click();
-  await expect(
-    detail.getByText(/Task override · Codex · second/),
-  ).toBeVisible();
+  await expect(detail.getByText("Task override")).toBeVisible();
   expect(settings.selection?.mode).toBe("read-only");
   await detail.getByLabel("Model", { exact: true }).selectOption("first");
   await detail.getByLabel("Reasoning effort").selectOption("high");
@@ -167,7 +165,7 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   );
   await detail.getByRole("button", { name: "Use project defaults" }).click();
   await expect(
-    detail.getByText(/Using project defaults · Codex · first/),
+    detail.getByText("Using project defaults", { exact: true }),
   ).toBeVisible();
   await detail
     .getByText("Run the project checks", { exact: true })
@@ -199,19 +197,11 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
       }),
   );
   await page.goto("/projects/agent-settings/edit/coordinator");
-  await page.getByText("Coordinator defaults", { exact: true }).click();
   const coordinator = page.getByRole("tabpanel", {
-    name: "coordinator",
-    exact: false,
+    name: "Coordinator",
+    exact: true,
   });
-  await coordinator.getByLabel("Model", { exact: true }).selectOption("first");
-  await coordinator.getByLabel("Reasoning effort").selectOption("high");
-  await page.getByRole("tab", { name: "Workers", exact: true }).click();
-  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
-  await expect(coordinator.getByLabel("Reasoning effort")).toHaveValue("high");
-  await page.screenshot({
-    path: "/tmp/flowfield-slice2-coordinator-settings.png",
-  });
+  await expect(coordinator.getByLabel("Model", { exact: true })).toHaveCount(0);
   permission = {
     ...permission,
     id: "request-2",
@@ -279,7 +269,7 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await expect(action.getByText(/Allow once · Answer recorded/)).toBeVisible();
 });
 
-test("Local adoption is explicit and preserves drafts across project tabs", async ({
+test("Integration uses Local automatically and preserves drafts across project tabs", async ({
   page,
   request,
 }) => {
@@ -295,7 +285,7 @@ test("Local adoption is explicit and preserves drafts across project tabs", asyn
   let settings = {
     project_id: "local-adoption",
     revision: 1,
-    runtime: "legacy",
+    runtime: "local",
     target_branch: "main",
     checks: ["pnpm test"],
     setup_commands: ["pnpm install --frozen-lockfile"],
@@ -311,7 +301,7 @@ test("Local adoption is explicit and preserves drafts across project tabs", asyn
     "**/api/projects/local-adoption/integration",
     async (route) => {
       if (route.request().method() === "PUT") {
-        expect(route.request().postDataJSON().runtime).toBe("local");
+        expect(route.request().postDataJSON()).not.toHaveProperty("runtime");
         expect(route.request().postDataJSON()).not.toHaveProperty(
           "environment",
         );
@@ -322,21 +312,20 @@ test("Local adoption is explicit and preserves drafts across project tabs", asyn
   );
   await page.goto("/projects/local-adoption/edit/integration");
   const selection = page.getByLabel("Use Local host");
-  await expect(selection).not.toBeChecked();
+  await expect(selection).toHaveCount(0);
   await expect(page.getByLabel("Executable paths")).toHaveCount(0);
-  await expect(
-    page.getByText("Select Local before running workers", { exact: false }),
-  ).toBeVisible();
-  await selection.check();
+  await page.getByLabel("Validation commands").fill("pnpm check");
   await expect(page.getByLabel("Executable paths")).toHaveCount(0);
   await page.getByRole("tab", { name: "Info", exact: true }).click();
   await page.getByRole("tab", { name: "Integration", exact: true }).click();
-  await expect(selection).toBeChecked();
+  await expect(page.getByLabel("Validation commands")).toHaveValue(
+    "pnpm check",
+  );
   await page.getByRole("button", { name: "Save integration settings" }).click();
-  await expect(selection).toBeDisabled();
+  await expect(selection).toHaveCount(0);
   await page.reload();
-  await expect(selection).toBeChecked();
-  await selection.scrollIntoViewIfNeeded();
+  await expect(selection).toHaveCount(0);
+
   await page.screenshot({ path: "/tmp/flowfield-slice3-local.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "/tmp/flowfield-slice3-local-mobile.png" });

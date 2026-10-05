@@ -3,17 +3,16 @@
 import sqlite3
 from uuid import uuid4
 
+from flowfield.activity_text import preview
 from flowfield.agent_settings import AgentSettings
 from flowfield.application import Workspace, now
 from flowfield.coordinator_models import (
     CoordinatorConversation,
-    CoordinatorHistory,
     CoordinatorPage,
     CoordinatorSend,
     CoordinatorTurn,
 )
 from flowfield.errors import ApplicationError
-from flowfield.integration import Integrations
 from flowfield.run_activity import ActivityUpdate, update_activity
 
 
@@ -59,47 +58,39 @@ class CoordinatorStore:
         ).fetchone()
         return CoordinatorTurn.model_validate_json(row[0]) if row else None
 
-    def history(self, project: str, before: int | None = None) -> CoordinatorHistory:
-        with self.workspace.connection() as db:
-            self.workspace._project(db, project)
-            rows = db.execute(
-                "SELECT id,number,created_at FROM coordinator_conversations WHERE project_id=? "
-                "AND (? IS NULL OR number<?) ORDER BY number DESC LIMIT 21",
-                (project, before, before),
-            ).fetchall()
-            items = [
-                CoordinatorConversation(id=r[0], number=r[1], created_at=r[2]) for r in rows[:20]
-            ]
-            return CoordinatorHistory(
-                items=items, next_before=items[-1].number if len(rows) > 20 else None
-            )
-
     def new(self, project: str) -> CoordinatorConversation:
         with self.workspace.connection(write=True, project_id=project) as db:
             self.workspace._project(db, project)
-            if self._active(db, project):
-                raise ApplicationError(
-                    "coordinator_busy", "Finish or stop the current turn first.", 409
-                )
+            existing = db.execute(
+                "SELECT id FROM coordinator_conversations WHERE project_id=? "
+                "ORDER BY number DESC LIMIT 1",
+                (project,),
+            ).fetchone()
+            if existing:
+                return self._conversation(db, project, existing[0])
             identity = uuid4().hex
             db.execute(
                 "INSERT INTO coordinator_conversations(id,project_id,created_at) VALUES (?,?,?)",
                 (identity, project, now()),
             )
-            db.execute(
-                "INSERT INTO agent_settings VALUES (?,'coordinator',?,1,NULL)", (project, identity)
-            )
             return self._conversation(db, project, identity)
 
-    def page(self, project: str, conversation: str, before: int | None = None) -> CoordinatorPage:
+    def page(
+        self, project: str, conversation: str | None = None, before: int | None = None
+    ) -> CoordinatorPage:
         with self.workspace.connection() as db:
-            owner = self._conversation(db, project, conversation)
+            self.workspace._project(db, project)
+            owner = self._conversation(db, project, conversation) if conversation else None
             rows = db.execute(
-                "SELECT data FROM coordinator_turns WHERE conversation_id=? "
+                "SELECT data FROM coordinator_turns WHERE project_id=? "
                 "AND (? IS NULL OR number<?) ORDER BY number DESC LIMIT 21",
-                (conversation, before, before),
+                (project, before, before),
             ).fetchall()
             items = [CoordinatorTurn.model_validate_json(row[0]) for row in rows[:20]]
+            for turn in items:
+                for entry in turn.activity.items:
+                    entry.preview = preview(entry.text, entry.kind)
+                    entry.abridged = entry.preview != entry.text
             return CoordinatorPage(
                 conversation=owner,
                 items=list(reversed(items)),
@@ -136,23 +127,9 @@ class CoordinatorStore:
                 raise ApplicationError(
                     "coordinator_busy", "The coordinator already has an active turn.", 409
                 )
-            latest = db.execute(
-                "SELECT id FROM coordinator_conversations WHERE project_id=? "
-                "ORDER BY number DESC LIMIT 1",
-                (project,),
-            ).fetchone()
-            if latest[0] != conversation:
-                raise ApplicationError(
-                    "conversation_closed", "Send messages in the current conversation.", 409
-                )
             if not request.text.strip():
                 raise ApplicationError("empty_message", "Write a message first.")
-            Integrations(self.workspace)._settings(db, project).require_local()
-            settings = (
-                AgentSettings(self.workspace)
-                .resolve(db, project, "coordinator", conversation)
-                .effective
-            )
+            settings = AgentSettings(self.workspace).resolve(db, project, "coordinator").effective
             if settings is None:
                 raise ApplicationError(
                     "coordinator_settings",

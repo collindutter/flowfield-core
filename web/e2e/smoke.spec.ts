@@ -46,7 +46,9 @@ test("board failures retain readable context and recover through their alert", a
       : route.continue(),
   );
   await page.goto("/projects/board-recovery");
-  const alert = page.getByRole("alert");
+  const alert = page
+    .getByRole("alert")
+    .filter({ hasText: /Board unavailable|Could not refresh the board/ });
   await expect(alert).toContainText("Board unavailable");
   await expect(alert).toContainText("Temporary board failure");
   fail = false;
@@ -3126,7 +3128,7 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
     .click();
   await expect(
     page.getByRole("button", { name: "Add project", exact: true }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await page.getByRole("tab", { name: "Decisions", exact: true }).click();
   await page.getByRole("button", { name: "New decision", exact: true }).click();
   await page
@@ -3934,13 +3936,15 @@ test("worker models load automatically and retry without replacing setting draft
     data: { path: existingDirectory(join(state, project)), task_prefix: "MDL" },
   });
   let calls = 0;
-  await page.route("**/api/worker-models", async (route) => {
+  let refreshCalls = 0;
+  await page.route("**/api/worker-models*", async (route) => {
     calls++;
-    if (calls === 1)
+    if (!route.request().url().includes("refresh=true"))
       return route.fulfill({
         status: 503,
         json: { error: { message: "Catalog temporarily unavailable" } },
       });
+    refreshCalls++;
     return route.fulfill({
       json: [
         { id: "model-one", name: "Model one", efforts: ["low", "high"] },
@@ -3972,7 +3976,8 @@ test("worker models load automatically and retry without replacing setting draft
     effort.getByRole("option", { name: "high", exact: true }),
   ).toHaveCount(0);
   await effort.selectOption("medium");
-  expect(calls).toBe(2);
+  expect(calls).toBeGreaterThan(1);
+  expect(refreshCalls).toBe(1);
 });
 
 test("integration settings create an explicit local target without changing the human checkout", async ({
@@ -4015,7 +4020,6 @@ test("integration settings create an explicit local target without changing the 
     settings.getByRole("checkbox", { name: "Create this branch" }),
   ).toHaveCount(0);
   await expect(settings.getByLabel("Executable paths")).toHaveCount(0);
-  await settings.getByLabel("Use Local host").check();
   await expect(settings.getByLabel("Seconds per setup command")).toBeVisible();
   await settings
     .getByLabel("Validation commands", { exact: true })

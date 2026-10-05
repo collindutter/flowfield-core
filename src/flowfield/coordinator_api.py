@@ -8,7 +8,6 @@ from flowfield.agent_models import AgentSettingsEdit, AgentSettingsView
 from flowfield.agent_settings import AgentSettings
 from flowfield.coordinator_models import (
     CoordinatorConversation,
-    CoordinatorHistory,
     CoordinatorPage,
     CoordinatorSend,
     CoordinatorTurn,
@@ -20,12 +19,18 @@ def coordinator_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     router = APIRouter(prefix="/api/projects/{project_id}/coordinator")
 
     @router.get("")
-    def history(project_id: str, before: int | None = Query(None, ge=1)) -> CoordinatorHistory:
-        return supervisor().coordinator.store.history(project_id, before)
+    def history(project_id: str, before: int | None = Query(None, ge=1)) -> CoordinatorPage:
+        return supervisor().coordinator.store.page(project_id, before=before)
 
     @router.post("", status_code=201)
     def new(project_id: str) -> CoordinatorConversation:
         return supervisor().coordinator.store.new(project_id)
+
+    @router.post("/messages", status_code=202)
+    async def message(project_id: str, request: CoordinatorSend) -> CoordinatorTurn:
+        service = supervisor()
+        conversation = service.coordinator.store.new(project_id)
+        return service.coordinator.send(project_id, conversation.id, request)
 
     @router.get("/{conversation_id}")
     def page(
@@ -50,7 +55,7 @@ def coordinator_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     @router.get("/{conversation_id}/settings")
     def settings(project_id: str, conversation_id: str) -> AgentSettingsView:
         supervisor().coordinator.store.page(project_id, conversation_id)
-        return AgentSettings(supervisor().workspace).get(project_id, "coordinator", conversation_id)
+        return AgentSettings(supervisor().workspace).get(project_id, "coordinator")
 
     @router.put("/{conversation_id}/settings")
     async def edit(
@@ -60,8 +65,6 @@ def coordinator_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
         service.coordinator.store.page(project_id, conversation_id)
         if request.selection:
             await service.validate_agent_choice(request.selection)
-        return AgentSettings(service.workspace).edit(
-            project_id, "coordinator", request, conversation_id
-        )
+        return AgentSettings(service.workspace).edit(project_id, "coordinator", request)
 
     return router

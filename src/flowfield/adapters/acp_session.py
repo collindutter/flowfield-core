@@ -66,10 +66,13 @@ class AcpSession:
         on_permission: PermissionHandler | None = None,
         cleanup: CleanupHandler | None = None,
         permission_projection: Callable[[BaseModel], str] | None = None,
+        activity_projection: Callable[[BaseModel], str] | None = None,
         request_timeout: float = 30,
         turn_timeout: float = 3600,
     ):
         self.on_event, self.on_permission = on_event, on_permission
+        self.activity_projection = activity_projection or activity_locations
+        self._tool_activity: dict[str, dict[str, Any]] = {}
         self.cleanup = cleanup
         self.permission_projection = permission_projection or permission_details
         self._tool_details: dict[str, str] = {}
@@ -206,6 +209,7 @@ class AcpSession:
         assert self.transport
         self.transport.reset_budget()
         self._tool_details.clear()
+        self._tool_activity.clear()
         self.state = "running"
         self._turn = asyncio.create_task(
             connection.prompt(session_id=session_id, prompt=[text_block(text)])
@@ -226,6 +230,7 @@ class AcpSession:
         finally:
             await self._cancel_permission()
             self._tool_details.clear()
+            self._tool_activity.clear()
 
     async def _cancel_permission(self) -> None:
         if self._permission:
@@ -239,7 +244,7 @@ class AcpSession:
             return
         data = update.model_dump(by_alias=True, exclude_none=True)
         kind = data.pop("sessionUpdate", "")
-        # Publish a deliberate projection, never raw reasoning, inputs, metadata or tool output.
+        # Publish only allowlisted activity facts; never private reasoning or arbitrary payloads.
         if kind == "agent_message_chunk" and self.state == "running":
             content = data.get("content", {})
             if content.get("type") == "text":
@@ -254,16 +259,21 @@ class AcpSession:
                 self._tool_details[data["toolCallId"]] = detail
                 while len(self._tool_details) > 32:
                     del self._tool_details[next(iter(self._tool_details))]
-            self._emit(
-                AgentEvent(
-                    "tool",
-                    {
-                        key: data[key]
-                        for key in ("toolCallId", "title", "status", "kind")
-                        if key in data
-                    },
-                )
+            identity = data["toolCallId"]
+            public = self._tool_activity.setdefault(identity, {})
+            public.update(
+                {
+                    key: bounded_details(str(data[key]))[:4000]
+                    for key in ("toolCallId", "title", "status", "kind")
+                    if key in data
+                }
             )
+            activity_detail = self.activity_projection(update)
+            if activity_detail:
+                public["details"] = bounded_details(activity_detail)[:4000]
+            while len(self._tool_activity) > 100:
+                del self._tool_activity[next(iter(self._tool_activity))]
+            self._emit(AgentEvent("tool", dict(public)))
         elif kind == "usage_update" and self.state == "running":
             self._emit(
                 AgentEvent("usage", {key: data[key] for key in ("used", "size") if key in data})
@@ -407,6 +417,15 @@ class AcpSession:
             else "interrupted"
         )
         return StopReceipt(turn_finished, exited, session_closed, graceful_exit, owned_work_stopped)
+
+
+def activity_locations(tool: BaseModel) -> str:
+    data = tool.model_dump(by_alias=True, exclude_none=True)
+    return "\n".join(
+        f"Path: {location['path']}"
+        for location in data.get("locations", [])
+        if isinstance(location.get("path"), str)
+    )
 
 
 def bounded_details(value: str) -> str:

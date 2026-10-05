@@ -49,25 +49,17 @@ def test_inheritance_override_reset_and_frozen_claim(tmp_path):
         settings.edit("harbor", "worker", edit(), "missing")
 
 
-def test_coordinator_defaults_and_conversation_are_separate(tmp_path):
+def test_coordinator_has_one_selection_independent_of_workers(tmp_path):
     execution = fixture(tmp_path)
     settings = AgentSettings(execution.workspace)
     assert settings.get("harbor", "coordinator").effective is None
-    settings.edit("harbor", "coordinator", edit())
-    conversation = settings.new_conversation("harbor")
-    assert settings.get("harbor", "coordinator", conversation).effective.choice.model == "other"
-    settings.edit("harbor", "coordinator", edit(model="conversation"), conversation)
-    settings.edit("harbor", "coordinator", edit(revision=2, model="default"))
-    assert (
-        settings.get("harbor", "coordinator", conversation).effective.choice.model == "conversation"
-    )
+    saved = settings.edit("harbor", "coordinator", edit())
+    assert saved.effective.choice.model == "other"
+    settings.edit("harbor", "coordinator", edit(revision=2, model="updated"))
+    assert settings.get("harbor", "coordinator").effective.choice.model == "updated"
     assert settings.get("harbor", "worker").effective.choice.model == "test-model"
-    with pytest.raises(ApplicationError):
-        settings.edit("harbor", "coordinator", edit(), "invented-conversation")
     restored = AgentSettings(Workspace(execution.workspace.directory))
-    assert restored.get("harbor", "coordinator", conversation) == settings.get(
-        "harbor", "coordinator", conversation
-    )
+    assert restored.get("harbor", "coordinator") == settings.get("harbor", "coordinator")
 
 
 def test_concurrent_edits_have_one_winner(tmp_path):

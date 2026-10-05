@@ -251,3 +251,63 @@ def test_closing_one_session_does_not_interrupt_another(tmp_path):
             await asyncio.gather(first_turn, second_turn, return_exceptions=True)
 
     asyncio.run(exercise())
+
+
+def test_partial_tool_updates_keep_public_facts_and_bound_cache():
+    from acp.schema import ToolCallProgress, ToolCallStart
+
+    from flowfield.adapters.codex_agent import codex_activity_details
+
+    async def exercise():
+        events = []
+        client = AcpSession(events.append, activity_projection=codex_activity_details)
+        client.session_id = "session"
+        client.state = "running"
+        await client.session_update(
+            "session",
+            ToolCallStart.model_validate(
+                {
+                    "sessionUpdate": "tool_call",
+                    "toolCallId": "check",
+                    "title": "Run tests",
+                    "kind": "execute",
+                    "status": "in_progress",
+                    "locations": [{"path": "/project/test.py"}],
+                    "rawInput": {"command": "pnpm test", "cwd": "/project", "secret": "PRIVATE"},
+                    "rawOutput": "PRIVATE OUTPUT",
+                }
+            ),
+        )
+        await client.session_update(
+            "session",
+            ToolCallProgress.model_validate(
+                {
+                    "sessionUpdate": "tool_call_update",
+                    "toolCallId": "check",
+                    "status": "completed",
+                }
+            ),
+        )
+        final = events[-1].data
+        assert final["title"] == "Run tests" and final["status"] == "completed"
+        assert final["kind"] == "execute"
+        assert "pnpm test" in final["details"] and "/project/test.py" in final["details"]
+        assert "PRIVATE" not in str(events)
+        assert events[0].data["status"] == "in_progress"
+        for index in range(110):
+            await client.session_update(
+                "session",
+                ToolCallStart.model_validate(
+                    {
+                        "sessionUpdate": "tool_call",
+                        "toolCallId": str(index),
+                        "title": "x" * 10000,
+                        "kind": "read",
+                        "status": "completed",
+                    }
+                ),
+            )
+        assert len(client._tool_activity) == 100
+        assert all(len(item["title"]) <= 4000 for item in client._tool_activity.values())
+
+    asyncio.run(exercise())

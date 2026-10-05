@@ -1310,6 +1310,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/{project_id}/coordinator/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Message */
+    post: operations["message_api_projects__project_id__coordinator_messages_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/coordinator/{conversation_id}": {
     parameters: {
       query?: never;
@@ -1408,23 +1425,6 @@ export interface paths {
     /** Configure */
     put: operations["configure_api_projects__project_id__integration_put"];
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/projects/{project_id}/integration/local": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Adopt Local */
-    post: operations["adopt_local_api_projects__project_id__integration_local_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2288,16 +2288,9 @@ export interface components {
       /** Created At */
       created_at: string;
     };
-    /** CoordinatorHistory */
-    CoordinatorHistory: {
-      /** Items */
-      items: components["schemas"]["CoordinatorConversation"][];
-      /** Next Before */
-      next_before: number | null;
-    };
     /** CoordinatorPage */
     CoordinatorPage: {
-      conversation: components["schemas"]["CoordinatorConversation"];
+      conversation: components["schemas"]["CoordinatorConversation"] | null;
       /** Items */
       items: components["schemas"]["CoordinatorTurn"][];
       /** Next Before */
@@ -2826,7 +2819,7 @@ export interface components {
       revision: number;
       /**
        * Runtime
-       * @default legacy
+       * @default local
        * @enum {string}
        */
       runtime: "legacy" | "local";
@@ -2909,11 +2902,6 @@ export interface components {
       purpose: "preparation" | "availability";
       /** Problem Code */
       problem_code: string | null;
-    };
-    /** LocalAdoption */
-    LocalAdoption: {
-      /** Expected Revision */
-      expected_revision: number;
     };
     /** Milestone */
     Milestone: {
@@ -6986,7 +6974,9 @@ export interface operations {
   };
   models_api_worker_models_get: {
     parameters: {
-      query?: never;
+      query?: {
+        refresh?: boolean;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -7000,6 +6990,15 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ModelOption"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -7734,7 +7733,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["CoordinatorHistory"];
+          "application/json": components["schemas"]["CoordinatorPage"];
         };
       };
       /** @description Validation Error */
@@ -7766,6 +7765,41 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["CoordinatorConversation"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  message_api_projects__project_id__coordinator_messages_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CoordinatorSend"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CoordinatorTurn"];
         };
       };
       /** @description Validation Error */
@@ -8024,41 +8058,6 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["IntegrationConfig"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["IntegrationSettings"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  adopt_local_api_projects__project_id__integration_local_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        project_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["LocalAdoption"];
       };
     };
     responses: {

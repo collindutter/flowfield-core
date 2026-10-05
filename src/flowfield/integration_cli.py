@@ -58,8 +58,8 @@ def register(project_app: typer.Typer) -> None:
         check_timeout: int = typer.Option(60, min=1, max=900),
         local: bool = typer.Option(
             False,
-            help="Explicitly adopt service-host tools, credentials "
-            "and native harness settings for future execution.",
+            help="Use Local (the default environment).",
+            hidden=True,
         ),
         create_from: str | None = typer.Option(
             None, help="Explicitly create the target from this commit/branch."

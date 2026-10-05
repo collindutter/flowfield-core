@@ -109,46 +109,48 @@ export function SetupInstructions({
             </ContentStack>
             {path && (
               <Disclosure summary="Project details (optional)">
-                <Label className="field block">
-                  Name
-                  <Input
-                    value={name}
-                    maxLength={200}
-                    placeholder="Derived from the directory name"
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </Label>
-                <Label className="field block">
-                  Project ID
-                  <Input
-                    value={id}
-                    maxLength={64}
-                    pattern={"[a-z0-9][a-z0-9_\\-]{0,63}"}
-                    placeholder="Derived from the directory name"
-                    onChange={(event) => setId(event.target.value)}
-                  />
-                </Label>
-                <p>
-                  Choose a unique ID if another project has the same directory
-                  name.
-                </p>
-                <Label className="field block">
-                  Task prefix
-                  <Input
-                    value={prefix}
-                    minLength={3}
-                    maxLength={3}
-                    pattern="[A-Za-z]{3}"
-                    placeholder="Three letters, derived from the project ID"
-                    onChange={(event) =>
-                      setPrefix(event.target.value.toUpperCase())
-                    }
-                  />
-                </Label>
-                <p>
-                  Choose a unique three-letter prefix if the derived prefix is
-                  already used.
-                </p>
+                <ContentStack space="section">
+                  <Label className="field block">
+                    Name
+                    <Input
+                      value={name}
+                      maxLength={200}
+                      placeholder="Derived from the directory name"
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </Label>
+                  <Label className="field block">
+                    Project ID
+                    <Input
+                      value={id}
+                      maxLength={64}
+                      pattern={"[a-z0-9][a-z0-9_\\-]{0,63}"}
+                      placeholder="Derived from the directory name"
+                      onChange={(event) => setId(event.target.value)}
+                    />
+                  </Label>
+                  <p>
+                    Choose a unique ID if another project has the same directory
+                    name.
+                  </p>
+                  <Label className="field block">
+                    Task prefix
+                    <Input
+                      value={prefix}
+                      minLength={3}
+                      maxLength={3}
+                      pattern="[A-Za-z]{3}"
+                      placeholder="Three letters, derived from the project ID"
+                      onChange={(event) =>
+                        setPrefix(event.target.value.toUpperCase())
+                      }
+                    />
+                  </Label>
+                  <p>
+                    Choose a unique three-letter prefix if the derived prefix is
+                    already used.
+                  </p>
+                </ContentStack>
               </Disclosure>
             )}
           </fieldset>
@@ -164,10 +166,8 @@ export function SetupInstructions({
         </p>
         <DetailSection title="Start planning">
           <p>
-            Enable <strong>Use Local host</strong> in Integration settings, then
-            choose your model in Coordinator settings. Install and sign in to
-            Codex, and install its managed ACP runtime on the machine running
-            Flowfield.
+            Choose a model in Coordinator Chat. Flowfield uses this machine’s
+            installed, signed-in Codex and managed ACP runtime.
           </p>
           <p>
             Worker setup and delivery settings can wait until you’re ready to

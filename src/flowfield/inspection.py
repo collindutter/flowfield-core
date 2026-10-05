@@ -165,7 +165,6 @@ class Inspections:
                     "a separate copy is being prepared."
                 )
                 self._save(previous)
-            settings.require_local()
             value = Inspection(
                 id=uuid4().hex,
                 project_id=project_id,

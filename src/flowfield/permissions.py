@@ -14,8 +14,8 @@ from typing import Literal
 from uuid import uuid4
 
 from flowfield.agent_models import AgentRole
-from flowfield.agent_settings import AgentSettings
 from flowfield.application import Workspace, now
+from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
 from flowfield.permission_models import (
     PermissionAnswer,
@@ -169,7 +169,7 @@ class Permissions:
                     )
                 task_id = row[0]
             else:
-                AgentSettings(self.workspace)._read(db, project, role, conversation_id or "")
+                CoordinatorStore._conversation(db, project, conversation_id or "")
         if any(
             t.project == project
             and (t.run_id == run_id if run_id else t.conversation_id == conversation_id)

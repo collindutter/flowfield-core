@@ -38,10 +38,16 @@ export function AgentModelFields({
           aria-label="Model"
           value={model}
           required
-          disabled={loading}
+          disabled={loading || !models.length}
           onChange={(event) => change(event.target.value, "", mode)}
         >
-          <option value="">Choose a model</option>
+          <option value="">
+            {loading
+              ? "Loading models…"
+              : !models.length
+                ? "Models unavailable"
+                : "Choose a model"}
+          </option>
           {model && !selected && (
             <option value={model}>{model} (unavailable)</option>
           )}
@@ -58,10 +64,18 @@ export function AgentModelFields({
           aria-label="Reasoning effort"
           value={effort}
           required
-          disabled={loading || !model}
+          disabled={loading || !model || !selected?.efforts.length}
           onChange={(event) => change(model, event.target.value, mode)}
         >
-          <option value="">Choose an effort</option>
+          <option value="">
+            {loading
+              ? "Loading efforts…"
+              : !model
+                ? "Select a model first"
+                : !selected?.efforts.length
+                  ? "Efforts unavailable"
+                  : "Choose an effort"}
+          </option>
           {effort && !selected?.efforts.includes(effort) && (
             <option value={effort}>{effort} (unavailable)</option>
           )}
@@ -82,7 +96,9 @@ export function AgentModelFields({
             disabled={loading}
             onChange={(event) => change(model, effort, event.target.value)}
           >
-            <option value="">Choose a mode</option>
+            <option value="">
+              {loading ? "Loading modes…" : "Choose a mode"}
+            </option>
             {mode && !selected.modes.some((item) => item.id === mode) && (
               <option value={mode}>{mode} (unavailable)</option>
             )}
@@ -102,28 +118,26 @@ export function AgentModelFields({
 }
 
 export function AgentSettingsEditor({
-  projectId,
   path,
   refresh,
   onDirty,
   coordinator = false,
-  conversation = false,
+  onReady,
 }: {
   projectId: string;
   path: string;
   refresh: unknown;
   onDirty: (value: boolean) => void;
   coordinator?: boolean;
-  conversation?: boolean;
+  onReady?: (choice: Choice | null) => void;
 }) {
   const resource = useResource<Settings>(path, refresh);
-  const runtime = useResource<components["schemas"]["IntegrationSettings"]>(
-    coordinator ? null : `projects/${projectId}/integration`,
-    refresh,
-  );
-  const local = coordinator || runtime.data?.runtime === "local";
   const [retry, setRetry] = useState(0);
-  const catalog = useResource<Model[]>("worker-models", retry);
+  const catalog = useResource<Model[]>(
+    retry ? "worker-models?refresh=true" : "worker-models",
+    retry,
+    180000,
+  );
   const [draft, setDraft] = useState<{
     revision: number;
     selection: Choice | null;
@@ -142,6 +156,18 @@ export function AgentSettingsEditor({
     onDirty(!!draft);
     return () => onDirty(false);
   }, [draft, onDirty]);
+  useEffect(() => {
+    const saved = data?.effective?.choice;
+    const available =
+      !catalog.data ||
+      catalog.data.some(
+        (item) =>
+          item.id === saved?.model && item.efforts.includes(saved.effort),
+      );
+    onReady?.(
+      !draft && !busy && !resource.error && available ? (saved ?? null) : null,
+    );
+  }, [data, draft, busy, resource.error, catalog.data, onReady]);
   function change(model: string, effort: string, mode: string) {
     if (data)
       setDraft({
@@ -160,20 +186,20 @@ export function AgentSettingsEditor({
     setError("");
     setNotice("");
     try {
-      const updated = await request<Settings>(path, "PUT", {
-        expected_revision: draft?.revision ?? data.revision,
-        selection: reset ? null : selection,
-      });
+      const updated = await request<Settings>(
+        path,
+        "PUT",
+        {
+          expected_revision: draft?.revision ?? data.revision,
+          selection: reset ? null : selection,
+        },
+        undefined,
+        180000,
+      );
       resource.invalidate();
       resource.setData(updated);
       setDraft(null);
-      setNotice(
-        reset
-          ? coordinator && !conversation
-            ? "Default cleared."
-            : "Using project defaults."
-          : "Settings saved.",
-      );
+      setNotice(reset ? "Using project defaults." : "Settings saved.");
     } catch (error) {
       setError((error as Error).message);
     } finally {
@@ -184,31 +210,14 @@ export function AgentSettingsEditor({
     <ContentStack space="section">
       <p>
         {coordinator
-          ? "Model and effort for the next Coordinator Chat turn. Running turns keep their settings. These do not change your standalone coding agent."
-          : "Changes apply to the next worker attempt, including replies and retries. Running attempts keep their settings."}
+          ? "Model and effort for your next message."
+          : "Changes apply to the next worker attempt."}
       </p>
-      {(!coordinator || conversation) && (
+      {!coordinator && (
         <p className="detail-metadata">
-          {data?.selection
-            ? conversation
-              ? "Conversation override"
-              : "Task override"
-            : "Using project defaults"}
-          {data?.effective
-            ? ` · Codex · ${data.effective.choice.model} · ${data.effective.choice.effort}`
-            : coordinator
-              ? " · Choose a model in project coordinator settings first."
-              : " · Choose a model in project worker settings first."}
+          {data?.selection ? "Task override" : "Using project defaults"}
         </p>
       )}
-      <p className="detail-metadata">
-        Harness: Codex.{" "}
-        {coordinator
-          ? "Coordinator Chat uses read-only files and scoped planning tools. Code approval stays with you."
-          : local
-            ? "Native tool decisions never approve code delivery. Replies use read-only access."
-            : "Select Local in Integration settings before starting workers or choosing native modes."}
-      </p>
       {(catalog.error || (!catalog.loading && !catalog.data?.length)) && (
         <Alert>
           <AlertDescription>
@@ -239,9 +248,9 @@ export function AgentSettingsEditor({
             model={model}
             effort={effort}
             mode={mode}
-            modesEnabled={local && !coordinator}
+            modesEnabled={!coordinator}
             models={catalog.data ?? []}
-            loading={catalog.loading}
+            loading={catalog.loading || resource.loading}
             change={change}
           />
           <div className="actions">
@@ -255,19 +264,23 @@ export function AgentSettingsEditor({
                 )
               }
             >
-              Save agent settings
+              {busy
+                ? "Saving…"
+                : coordinator
+                  ? "Save model"
+                  : "Save agent settings"}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={stale || (!data?.selection && !draft)}
-              onClick={() => void save(true)}
-            >
-              {coordinator && !conversation
-                ? "Clear default"
-                : "Use project defaults"}
-            </Button>
+            {!coordinator && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={stale || (!data?.selection && !draft)}
+                onClick={() => void save(true)}
+              >
+                Use project defaults
+              </Button>
+            )}
           </div>
         </fieldset>
       </form>
@@ -287,6 +300,10 @@ export function AgentSettingsEditor({
           size="sm"
           disabled={busy}
           onClick={async () => {
+            if (!stale && !error && !resource.error) {
+              setDraft(null);
+              return;
+            }
             if (
               draft &&
               !window.confirm("Discard your edits and load the saved settings?")
@@ -295,6 +312,7 @@ export function AgentSettingsEditor({
             try {
               resource.invalidate();
               resource.setData(await request<Settings>(path));
+              resource.setError("");
               setDraft(null);
               setError("");
             } catch (error) {
@@ -302,7 +320,9 @@ export function AgentSettingsEditor({
             }
           }}
         >
-          Load latest settings
+          {stale || error || resource.error
+            ? "Load latest settings"
+            : "Cancel changes"}
         </Button>
       )}
       {notice && <p role="status">{notice}</p>}

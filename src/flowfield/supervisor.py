@@ -65,6 +65,7 @@ class Supervisor:
         self.jobs: dict[str, asyncio.Task[None]] = {}
         self.setup_jobs: dict[str, asyncio.Task[list[CheckResult]]] = {}
         self.catalog_job: asyncio.Task[list[ModelOption]] | None = None
+        self.catalog_at = 0.0
         self.loop_task: asyncio.Task[None] | None = None
         self.lock: BinaryIO | None = None
         self.closing = False
@@ -97,10 +98,20 @@ class Supervisor:
             self.lock = None
             raise
 
-    async def model_options(self) -> list[ModelOption]:
+    async def model_options(self, *, refresh: bool = False) -> list[ModelOption]:
         if self.closing:
             raise ApplicationError("service_stopping", "The service is stopping.", 409)
-        if self.catalog_job is None or self.catalog_job.done():
+        clock = asyncio.get_running_loop().time()
+        if self.catalog_job is None or (
+            self.catalog_job.done()
+            and (
+                refresh
+                or clock - self.catalog_at > 300
+                or self.catalog_job.cancelled()
+                or self.catalog_job.exception() is not None
+            )
+        ):
+            self.catalog_at = clock
             self.catalog_job = asyncio.create_task(model_options(self.workspace.directory))
         return await asyncio.shield(self.catalog_job)
 
@@ -113,12 +124,6 @@ class Supervisor:
     async def validate_agent_choice(
         self, choice: AgentChoice, project_id: str | None = None
     ) -> None:
-        if choice.mode and project_id and self.integrations.settings(project_id).runtime != "local":
-            raise ApplicationError(
-                "local_adoption_required",
-                "Select Local in Integration settings before choosing a native worker mode.",
-                409,
-            )
         models = await self.model_options()
         if not any(
             item.id == choice.model
@@ -173,7 +178,6 @@ class Supervisor:
                     await asyncio.to_thread(self.integrations.refresh_availability, project.id)
                     if not self.execution.settings(project.id).enabled:
                         continue
-                    self.integrations.settings(project.id).require_local()
                     repository = Path(project.path)
                     head = await asyncio.to_thread(self.integrations.head, project.id)
                     available = await asyncio.to_thread(
@@ -224,8 +228,8 @@ class Supervisor:
         try:
             if run.runtime != "local":
                 raise ApplicationError(
-                    "local_adoption_required",
-                    "Select Local in Integration settings before starting new work.",
+                    "retired_runtime",
+                    "This attempt uses a retired runtime. Start a new attempt to use Local.",
                     409,
                 )
             sections = self.execution.assignment(run.project_id, run.id)

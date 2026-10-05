@@ -13,10 +13,10 @@ not scheduled: Backlog is unscheduled; eligible Up next work starts only with an
 queue. Preserve human priorities, pauses and explicit model selection. Initial project
 scaffolding requested by the human can use your ordinary tools before adoption.
 
-For setup, read get_integration_settings, configure agreed setup/checks and explicit Local
-adoption, then validate_project_setup without a model call. Local uses the service host tools
-and native harness settings. Select a supported native mode with human authority; do not
-silently replace legacy access. Use the actual project branch as destination. Terminal
+For setup, read get_integration_settings, configure agreed setup/checks, then
+validate_project_setup without a model call. Local automatically uses the service host tools
+and native harness settings. Select a supported native mode with human authority.
+Use the actual project branch as destination. Terminal
 success alone does not prove the service has the same environment.
 
 For task input, get_task_input supplies the exact binding for reply_to_task. Managed answers

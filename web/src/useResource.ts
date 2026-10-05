@@ -3,7 +3,11 @@ import { request } from "./workspace";
 
 // Every read owns an abort signal. Navigation, refresh and a successful local
 // mutation invalidate stale replies; writes are never silently cancelled.
-export function useResource<T>(path: string | null, refresh: unknown) {
+export function useResource<T>(
+  path: string | null,
+  refresh: unknown,
+  timeoutMs = 10000,
+) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!!path);
@@ -15,12 +19,15 @@ export function useResource<T>(path: string | null, refresh: unknown) {
     if (key.path !== path) setData(null);
   }
   const controller = useRef<AbortController | null>(null);
-  const invalidate = useCallback(() => controller.current?.abort(), []);
+  const invalidate = useCallback(() => {
+    controller.current?.abort();
+    setLoading(false);
+  }, []);
   useEffect(() => {
     const pending = new AbortController();
     controller.current = pending;
     if (!path) return () => pending.abort();
-    request<T>(path, "GET", undefined, pending.signal)
+    request<T>(path, "GET", undefined, pending.signal, timeoutMs)
       .then((result) => {
         if (!pending.signal.aborted) {
           setData(result);
@@ -34,7 +41,7 @@ export function useResource<T>(path: string | null, refresh: unknown) {
         if (!pending.signal.aborted) setLoading(false);
       });
     return () => pending.abort();
-  }, [path, refresh]);
+  }, [path, refresh, timeoutMs]);
   return { data, setData, error, setError, loading, invalidate };
 }
 

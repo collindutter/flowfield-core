@@ -18,7 +18,6 @@ from flowfield.application import Workspace
 from flowfield.coordinator_models import CoordinatorSend
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
-from flowfield.integration_models import LocalAdoption
 from flowfield.run_activity import MAX_TOTAL, ActivityUpdate
 from flowfield.supervisor import Supervisor
 
@@ -92,18 +91,14 @@ def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
     page = restored.page("harbor", conversation.id)
     assert len(page.items) == 2 and page.active is None
     new = restored.new("harbor")
-    assert new.id != conversation.id
-    with pytest.raises(ApplicationError, match="current conversation"):
-        restored.reserve("harbor", conversation.id, message())
+    assert new.id == conversation.id
+    assert restored.page("harbor").items == page.items
 
 
 def test_planning_before_worker_delivery_configuration(tmp_path, monkeypatch):
     service, conversation = setup(tmp_path, monkeypatch)
     with service.workspace.connection(write=True) as db:
         db.execute("DELETE FROM integration_settings WHERE project_id='harbor'")
-    with pytest.raises(ApplicationError, match="Select Local"):
-        service.coordinator.store.reserve("harbor", conversation.id, message())
-    service.integrations.adopt_local("harbor", LocalAdoption(expected_revision=1))
     settings = service.integrations.settings("harbor")
     assert settings.checks == []
 
@@ -182,7 +177,7 @@ def test_atomic_reservation_frozen_settings_and_bounded_late_output(tmp_path, mo
         "harbor",
         "coordinator",
         AgentSettingsEdit(
-            expected_revision=1, selection=AgentChoice(model="different", effort="high")
+            expected_revision=2, selection=AgentChoice(model="different", effort="high")
         ),
         conversation.id,
     )
@@ -210,12 +205,15 @@ def test_crash_recovery_never_replays_and_schema33_upgrade(tmp_path, monkeypatch
         workspace = fixture(tmp_path).workspace
         project = workspace.project("harbor")
     upgraded = Workspace(workspace.directory)
-    assert upgraded.schema_version == 34 and upgraded.project("harbor") == project
+    assert (
+        upgraded.schema_version == migrations.current_version()
+        and upgraded.project("harbor") == project
+    )
     service = Supervisor(upgraded)
     # No native launch or model selection occurs when history is read/created.
     conversation = service.coordinator.store.new("harbor")
     assert service.coordinator.store.page("harbor", conversation.id).items == []
-    with pytest.raises(ApplicationError, match="Local"):
+    with pytest.raises(ApplicationError, match="model and effort"):
         service.coordinator.store.reserve("harbor", conversation.id, message())
     with upgraded.connection(write=True) as db:
         db.execute("UPDATE integration_settings SET data=json_set(data,'$.runtime','local')")
@@ -265,11 +263,7 @@ def test_history_pages_and_duplicate_retry_at_capacity(tmp_path, monkeypatch):
     assert store.reserve("harbor", conversation.id, request, available=False)[1] is False
     with pytest.raises(ApplicationError, match="slots are busy"):
         store.reserve("harbor", conversation.id, message(), available=False)
-    for _ in range(21):
-        store.new("harbor")
-    history = store.history("harbor")
-    assert len(history.items) == 20
-    assert store.history("harbor", history.next_before).items[-1].id == conversation.id
+    assert store.new("harbor").id == conversation.id
 
 
 def test_scoped_coordinator_applies_saved_answer_without_code_approval(tmp_path):

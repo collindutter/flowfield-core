@@ -7,25 +7,23 @@ Coordinator Chat is the conversation beside your project's board. Discuss an out
 ask it to capture and prepare tasks, or reconcile saved project answers. Task links open
 the same feeds you use for questions and review.
 
-## Start a conversation
+## Start planning
 
 Install and authenticate [Codex](/integrations/codex), including the managed ACP runtime.
 Add an existing project using **Add project → Choose directory** or `flowfield project init`.
-In project **Integration** settings, select **Use Local host** and click **Enable Local host**. Local uses the
-service host's tools, credentials and native harness configuration. In **Coordinator**
-settings, open **Coordinator defaults**, choose a model and reasoning effort, and save.
+In Coordinator Chat, choose a model and reasoning effort beside the input, then save.
+Local uses the service host’s tools, credentials and native harness configuration automatically.
 Worker delivery branches, setup and checks can be configured later. Built-in chat supplies
 its own MCP connection; `flowfield integration connect codex` is only for standalone sessions.
 
-Choose **Start conversation**, write your message, and select **Send** (or press
-Command/Ctrl+Enter). Opening a project or creating a conversation starts no model.
+Write your message and select **Send** (or press Command/Ctrl+Enter). Opening a project
+starts no model turn. Send is available once you have saved a model and effort.
 The coordinator reads project files using Codex's read-only mode and changes work through
 project-scoped Flowfield tools. Code changes belong to task workers. Answer worker questions
 and approve exact code results in their task feeds.
 
-Use **Settings** below the chat input to override the project model and effort for this
-conversation. **Use project defaults** clears the override. Changes apply to the next turn;
-turn settings show the applied choice, or the requested choice if startup failed. Standalone coding-agent settings are separate.
+Use the model button beside the input to change model or effort. Changes apply to the next
+message; a running turn keeps its saved choice. Standalone coding-agent settings are separate.
 
 ## Follow and stop
 
@@ -41,9 +39,9 @@ be confirmed, stop the remaining coordinator process on the host before choosing
 
 ## Continue later
 
-Messages, public output and turn settings are saved by the service. The conversation menu
-opens retained history; **New conversation** starts a fresh discussion. Older messages load
-on demand. Long public output is bounded and omissions are marked.
+Each project has one ongoing coordinator conversation. Messages, public output and turn settings
+are saved by the service. Older messages load on demand. Long output is bounded and omissions
+are marked. Tool activity shows names, status and available commands or paths.
 
 Each turn starts a fresh native session with up to eight recent exchanges within a bounded
 context budget, plus tools for reading current project state. This is application conversation

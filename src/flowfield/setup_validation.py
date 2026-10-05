@@ -122,7 +122,6 @@ class SetupValidation:
                     )
                 settings = Integrations(self.workspace).settings(project_id)
                 self.workspace._current(settings.revision, request.expected_revision)
-                settings.require_local()
                 if not settings.target_branch or not settings.checks:
                     raise ApplicationError(
                         "setup_missing", "Choose a destination and validation commands first.", 409

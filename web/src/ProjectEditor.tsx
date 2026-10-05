@@ -10,8 +10,6 @@ import { EditorFeedback, useRecordEditor } from "./useRecordEditor";
 import type { Project } from "./workspace";
 import { useId, useState } from "react";
 import { WorkerSettings } from "./Workers";
-import { AgentSettingsEditor } from "./AgentSettings";
-import { Disclosure } from "./DetailLayout";
 import { ProjectGuidance } from "./ProjectGuidance";
 import { IntegrationSettings } from "./Integration";
 
@@ -46,8 +44,6 @@ export function ProjectEditor({
   const navigate = useNavigate();
   const location = useLocation();
   const [workerDirty, setWorkerDirty] = useState(false);
-  const [coordinatorDirty, setCoordinatorDirty] = useState(false);
-  const [coordinatorOpened, setCoordinatorOpened] = useState(false);
   const [integrationDirty, setIntegrationDirty] = useState(false);
   const state = useRecordEditor({
     incoming,
@@ -55,7 +51,7 @@ export function ProjectEditor({
     path: () => path,
     onDirty,
     saved,
-    otherDirty: workerDirty || integrationDirty || coordinatorDirty,
+    otherDirty: workerDirty || integrationDirty,
   });
   const {
     values,
@@ -199,22 +195,6 @@ export function ProjectEditor({
         className="content-stack"
         data-space="section"
       >
-        <Disclosure
-          summary="Coordinator defaults"
-          onToggle={(event) => {
-            if (event.currentTarget.open) setCoordinatorOpened(true);
-          }}
-        >
-          {coordinatorOpened && (
-            <AgentSettingsEditor
-              projectId={incoming.id}
-              coordinator
-              path={`projects/${incoming.id}/coordinator-settings`}
-              refresh={incoming}
-              onDirty={setCoordinatorDirty}
-            />
-          )}
-        </Disclosure>
         <ProjectGuidance
           projectId={incoming.id}
           active={tab === "coordinator"}

@@ -156,8 +156,8 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                     assert preview == await call(
                         "get_project_guidance", {"project_id": "harbor", "preview": True}
                     )
-                    assert setup["environment_info"]["runtime"] == "legacy"
-                    assert "Select Local" in setup["environment_info"]["description"]
+                    assert setup["environment_info"]["runtime"] == "local"
+                    assert "Service host" in setup["environment_info"]["description"]
                     await call(
                         "edit_project",
                         {

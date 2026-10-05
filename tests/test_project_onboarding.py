@@ -12,7 +12,6 @@ from flowfield.api import create_app
 from flowfield.application import ProjectSetup, Workspace
 from flowfield.errors import ApplicationError
 from flowfield.integration import Integrations
-from flowfield.integration_models import LocalAdoption
 
 
 def test_picker_selection_cancel_and_origin(
@@ -92,44 +91,18 @@ def test_desktop_commands_and_headless_fallback(monkeypatch: pytest.MonkeyPatch)
         directory_picker.picker_command()
 
 
-def test_local_adoption_before_git_or_delivery_and_revision_conflict(tmp_path: Path) -> None:
+def test_local_is_automatic_before_git_or_delivery(tmp_path: Path) -> None:
     root = tmp_path / "project"
     root.mkdir()
     workspace = Workspace(tmp_path / "state")
     workspace.setup_project(ProjectSetup(path=str(root)))
-    integration = Integrations(workspace)
-    before = integration.settings("project")
-    with pytest.raises(ApplicationError, match="Select Local"):
-        before.require_local()
-    selected = integration.adopt_local("project", LocalAdoption(expected_revision=1))
-    selected.require_local()
-    assert selected.revision == 2
-    assert selected.model_dump(exclude={"revision", "runtime"}) == before.model_dump(
-        exclude={"revision", "runtime"}
-    )
+    settings = Integrations(workspace).settings("project")
+    assert settings.runtime == "local" and settings.revision == 1
+    assert settings.checks == [] and settings.target_branch is None
     assert not (root / ".git").exists()
-    assert integration.adopt_local("project", LocalAdoption(expected_revision=2)) == selected
-    with pytest.raises(ApplicationError, match="stale"):
-        integration.adopt_local("project", LocalAdoption(expected_revision=1))
-    assert Integrations(Workspace(workspace.directory)).settings("project") == selected
-
-
-def test_local_adoption_api(tmp_path: Path) -> None:
-    root = tmp_path / "project"
-    root.mkdir()
-    with TestClient(create_app(data_dir=tmp_path / "state"), base_url="http://localhost") as client:
-        client.post("/api/projects/initialize", json={"path": str(root)})
-        path = "/api/projects/project/integration/local"
-        assert (
-            client.post(
-                path, json={"expected_revision": 1}, headers={"origin": "https://evil.example"}
-            ).status_code
-            == 403
-        )
-        assert client.get("/api/projects/project/integration").json()["runtime"] == "legacy"
-        selected = client.post(path, json={"expected_revision": 1})
-        assert selected.status_code == 200
-        assert selected.json()["runtime"] == "local"
-        assert selected.json()["checks"] == []
-        assert selected.json()["target_branch"] is None
-        assert client.post(path, json={"expected_revision": 1}).status_code == 409
+    assert Integrations(Workspace(workspace.directory)).settings("project") == settings
+    with TestClient(
+        create_app(data_dir=workspace.directory), base_url="http://localhost"
+    ) as client:
+        assert client.get("/api/projects/project/integration").json()["runtime"] == "local"
+        assert client.post("/api/projects/project/integration/local", json={}).status_code == 404

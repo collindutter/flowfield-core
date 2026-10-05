@@ -194,7 +194,7 @@ def add_execution_tools(
 
     @mcp.tool(annotations=read)
     def get_integration_settings(project_id: str) -> dict[str, Any]:
-        """Read destination, setup/check commands and Local adoption status.
+        """Read destination, setup/check commands and Local environment.
         No Git mutations or commands are run.
         """
         settings = supervisor().integrations.settings(project_id)
@@ -205,12 +205,6 @@ def add_execution_tools(
                 "description": "Service host tools, credentials and native harness settings; "
                 "per-attempt "
                 "checkout and temporary/output paths. Legacy inventory is not applied.",
-            }
-            if settings.runtime == "local"
-            else {
-                "runtime": "legacy",
-                "description": "Historical settings retained. Select Local explicitly before new "
-                "managed execution; the legacy runtime is retired.",
             },
         }
 

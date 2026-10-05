@@ -29,8 +29,8 @@ def execution_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     @router.get("/worker-models")
-    async def models() -> list[ModelOption]:
-        return await supervisor().model_options()
+    async def models(refresh: bool = False) -> list[ModelOption]:
+        return await supervisor().model_options(refresh=refresh)
 
     @router.get("/projects/{project_id}/workers")
     def settings(project_id: str) -> WorkerSettings:

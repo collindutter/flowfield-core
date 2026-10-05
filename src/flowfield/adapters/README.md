@@ -9,16 +9,16 @@ this boundary; the service owns assignments, input delivery, approval and integr
   workers or wake an inactive conversation.
 - `codex_agent.py` resolves the installed standalone bridge and native choices over ACP.
   Local workers use native coding tools and a revocable, run-bound Flowfield MCP endpoint.
-- `local_execution.py` prepares explicitly adopted Local attempts. Git adapters own
+- `local_execution.py` prepares Local attempts. Git adapters own
   worktrees, candidate checks and delivery. The supervisor reserves work, freezes input,
   starts workers and reconciles recovery through the shared application operations.
 
 The ACP path separates `GitWorkspace` (checkout and result capture),
 `LocalHost`/`LocalAttempt` (explicit host environment and per-attempt scratch state),
-and `LocalProcess` (owned POSIX process groups). New managed execution requires explicit
-Local adoption. The native worker, tool inventory and forced language runtime are retired.
+and `LocalProcess` (owned POSIX process groups). Local is the automatic environment for new managed execution. The native worker, tool inventory and forced language runtime are retired.
 `historical_workspace.py` reads saved legacy locations/diffs; it cannot prepare or launch
-work. Persisted settings and active runs are never silently converted to broader host access.
+work. Schema migrations update current integration configuration; frozen runs and inspection copies
+retain their original runtime.
 
 `LocalHost` preserves the supplied HOME, PATH and harness configuration, without a
 tool inventory or mandatory language runtime. Its input is the intended launch
@@ -59,4 +59,6 @@ Permission projections retain at most 32 public tool details per turn, each boun
 16,000 characters. Codex adds known command/cwd/permission facts; unrelated raw inputs,
 metadata and reasoning stay excluded. ACP context occupancy is not billable token usage;
 unsupported input/output totals remain unknown. Catalog discovery is shared by concurrent
-callers, bounded to 64 model selections and 120 seconds, and starts no model turn.
+callers, cached for five minutes (with explicit refresh), bounded to 64 model selections and
+120 seconds, and starts no model turn. Public tool activity merges partial updates in a
+100-entry cache bounded to 4,000 characters per field; caches clear when the turn ends.

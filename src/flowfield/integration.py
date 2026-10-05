@@ -23,7 +23,6 @@ from flowfield.integration_models import (
     IntegrationPrepare,
     IntegrationSettings,
     IntegrationSummary,
-    LocalAdoption,
 )
 
 
@@ -53,24 +52,6 @@ class Integrations:
             if row
             else IntegrationSettings(project_id=project_id)
         )
-
-    def adopt_local(self, project_id: str, request: LocalAdoption) -> IntegrationSettings:
-        """Select the same host environment without configuring worker delivery or touching Git."""
-        with self.workspace.connection(write=True, project_id=project_id) as db:
-            current = self._settings(db, project_id)
-            self.workspace._current(current.revision, request.expected_revision)
-            if current.runtime == "local":
-                return current
-            value = current.model_copy(
-                update={"runtime": "local", "revision": current.revision + 1}
-            )
-            db.execute(
-                "INSERT INTO integration_settings VALUES (?,?) ON CONFLICT(project_id) "
-                "DO UPDATE SET data=excluded.data",
-                (project_id, value.model_dump_json()),
-            )
-            self._invalidate_availability(db, project_id)
-            return value
 
     def configure(self, project_id: str, request: IntegrationConfig) -> IntegrationSettings:
         repository = Path(self.workspace.project(project_id).path)
@@ -306,7 +287,6 @@ class Integrations:
                     current_version.integration_id = record.id
                     results._save(db, current_version)
             try:
-                settings.require_local()
                 record.candidate_commit = gitops.candidate(
                     repository, before, record.result_commit, record.id
                 )

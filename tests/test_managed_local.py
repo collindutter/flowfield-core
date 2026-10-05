@@ -174,12 +174,12 @@ def test_lost_native_cleanup_keeps_capacity_reserved(tmp_path, monkeypatch, scen
     assert service.execution.occupancy("harbor").uncertain == 1
 
 
-def test_local_adoption_is_explicit_and_preserves_legacy_settings(tmp_path):
+def test_new_projects_and_attempts_use_local(tmp_path):
     execution = fixture(tmp_path)
     settings = Supervisor(execution.workspace).integrations.settings("harbor")
-    assert settings.runtime == "legacy"
+    assert settings.runtime == "local"
     run = execution.claim("harbor", "a" * 40, {"a" * 40: set()})
-    assert run.runtime == "legacy"
+    assert run.runtime == "local"
 
 
 def test_answer_continuation_uses_new_local_attempt_and_saved_code(tmp_path, monkeypatch):
@@ -279,7 +279,7 @@ def test_schema32_upgrade_retains_legacy_runtime_and_live_ownership(tmp_path, mo
     current = Execution(upgraded).get("harbor", run.id)
     assert current.runtime == "legacy" and current.status == "preparing"
     assert Execution(upgraded).local(run.id) == {"pid": 1234567, "commands": ["retained-tool"]}
-    assert Supervisor(upgraded).integrations.settings("harbor").runtime == "legacy"
+    assert Supervisor(upgraded).integrations.settings("harbor").runtime == "local"
 
 
 def test_public_permission_projection_keeps_commands_and_diff_but_not_private_inputs():
@@ -400,17 +400,19 @@ def test_stop_during_local_setup_stops_owned_command_before_freeing_slot(tmp_pat
     asyncio.run(exercise())
 
 
-def test_native_mode_requires_explicit_local_adoption_before_discovery(tmp_path):
+def test_native_mode_discovery_needs_no_environment_activation(tmp_path, monkeypatch):
     from flowfield.agent_models import AgentChoice
-    from flowfield.errors import ApplicationError
+    from flowfield.execution_models import ModelOption
 
     service = Supervisor(fixture(tmp_path).workspace)
-    with pytest.raises(ApplicationError, match="Select Local"):
-        asyncio.run(
-            service.validate_agent_choice(
-                AgentChoice(model="test-model", effort="low", mode="workspace-write"), "harbor"
-            )
-        )
+
+    async def catalog():
+        return [ModelOption(id="test-model", name="Test", efforts=["low"], modes=[])]
+
+    monkeypatch.setattr(service, "model_options", catalog)
+    asyncio.run(
+        service.validate_agent_choice(AgentChoice(model="test-model", effort="low"), "harbor")
+    )
 
 
 def test_local_setup_failure_explains_host_tools_not_retired_inventory(tmp_path, monkeypatch):

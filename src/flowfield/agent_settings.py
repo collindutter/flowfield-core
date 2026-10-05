@@ -1,7 +1,6 @@
 """One resolution path; existing worker defaults and queue revisions retain their owner."""
 
 import sqlite3
-from uuid import uuid4
 
 from flowfield.agent_models import (
     AgentChoice,
@@ -47,8 +46,6 @@ class AgentSettings:
             "AND scope=?",
             (project, role, scope),
         ).fetchone()
-        if role == "coordinator" and scope and row is None:
-            raise ApplicationError("conversation_missing", "Conversation settings not found.", 404)
         return (
             AgentSettingsView(
                 revision=row[0],
@@ -61,6 +58,8 @@ class AgentSettings:
     def resolve(
         self, db: sqlite3.Connection, project: str, role: AgentRole, scope: str = ""
     ) -> AgentSettingsView:
+        if role == "coordinator":
+            scope = ""
         defaults = self._read(db, project, role)
         override = self._read(db, project, role, scope) if scope else None
         selected = override.selection if override and override.selection else defaults.selection
@@ -91,6 +90,8 @@ class AgentSettings:
             raise ApplicationError(
                 "worker_defaults", "Use worker settings to edit project defaults."
             )
+        if role == "coordinator":
+            scope = ""
         with self.workspace.connection(write=True, project_id=project) as db:
             if role == "worker" and scope:
                 scope = self.workspace._task(db, project, scope).id
@@ -109,13 +110,3 @@ class AgentSettings:
                 ),
             )
             return self.resolve(db, project, role, scope)
-
-    def new_conversation(self, project: str) -> str:
-        """Reserve settings identity for a service-owned conversation; launches nothing."""
-        scope = uuid4().hex
-        with self.workspace.connection(write=True, project_id=project) as db:
-            self.workspace._project(db, project)
-            db.execute(
-                "INSERT INTO agent_settings VALUES (?,'coordinator',?,1,NULL)", (project, scope)
-            )
-        return scope

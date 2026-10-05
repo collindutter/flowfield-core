@@ -14,11 +14,6 @@ class CoordinatorConversation(AgentRecord):
     created_at: str
 
 
-class CoordinatorHistory(AgentRecord):
-    items: list[CoordinatorConversation]
-    next_before: int | None = None
-
-
 class CoordinatorSend(AgentRecord):
     id: str = Field(pattern=r"^[a-zA-Z0-9_-]{16,100}$")
     text: str = Field(min_length=1, max_length=16000)
@@ -49,7 +44,7 @@ class CoordinatorTurn(AgentRecord):
 
 
 class CoordinatorPage(AgentRecord):
-    conversation: CoordinatorConversation
+    conversation: CoordinatorConversation | None = None
     items: list[CoordinatorTurn]
     next_before: int | None = None
     active: CoordinatorTurn | None = None

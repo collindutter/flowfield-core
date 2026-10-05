@@ -39,67 +39,72 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   const turns: Turn[] = [];
   let active: Turn | null = null;
   let sends = 0;
-  await page.route(`**${historyPath}/${conversation.id}`, (route) =>
+  await page.route(`**${historyPath}`, (route) =>
     route.fulfill({
       json: { conversation, items: turns, active, next_before: null },
     }),
   );
-  await page.route(
-    `**${historyPath}/${conversation.id}/messages`,
-    async (route) => {
-      sends++;
-      const message = route.request().postDataJSON();
-      const turn: Turn = {
-        ...message,
-        number: sends,
-        project_id: "chat-browser",
-        conversation_id: conversation.id,
-        created_at: new Date().toISOString(),
-        status: "running",
-        native_started: true,
-        notice: "",
-        settings: {
-          choice: {
-            harness: "codex",
-            model: "test-model",
-            effort: "low",
-            mode: null,
-          },
-          source: "project",
-          default_revision: 1,
-          override_revision: 1,
+  await page.route(`**${historyPath}/messages`, async (route) => {
+    sends++;
+    const message = route.request().postDataJSON();
+    const turn: Turn = {
+      ...message,
+      number: sends,
+      project_id: "chat-browser",
+      conversation_id: conversation.id,
+      created_at: new Date().toISOString(),
+      status: "running",
+      native_started: true,
+      notice: "",
+      settings: {
+        choice: {
+          harness: "codex",
+          model: "test-model",
+          effort: "low",
+          mode: null,
         },
-        applied: null,
-        activity: {
-          revision: 1,
-          supported: true,
-          active: true,
-          changed: true,
-          omitted: false,
-          items: [
-            {
-              key: "reply",
-              kind: "agent",
-              text: "Let’s plan the work.",
-              omitted: false,
-              preview: "",
-              abridged: false,
-            },
-          ],
-          usage: {
-            input_tokens: null,
-            output_tokens: null,
-            cached_input_tokens: null,
-            reasoning_output_tokens: null,
-            total_tokens: null,
+        source: "project",
+        default_revision: 1,
+        override_revision: 1,
+      },
+      applied: null,
+      activity: {
+        revision: 1,
+        supported: true,
+        active: true,
+        changed: true,
+        omitted: false,
+        items: [
+          {
+            key: "tool",
+            kind: "tool",
+            text: "Read project · completed\n/project/README.md",
+            preview: "Read project · completed\n/project/README.md",
+            omitted: false,
+            abridged: false,
           },
+          {
+            key: "reply",
+            kind: "agent",
+            text: "Let’s plan the work.",
+            omitted: false,
+            preview: "",
+            abridged: false,
+          },
+        ],
+        usage: {
+          input_tokens: null,
+          output_tokens: null,
+          cached_input_tokens: null,
+          reasoning_output_tokens: null,
+          total_tokens: null,
         },
-      };
-      turns.push(turn);
-      active = turn;
-      await route.fulfill({ status: 202, json: turn });
-    },
-  );
+      },
+    };
+    turns.push(turn);
+    active = turn;
+    await route.fulfill({ status: 202, json: turn });
+  });
   await page.route(`**${historyPath}/turns/*/stop`, async (route) => {
     if (active) {
       active.status = "stopped";
@@ -110,6 +115,37 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     active = null;
     await route.fulfill({ json: saved });
   });
+  await page.route("**/api/worker-models*", (route) =>
+    route.fulfill({
+      json: [{ id: "test-model", name: "Test", efforts: ["low"], modes: [] }],
+    }),
+  );
+  await page.route(
+    "**/api/projects/chat-browser/coordinator-settings",
+    (route) =>
+      route.fulfill({
+        json: {
+          revision: 1,
+          selection: {
+            harness: "codex",
+            model: "test-model",
+            effort: "low",
+            mode: null,
+          },
+          effective: {
+            choice: {
+              harness: "codex",
+              model: "test-model",
+              effort: "low",
+              mode: null,
+            },
+            source: "project",
+            default_revision: 1,
+            override_revision: null,
+          },
+        },
+      }),
+  );
   await page.goto("/projects/chat-browser");
   await expect(
     page.getByRole("heading", { name: "Coordinator Chat" }),
@@ -127,7 +163,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   await expect(
     page.getByRole("button", { name: "Send", exact: true }),
   ).toBeDisabled();
-  active!.activity.items[0].text +=
+  active!.activity.items.find((item) => item.kind === "agent")!.text +=
     " Open [CHT-1](/projects/chat-browser/tasks/CHT-1).";
   await expect(
     page
@@ -142,7 +178,13 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     ),
   ).toBeVisible();
   await expect(input).toHaveValue("A draft for the next turn");
+  await page.getByText("Activity", { exact: true }).click();
+  await expect(page.getByLabel("Tool", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Read project · completed", { exact: false }),
+  ).toContainText("/project/README.md");
   await page.screenshot({
+    animations: "disabled",
     path: testInfo.outputPath("coordinator-desktop.png"),
   });
   await page.emulateMedia({ colorScheme: "dark" });
@@ -159,6 +201,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
   await expect(input).toHaveValue("A draft for the next turn");
   await page.screenshot({
+    animations: "disabled",
     path: testInfo.outputPath("coordinator-mobile.png"),
   });
   expect(
@@ -167,119 +210,136 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     ),
   ).toBeTruthy();
   await page.screenshot({
+    animations: "disabled",
     path: testInfo.outputPath("coordinator-mobile.png"),
   });
-  await input.fill("");
-  await page
-    .getByRole("button", { name: "New conversation", exact: true })
-    .click();
-  await expect(
-    page
-      .getByRole("combobox", { name: "Conversation history" })
-      .locator("option"),
-  ).toHaveCount(2);
-  await expect(input).toHaveValue("");
-  await page
-    .getByRole("combobox", { name: "Conversation history" })
-    .selectOption(conversation.id);
-  await expect(
-    page.getByText("This conversation is retained history.", { exact: false }),
-  ).toBeVisible();
+  await page.reload();
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
   await expect(
     page.getByText("Let’s plan the work.", { exact: false }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "New conversation", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("combobox", { name: "Conversation history" }),
+  ).toHaveCount(0);
   expect(sends).toBe(1);
 });
 
-test("conversation settings inherit defaults and retain edits through disclosure and navigation", async ({
+test("single coordinator requires a saved model, labels loading and retains unsaved edits", async ({
   page,
   request,
-}) => {
+}, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const directory = join(state, "chat-settings");
   mkdirSync(directory, { recursive: true });
   await request.post("/api/projects/initialize", {
     data: { path: directory, name: "Chat Settings", task_prefix: "CST" },
   });
-  const conversation = await (
-    await request.post("/api/projects/chat-settings/coordinator")
-  ).json();
-  await page.route("**/api/worker-models", (route) =>
-    route.fulfill({
+  let release!: () => void;
+  const discovery = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/worker-models*", async (route) => {
+    await discovery;
+    await route.fulfill({
       json: [
         { id: "first", name: "First", efforts: ["low"], modes: [] },
         { id: "second", name: "Second", efforts: ["high"], modes: [] },
       ],
-    }),
-  );
-  const defaults = {
-    harness: "codex",
-    model: "first",
-    effort: "low",
-    mode: null,
-  };
-  let settings = {
-    revision: 1,
-    selection: null as typeof defaults | null,
-    effective: {
-      choice: defaults,
-      source: "project",
-      default_revision: 1,
-      override_revision: 1,
-    },
-  };
+    });
+  });
+  type Settings = components["schemas"]["AgentSettingsView"];
+  let settings: Settings = { revision: 1, selection: null, effective: null };
   await page.route(
-    `**/api/projects/chat-settings/coordinator/${conversation.id}/settings`,
+    "**/api/projects/chat-settings/coordinator-settings",
     async (route) => {
       if (route.request().method() === "PUT") {
         const change = route.request().postDataJSON();
-        expect(change.selection?.mode ?? null).toBeNull();
+        expect(change.selection.mode).toBeNull();
         settings = {
           revision: settings.revision + 1,
           selection: change.selection,
           effective: {
-            choice: change.selection ?? defaults,
-            source: change.selection ? "override" : "project",
-            default_revision: 1,
-            override_revision: settings.revision + 1,
+            choice: change.selection,
+            source: "project",
+            default_revision: settings.revision + 1,
+            override_revision: null,
           },
         };
       }
       await route.fulfill({ json: settings });
     },
   );
+  let sends = 0;
+  await page.route(
+    "**/api/projects/chat-settings/coordinator/messages",
+    (route) => {
+      sends++;
+      return route.fulfill({
+        status: 409,
+        json: {
+          error: {
+            code: "unavailable",
+            message: "Model is unavailable. Reload models.",
+          },
+        },
+      });
+    },
+  );
   await page.goto("/projects/chat-settings");
-  const controls = page.getByRole("button", { name: "Settings", exact: true });
-  await controls.click();
-  await expect(
-    page.getByText("Using project defaults", { exact: false }),
-  ).toBeVisible();
-  await page
-    .getByRole("combobox", { name: "Model", exact: true })
-    .selectOption("second");
-  await page
-    .getByRole("combobox", { name: "Reasoning effort", exact: true })
-    .selectOption("high");
-  await controls.click();
-  await controls.click();
-  await expect(
-    page.getByRole("combobox", { name: "Model", exact: true }),
-  ).toHaveValue("second");
+  const model = page.getByRole("combobox", { name: "Model", exact: true });
+  const effort = page.getByRole("combobox", {
+    name: "Reasoning effort",
+    exact: true,
+  });
+  const send = page.getByRole("button", { name: "Send", exact: true });
+  const input = page.getByRole("textbox", { name: "Message coordinator" });
+  await expect(model).toBeDisabled();
+  await expect(model.locator("option:checked")).toHaveText("Loading models…");
+  await expect(effort.locator("option:checked")).toHaveText("Loading efforts…");
+  await input.fill("Plan something useful");
+  await expect(send).toBeDisabled();
+  await input.press("Control+Enter");
+  expect(sends).toBe(0);
+  release();
+  await expect(model).toBeEnabled();
+  await expect(model.locator("option:checked")).toHaveText("Choose a model");
+  await expect(effort).toBeDisabled();
+  await expect(effort.locator("option:checked")).toHaveText(
+    "Select a model first",
+  );
+  await model.selectOption("second");
+  await expect(effort).toBeEnabled();
+  await effort.selectOption("high");
+  await expect(send).toBeDisabled();
   await page.getByRole("link", { name: "Flowfield", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Keep editing", exact: true }).click();
+  await expect(model).toHaveValue("second");
+  await page.screenshot({
+    path: testInfo.outputPath("coordinator-model-settings.png"),
+  });
+  await page.getByRole("button", { name: "Save model", exact: true }).click();
+  await expect(send).toBeEnabled();
+  await expect(model).not.toBeVisible();
   await page
-    .getByRole("button", { name: "Save agent settings", exact: true })
+    .getByRole("button", { name: "second · high", exact: true })
     .click();
+  await expect(model).toHaveValue("second");
   await expect(
-    page.getByText("Conversation override", { exact: false }),
+    page.getByRole("button", { name: "Use project defaults" }),
+  ).toHaveCount(0);
+  await send.click();
+  await expect(page.getByRole("alert")).toContainText("Model is unavailable");
+  await expect(page.getByRole("button", { name: "Refresh chat" })).toHaveCount(
+    0,
+  );
+  await expect(input).toHaveValue("Plan something useful");
+  expect(sends).toBe(1);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "second · high", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Use project defaults", exact: true })
-    .click();
-  await expect(
-    page.getByRole("combobox", { name: "Model", exact: true }),
-  ).toHaveValue("first");
-  await page.getByRole("link", { name: "Flowfield", exact: true }).click();
-  await expect(page).toHaveURL(/\/$/);
 });

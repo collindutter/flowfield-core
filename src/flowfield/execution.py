@@ -452,7 +452,7 @@ class Execution:
                     input_base_commit=input_base,
                     correction=correction,
                     environment=runtime_settings.get("environment", {}),
-                    runtime=runtime_settings.get("runtime", "legacy"),
+                    runtime=runtime_settings.get("runtime", "local"),
                     setup_commands=runtime_settings.get("setup_commands", []),
                     setup_timeout_seconds=runtime_settings.get("setup_timeout_seconds", 120),
                     model=effective.choice.model,
