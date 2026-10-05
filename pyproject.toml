@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = [
+  "agent-client-protocol>=0.12.1,<0.13",
   "anyio>=4.5,<5",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",

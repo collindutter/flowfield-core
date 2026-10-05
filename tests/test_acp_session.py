@@ -1,0 +1,203 @@
+"""Shared ACP lifecycle against a real deterministic subprocess, with no credentials."""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+from flowfield.adapters.acp_session import AcpSession
+
+FAKE = Path(__file__).with_name("fake_acp.py")
+
+
+async def start(tmp_path, events, *flags, permission=None, load=None):
+    client = AcpSession(events.append, on_permission=permission, request_timeout=2, turn_timeout=4)
+    await client.start(
+        [sys.executable, str(FAKE), *flags],
+        cwd=tmp_path,
+        env={},
+        mcp_servers=[],
+        load_session_id=load,
+    )
+    return client
+
+
+def test_stream_model_scope_and_no_private_reasoning(tmp_path, caplog):
+    async def exercise():
+        events = []
+        client = await start(tmp_path, events)
+        try:
+            with pytest.raises(ValueError, match="unavailable"):
+                await client.select("model", "absent")
+            await client.select("model", "second")
+            assert client.config[0]["currentValue"] == "second"
+            assert await client.prompt('{"mode":"stderr"}') == "end_turn"
+            assert [event.kind for event in events] == ["tool", "usage", "text"]
+            assert events[1].data == {"used": 100, "size": 1000}
+            assert "PRIVATE" not in str(events) and "WRONG" not in str(events)
+            assert client.state == "ready"
+        finally:
+            receipt = await client.close()
+        assert receipt.turn_finished and receipt.process_group_exited
+        assert await client.close() == receipt
+
+    asyncio.run(exercise())
+    assert "PRIVATE" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "choice,expected", [("allow", "selected"), ("invented", "cancelled"), (None, "cancelled")]
+)
+def test_permissions_only_accept_offered_options(tmp_path, choice, expected):
+    async def exercise():
+        async def permission(request):
+            assert request.tool_id == "tool-1"
+            return choice
+
+        events = []
+        client = await start(tmp_path, events, permission=permission)
+        try:
+            await client.prompt('{"mode":"permission"}')
+            response = json.loads(events[0].data["text"])
+            assert response["outcome"]["outcome"] == expected
+        finally:
+            await client.close()
+
+    asyncio.run(exercise())
+
+
+def test_stop_cancels_pending_permission_and_blocks_new_work(tmp_path):
+    async def exercise():
+        requested = asyncio.Event()
+
+        async def permission(request):
+            requested.set()
+            await asyncio.Event().wait()
+
+        client = await start(tmp_path, [], permission=permission)
+        prompt = asyncio.create_task(client.prompt('{"mode":"permission"}'))
+        await asyncio.wait_for(requested.wait(), 3)
+        with pytest.raises(RuntimeError, match="not ready"):
+            await client.prompt("second turn")
+        with pytest.raises(RuntimeError, match="not ready"):
+            await client.select("model", "second")
+        receipt = await client.close()
+        assert receipt.turn_finished and receipt.process_group_exited
+        assert await prompt == "cancelled"
+        with pytest.raises(RuntimeError, match="not ready"):
+            await client.prompt("after stop")
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("mode", ["disconnect", "oversized", "malformed"])
+def test_broken_transport_never_replays_or_reuses_session(tmp_path, mode):
+    async def exercise():
+        client = await start(tmp_path, [])
+        with pytest.raises((ConnectionError, RuntimeError)):
+            await client.prompt(json.dumps({"mode": mode}))
+        assert client.state == "interrupted"
+        assert client.process.returncode is not None
+        with pytest.raises(RuntimeError, match="not ready"):
+            await client.prompt("retry")
+
+    asyncio.run(exercise())
+
+
+def test_unacknowledged_stop_is_uncertain_even_after_process_exit(tmp_path):
+    async def exercise():
+        client = await start(tmp_path, [])
+        prompt = asyncio.create_task(client.prompt('{"mode":"ignore_cancel"}'))
+        await asyncio.sleep(0.1)
+        receipt = await client.close(timeout=0.15)
+        assert not receipt.turn_finished
+        assert receipt.process_group_exited
+        assert client.state == "interrupted"
+        with pytest.raises((ConnectionError, asyncio.CancelledError)):
+            await prompt
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize(
+    "flag,load,message",
+    [
+        ("bad-version", None, "protocol version"),
+        ("no-load", "old", "loading sessions"),
+        ("", "missing", "Session missing"),
+    ],
+)
+def test_capability_and_missing_session_errors_are_explicit(tmp_path, flag, load, message):
+    async def exercise():
+        with pytest.raises(Exception, match=message):
+            await start(tmp_path, [], flag, load=load)
+
+    asyncio.run(exercise())
+
+
+def test_model_fallback_closes_session(tmp_path):
+    async def exercise():
+        client = await start(tmp_path, [], "fallback")
+        with pytest.raises(RuntimeError, match="did not apply"):
+            await client.select("model", "second")
+        assert client.state != "ready" and client.process.returncode is not None
+
+    asyncio.run(exercise())
+
+
+def test_event_delivery_failure_interrupts_instead_of_claiming_success(tmp_path):
+    async def exercise():
+        client = await start(tmp_path, [])
+
+        def fail(event):
+            raise RuntimeError("Storage unavailable")
+
+        client.on_event = fail
+        with pytest.raises((asyncio.CancelledError, RuntimeError)):
+            await client.prompt("{}")
+        assert client.state == "interrupted"
+        assert client.process.returncode is not None
+
+    asyncio.run(exercise())
+
+
+def test_load_is_explicit_and_does_not_resend_previous_work(tmp_path):
+    async def exercise():
+        events = []
+        client = await start(tmp_path, events, load="test-session")
+        assert client.state == "ready" and events == []
+        await client.prompt("{}")
+        assert [event.data["text"] for event in events if event.kind == "text"] == ["finished"]
+        await client.close()
+
+    asyncio.run(exercise())
+
+
+def test_stop_during_startup_and_cancelled_stop_caller(tmp_path):
+    async def exercise():
+        client = AcpSession(lambda event: None, request_timeout=2)
+        startup = asyncio.create_task(
+            client.start(
+                [sys.executable, str(FAKE), "slow-start"],
+                cwd=tmp_path,
+                env={},
+                mcp_servers=[],
+            )
+        )
+        async with asyncio.timeout(2):
+            while client.process is None:
+                await asyncio.sleep(0.001)
+        stop = asyncio.create_task(client.close())
+        await asyncio.sleep(0)
+        stop.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await stop
+        receipt = await client.close()
+        assert receipt.process_group_exited
+        with pytest.raises((ConnectionError, RuntimeError)):
+            await startup
+        assert client.state != "ready" and client.process.returncode is not None
+
+    asyncio.run(exercise())

@@ -47,7 +47,10 @@ from flowfield.supervisor import Supervisor
 
 
 def create_mcp(
-    workspace: Callable[[], Workspace], supervisor: Callable[[], Supervisor] | None = None
+    workspace: Callable[[], Workspace],
+    supervisor: Callable[[], Supervisor] | None = None,
+    *,
+    origin: str | None = None,
 ) -> FastMCP:
     mcp = FastMCP(
         "Flowfield",
@@ -81,9 +84,13 @@ def create_mcp(
         return await invoke(lambda: receipt(action()))
 
     def reads() -> ContextReads:
+        if origin is not None:
+            return ContextReads(workspace(), origin)
         request = mcp.get_context().request_context.request
-        origin = f"{request.url.scheme}://{request.url.netloc}" if request is not None else ""
-        return ContextReads(workspace(), origin)
+        request_origin = (
+            f"{request.url.scheme}://{request.url.netloc}" if request is not None else ""
+        )
+        return ContextReads(workspace(), request_origin)
 
     def attributed[T: BaseModel](request: T) -> T:
         if "author" not in request.model_fields_set:

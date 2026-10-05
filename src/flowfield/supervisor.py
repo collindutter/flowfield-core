@@ -8,7 +8,7 @@ import signal
 import subprocess
 from functools import partial
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Protocol
 
 from pydantic import Field
 
@@ -140,10 +140,14 @@ def process_stamp(pid: int) -> str:
     return value.stdout.strip() if value.returncode == 0 else ""
 
 
+class WorkerCommands(Protocol):
+    async def command(self, script: str, *, timeout_ms: int) -> dict[str, Any]: ...
+
+
 class WorkerBridge:
     """Fixed server-side run identity; worker input cannot select another task/project."""
 
-    def __init__(self, execution: Execution, run: Run, client: CodexWorker):
+    def __init__(self, execution: Execution, run: Run, client: WorkerCommands):
         self.execution, self.run, self.client = execution, run, client
         self.result: WorkerResult | None = None
         self.question_id: str | None = None
