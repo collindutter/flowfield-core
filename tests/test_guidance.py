@@ -158,7 +158,10 @@ def test_baseline_uses_destination_and_never_commits(tmp_path: Path) -> None:
     assert service.get("project").baseline == "committed"
     integrations = Integrations(service.workspace)
     integrations.configure(
-        "project", IntegrationConfig(expected_revision=1, target_branch="delivery", checks=["true"])
+        "project",
+        IntegrationConfig(
+            runtime="local", expected_revision=1, target_branch="delivery", checks=["true"]
+        ),
     )
     assert service.get("project").baseline == "not_committed"
     assert service.get("project").baseline_ref == "refs/heads/delivery"

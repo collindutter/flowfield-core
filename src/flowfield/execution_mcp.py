@@ -7,7 +7,6 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from flowfield.adapters.toolchain import describe_environment
 from flowfield.execution_history import ExecutionHistory
 from flowfield.execution_models import QueueEdit, ReviewAction, RunAction, SettingsEdit
 from flowfield.integration_models import IntegrationApply, IntegrationConfig, IntegrationPrepare
@@ -195,8 +194,7 @@ def add_execution_tools(
 
     @mcp.tool(annotations=read)
     def get_integration_settings(project_id: str) -> dict[str, Any]:
-        """Read destination, setup/check commands and environment_info: declared executable
-        availability and reserved variable rules. Host availability is not worker validation.
+        """Read destination, setup/check commands and Local adoption status.
         No Git mutations or commands are run.
         """
         settings = supervisor().integrations.settings(project_id)
@@ -209,7 +207,11 @@ def add_execution_tools(
                 "checkout and temporary/output paths. Legacy inventory is not applied.",
             }
             if settings.runtime == "local"
-            else describe_environment(settings.environment),
+            else {
+                "runtime": "legacy",
+                "description": "Historical settings retained. Select Local explicitly before new "
+                "managed execution; the legacy runtime is retired.",
+            },
         }
 
     @mcp.tool(annotations=write)

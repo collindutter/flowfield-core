@@ -92,10 +92,10 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                     for tool in tools.values()
                 )
                 assert all(tool.description and tool.inputSchema for tool in tools.values())
-                variables = tools["configure_integration"].inputSchema["$defs"][
-                    "EnvironmentConfig"
-                ]["properties"]["variables"]["description"]
-                assert "UV_PYTHON_DOWNLOADS" in variables and "UV_PROJECT_ENVIRONMENT" in variables
+                config = tools["configure_integration"].inputSchema["$defs"]["IntegrationConfig"][
+                    "properties"
+                ]
+                assert "environment" not in config and "runtime" in config
                 assert {
                     "publish_task",
                     "get_task",
@@ -156,8 +156,8 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                     assert preview == await call(
                         "get_project_guidance", {"project_id": "harbor", "preview": True}
                     )
-                    assert setup["environment_info"]["configured_tools"] == []
-                    assert "no login-shell PATH" in setup["environment_info"]["baseline"]
+                    assert setup["environment_info"]["runtime"] == "legacy"
+                    assert "Select Local" in setup["environment_info"]["description"]
                     await call(
                         "edit_project",
                         {

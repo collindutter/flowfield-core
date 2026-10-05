@@ -1,9 +1,10 @@
+import os
 from pathlib import Path
 
 import pytest
 
 from flowfield.adapters.git_review import changed_files, file_patch
-from flowfield.adapters.local_environment import baseline, git
+from flowfield.adapters.git_workspace import baseline, git
 from flowfield.errors import ApplicationError
 
 
@@ -79,10 +80,11 @@ def test_empty_and_mode_only_changes_and_literal_paths(tmp_path: Path) -> None:
 
 def test_review_api_files_and_successor_use_captured_commits(tmp_path: Path, monkeypatch) -> None:
     """Actual HTTP review -> revised result -> acceptance, with no harness process."""
+
     from fastapi.testclient import TestClient
     from test_execution import fixture
 
-    from flowfield.adapters.local_environment import LocalEnvironment
+    from flowfield.adapters.local_execution import LocalHost
     from flowfield.api import create_app
     from flowfield.application import TaskPublish
     from flowfield.execution_models import QueueEdit, WorkerResult
@@ -103,6 +105,7 @@ def test_review_api_files_and_successor_use_captured_commits(tmp_path: Path, mon
     Integrations(execution.workspace).configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="integration",
             create_from="HEAD",
@@ -125,12 +128,15 @@ def test_review_api_files_and_successor_use_captured_commits(tmp_path: Path, mon
         execution.queue("harbor", QueueEdit(expected_revision=settings.revision, enabled=True))
         run = execution.claim("harbor", base, {base: set()})
         assert run
-        env = LocalEnvironment.prepare(tmp_path / "state", repo, run.id, run.base_commit)
+        env = LocalHost(os.environ).prepare(tmp_path / "state", repo, run.id, run.base_commit)
         execution.save_local(
             run.id,
             {
-                key: str(getattr(env, key))
-                for key in ("root", "checkout", "runtime", "common_git", "python_runtime")
+                "runtime_kind": "local",
+                **{
+                    key: str(getattr(env, key))
+                    for key in ("root", "checkout", "runtime", "common_git")
+                },
             },
         )
         execution.started("harbor", run.id)

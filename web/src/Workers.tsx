@@ -186,7 +186,7 @@ export function WorkerSettings({
         Harness: Codex.{" "}
         {local
           ? "Native tool decisions never approve code delivery."
-          : "Legacy workers retain disabled tool approvals. Select Local in Integration settings to use native modes."}
+          : "Select Local in Integration settings before starting workers or choosing native modes."}
       </p>
       {catalog.loading && <p role="status">Loading available models…</p>}
       {!catalog.loading && (catalog.error || !models.length) && (

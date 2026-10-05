@@ -18,23 +18,6 @@ const lines = (text: string) =>
     .split("\n")
     .map((v) => v.trim())
     .filter(Boolean);
-const entries = (value: { [key: string]: string } | undefined) =>
-  Object.entries(value ?? {})
-    .map(([k, v]) => `${k}=${v}`)
-    .join("\n");
-function assignments(text: string) {
-  const result: { [key: string]: string } = {};
-  for (const line of lines(text)) {
-    const at = line.indexOf("=");
-    if (at < 1)
-      throw new Error("Use NAME=value on each tool or variable line.");
-    const name = line.slice(0, at).trim();
-    if (name in result) throw new Error(`Duplicate name: ${name}`);
-    result[name] = line.slice(at + 1).trim();
-  }
-  return result;
-}
-
 export function FailureEvidence({ problem }: { problem: string }) {
   const [summary, ...details] = problem.split("\n");
   return (
@@ -69,9 +52,6 @@ export function IntegrationSettings({
     setup: string;
     setupTimeout: number;
     checkTimeout: number;
-    tools: string;
-    readPaths: string;
-    variables: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -84,11 +64,6 @@ export function IntegrationSettings({
     draft?.setupTimeout ?? resource.data?.setup_timeout_seconds ?? 120;
   const checkTimeout =
     draft?.checkTimeout ?? resource.data?.check_timeout_seconds ?? 60;
-  const tools = draft?.tools ?? entries(resource.data?.environment.tools);
-  const readPaths =
-    draft?.readPaths ?? resource.data?.environment.read_paths?.join("\n") ?? "";
-  const variables =
-    draft?.variables ?? entries(resource.data?.environment.variables);
   const fields = {
     local,
     target,
@@ -96,22 +71,14 @@ export function IntegrationSettings({
     setup,
     setupTimeout,
     checkTimeout,
-    tools,
-    readPaths,
-    variables,
   };
-  const environmentDirty =
-    tools !== entries(resource.data?.environment.tools) ||
-    readPaths !== (resource.data?.environment.read_paths?.join("\n") ?? "") ||
-    variables !== entries(resource.data?.environment.variables);
   const dirty =
     local !== (resource.data?.runtime === "local") ||
     target !== (resource.data?.target_branch ?? "") ||
     checks !== (resource.data?.checks.join("\n") ?? "") ||
     setup !== (resource.data?.setup_commands.join("\n") ?? "") ||
     setupTimeout !== (resource.data?.setup_timeout_seconds ?? 120) ||
-    checkTimeout !== (resource.data?.check_timeout_seconds ?? 60) ||
-    environmentDirty;
+    checkTimeout !== (resource.data?.check_timeout_seconds ?? 60);
   useEffect(() => {
     onDirty(dirty || inspection.dirty);
     return () => onDirty(false);
@@ -145,15 +112,7 @@ export function IntegrationSettings({
                 expected_revision: resource.data.revision,
                 target_branch: target,
                 runtime: local ? "local" : null,
-                environment: {
-                  tools: assignments(tools),
-                  read_paths: lines(readPaths),
-                  variables: assignments(variables),
-                },
-                checks: checks
-                  .split("\n")
-                  .map((v) => v.trim())
-                  .filter(Boolean),
+                checks: lines(checks),
                 setup_commands: setup
                   .split("\n")
                   .map((v) => v.trim())
@@ -290,63 +249,13 @@ export function IntegrationSettings({
               copies. Existing attempts keep their recorded environment. Native
               access mode is selected in Workers settings.
             </p>
-            {local && (
+            {!local && (
               <p>
-                Legacy executable paths, read paths and variables are retained
-                as history and are not applied.
+                Select Local before running workers, setup checks or new result
+                copies. Historical attempts and their settings remain available.
               </p>
             )}
           </DetailSection>
-          {!local && (
-            <DetailSection title="Legacy environment">
-              <ContentStack space="section">
-                <p>
-                  Expose installed tools and read-only support files. Your login
-                  shell and credentials are not imported.
-                </p>
-                <Label className="field block">
-                  Executable paths
-                  <Textarea
-                    aria-label="Executable paths"
-                    rows={3}
-                    value={tools}
-                    placeholder="command=/absolute/path/to/executable"
-                    onChange={(e) =>
-                      setDraft({ ...fields, tools: e.target.value })
-                    }
-                  />
-                </Label>
-                <Label className="field block">
-                  Read-only support paths
-                  <Textarea
-                    aria-label="Read-only support paths"
-                    rows={3}
-                    value={readPaths}
-                    placeholder="One absolute path per line"
-                    onChange={(e) =>
-                      setDraft({ ...fields, readPaths: e.target.value })
-                    }
-                  />
-                </Label>
-                <Label className="field block">
-                  Environment variables
-                  <Textarea
-                    aria-label="Environment variables"
-                    rows={3}
-                    value={variables}
-                    placeholder="NAME=value"
-                    onChange={(e) =>
-                      setDraft({ ...fields, variables: e.target.value })
-                    }
-                  />
-                </Label>
-                <p>
-                  No secrets. $RUNTIME and $CHECKOUT identify each private copy;
-                  HOME, PATH and permissions are managed.
-                </p>
-              </ContentStack>
-            </DetailSection>
-          )}
           <DetailSection title="Time limits">
             <ContentStack space="section">
               <Label className="field block">

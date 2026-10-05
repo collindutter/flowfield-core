@@ -6,8 +6,8 @@ from pathlib import Path
 from uuid import uuid4
 
 from flowfield.adapters import git_integration as gitops
+from flowfield.adapters.git_workspace import baseline, git
 from flowfield.adapters.inspection_launcher import write_launcher
-from flowfield.adapters.local_environment import LocalEnvironment, baseline, git
 from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import Workspace, now
 from flowfield.errors import ApplicationError
@@ -165,6 +165,7 @@ class Inspections:
                     "a separate copy is being prepared."
                 )
                 self._save(previous)
+            settings.require_local()
             value = Inspection(
                 id=uuid4().hex,
                 project_id=project_id,
@@ -181,25 +182,8 @@ class Inspections:
             )
             self._save(value, insert=True)
             try:
-                environment = (
-                    LocalHost(os.environ).prepare(
-                        self.workspace.directory / "inspection-work",
-                        repository,
-                        value.id,
-                        commit,
-                    )
-                    if settings.runtime == "local"
-                    else LocalEnvironment.prepare(
-                        self.workspace.directory / "inspection-work",
-                        repository,
-                        value.id,
-                        commit,
-                        settings.environment,
-                        [
-                            self.workspace.directory,
-                            *[Path(p.path) for p in self.workspace.projects()],
-                        ],
-                    )
+                environment = LocalHost(os.environ).prepare(
+                    self.workspace.directory / "inspection-work", repository, value.id, commit
                 )
                 value.workspace = str(environment.checkout)
                 if value.run_command:

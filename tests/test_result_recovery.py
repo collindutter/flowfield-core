@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
@@ -9,7 +10,8 @@ import pytest
 from test_results import approve, current, fixture
 
 from flowfield.adapters import git_integration as gitops
-from flowfield.adapters.local_environment import LocalEnvironment, contains, git
+from flowfield.adapters.git_workspace import contains, git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import TaskReconcile
 from flowfield.attention import attention_page
 from flowfield.errors import ApplicationError
@@ -23,7 +25,9 @@ def action(version):
 
 
 def target_change(service, repo, base, name="target.txt", content="target change\n"):
-    env = LocalEnvironment.prepare(service.workspace.directory, repo, "target-" + name, base)
+    env = LocalHost(os.environ).prepare(
+        service.workspace.directory, repo, "target-" + name.replace(".", "-"), base
+    )
     (env.checkout / name).write_text(content)
     commit, _ = env.snapshot(base)
     git(repo, "merge", "--ff-only", commit)
@@ -42,7 +46,7 @@ def claim_correction(service, repo):
 
 def finish_correction(service, repo, run, content="both changes resolved\n"):
     service.execution.started("harbor", run.id)
-    env = LocalEnvironment.prepare(service.workspace.directory, repo, run.id, run.base_commit)
+    env = LocalHost(os.environ).prepare(service.workspace.directory, repo, run.id, run.base_commit)
     (env.checkout / "result.txt").write_text(content)
     commit, _ = env.snapshot(run.base_commit)
     service.execution.finish(
@@ -203,10 +207,11 @@ def test_runtime_setup_and_failed_revalidation_preserve_completion(tmp_path):
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch="integration",
-            setup_commands=['touch "$VIRTUAL_ENV/runtime-ready"'],
-            checks=['test -f "$VIRTUAL_ENV/runtime-ready" && test -f result.txt'],
+            setup_commands=['touch "$FLOWFIELD_RUNTIME_DIR/runtime-ready"'],
+            checks=['test -f "$FLOWFIELD_RUNTIME_DIR/runtime-ready" && test -f result.txt'],
             check_timeout_seconds=180,
         ),
     )
@@ -220,6 +225,7 @@ def test_runtime_setup_and_failed_revalidation_preserve_completion(tmp_path):
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch="integration",
             checks=["exit 9"],
@@ -239,6 +245,7 @@ def test_changed_target_requires_explicit_reconciliation_before_correction(tmp_p
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch="new-target",
             create_from="main",
@@ -277,6 +284,7 @@ def test_setup_failure_does_not_launch_model_and_retains_location(tmp_path, monk
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch="integration",
             setup_commands=["exit 8"],
@@ -288,11 +296,10 @@ def test_setup_failure_does_not_launch_model_and_retains_location(tmp_path, monk
     async def forbidden(*args):
         pytest.fail("Setup failure must not launch a model")
 
-    from test_setup_validation import CommandHarness, boundary
+    from test_supervisor import FakeWorker
 
-    monkeypatch.setattr("flowfield.supervisor.CodexWorker", CommandHarness)
-    monkeypatch.setattr("flowfield.supervisor.preflight", boundary)
-    monkeypatch.setattr(CommandHarness, "run", forbidden, raising=False)
+    monkeypatch.setattr("flowfield.supervisor.CodexAgent", FakeWorker)
+    monkeypatch.setattr(FakeWorker, "run", forbidden, raising=False)
     asyncio.run(service._execute(correction, repo))
     failed = service.execution.get("harbor", correction.id)
     assert failed.status == "failed"

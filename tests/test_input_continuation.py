@@ -199,9 +199,9 @@ def test_supervisor_preserves_pre_question_code_and_report_baseline(tmp_path, mo
     import asyncio
     from pathlib import Path
 
-    from test_supervisor import FakeWorker, no_preflight
+    from test_supervisor import FakeWorker
 
-    from flowfield.adapters.local_environment import baseline, git
+    from flowfield.adapters.git_workspace import baseline, git
     from flowfield.supervisor import Supervisor
 
     class AskingWorker(FakeWorker):
@@ -235,8 +235,7 @@ def test_supervisor_preserves_pre_question_code_and_report_baseline(tmp_path, mo
                 )
             return {"status": "completed"}
 
-    monkeypatch.setattr("flowfield.supervisor.CodexWorker", AskingWorker)
-    monkeypatch.setattr("flowfield.supervisor.preflight", no_preflight)
+    monkeypatch.setattr("flowfield.supervisor.CodexAgent", AskingWorker)
     monkeypatch.setattr("flowfield.supervisor.process_stamp", lambda pid: "fixture")
     execution = fixture(tmp_path)
     repo = Path(tmp_path / "harbor")
@@ -255,6 +254,14 @@ def test_supervisor_preserves_pre_question_code_and_report_baseline(tmp_path, mo
     )
     base = baseline(repo)
     service = Supervisor(execution.workspace)
+    from flowfield.integration_models import IntegrationConfig
+
+    service.integrations.configure(
+        "harbor",
+        IntegrationConfig(
+            runtime="local", expected_revision=1, target_branch="integration", checks=["true"]
+        ),
+    )
 
     async def exercise():
         run = execution.claim("harbor", base, {base: set()})

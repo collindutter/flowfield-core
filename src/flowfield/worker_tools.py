@@ -14,11 +14,6 @@ from flowfield.stage_models import StageUpdate
 from flowfield.stages import Stages
 
 
-class Command(Record):
-    command: str = Field(min_length=1, max_length=30000)
-    timeout_seconds: int = Field(default=120, ge=1, le=900)
-
-
 class ReadContext(Record):
     section: str
     offset: int = Field(default=0, ge=0)
@@ -44,17 +39,6 @@ def worker_tools() -> list[dict[str, Any]]:
             "inputSchema": model.model_json_schema(),
         }
         for name, description, model in (
-            (
-                "run_command",
-                (
-                    "Run a shell command in this attempt's prepared environment. "
-                    "Inspect files here. Only when your assignment authorizes changes, "
-                    "edit files, install project dependencies and run tests. "
-                    "Public network is available; private/local services and unrelated "
-                    "state remain inaccessible. Returns bounded output."
-                ),
-                Command,
-            ),
             (
                 "read_context",
                 (
@@ -131,13 +115,6 @@ class WorkerBridge:
             from uuid import uuid4
 
             activity(ActivityUpdate(key=uuid4().hex, kind="tool", text=titles[name]))
-        if name == "run_command":
-            command = Command.model_validate(arguments)
-            return json.dumps(
-                await self.client.command(
-                    command.command, timeout_ms=command.timeout_seconds * 1000
-                )
-            )
         if name == "update_stages":
             if self.run.purpose == "discussion":
                 raise ApplicationError(

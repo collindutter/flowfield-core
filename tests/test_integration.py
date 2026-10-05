@@ -1,12 +1,14 @@
 """Real Git journeys with deterministic local checks; no models or user repositories."""
 
+import os
 from pathlib import Path
 
 import pytest
 from test_execution import fixture
 
 from flowfield.adapters import git_integration as gitops
-from flowfield.adapters.local_environment import LocalEnvironment, baseline, git
+from flowfield.adapters.git_workspace import baseline, git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import TaskEdit, TaskPublish
 from flowfield.browser import BrowserReads
 from flowfield.errors import ApplicationError
@@ -16,7 +18,7 @@ from flowfield.integration_models import IntegrationApply, IntegrationConfig
 from flowfield.result_models import ResultReview
 from flowfield.results import Results
 
-CHECK = "python -c 'from loader import load; assert load() == 42'"
+CHECK = "python -B -c 'from loader import load; assert load() == 42'"
 
 
 def seed(tmp_path: Path, checks: list[str] | None = None):
@@ -39,6 +41,7 @@ def seed(tmp_path: Path, checks: list[str] | None = None):
     integration.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="integration",
             create_from="main",
@@ -60,7 +63,7 @@ def seed(tmp_path: Path, checks: list[str] | None = None):
     run = execution.claim("harbor", base, {base: set()})
     assert run
     execution.started("harbor", run.id)
-    env = LocalEnvironment.prepare(execution.workspace.directory, repo, run.id, base)
+    env = LocalHost(os.environ).prepare(execution.workspace.directory, repo, run.id, base)
     (env.checkout / "loader.py").write_text("def load():\n    return 42\n")
     result, _ = env.snapshot(base)
     run = execution.finish(
@@ -209,7 +212,10 @@ def test_conflicts_and_failed_or_mutating_checks_preserve_target(tmp_path):
     service.configure(
         "harbor",
         IntegrationConfig(
-            expected_revision=settings.revision, target_branch="integration", checks=["exit 7"]
+            runtime="local",
+            expected_revision=settings.revision,
+            target_branch="integration",
+            checks=["exit 7"],
         ),
     )
     failed = prepare(service, run)
@@ -218,6 +224,7 @@ def test_conflicts_and_failed_or_mutating_checks_preserve_target(tmp_path):
     service.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch="integration",
             checks=["printf 'changed' > loader.py"],
@@ -373,7 +380,7 @@ def test_target_compare_and_swap_and_changed_intent_cannot_be_bypassed(tmp_path,
 def test_enabled_scheduler_picks_up_dependent_after_explicit_integration(tmp_path, monkeypatch):
     import asyncio
 
-    from test_supervisor import FakeWorker, no_preflight
+    from test_supervisor import FakeWorker
 
     from flowfield.execution_models import QueueEdit
     from flowfield.supervisor import Supervisor
@@ -398,8 +405,7 @@ def test_enabled_scheduler_picks_up_dependent_after_explicit_integration(tmp_pat
             assert (self.cwd / "loader.py").read_text().endswith("return 42\n")
             return await super().run(*args)
 
-    monkeypatch.setattr("flowfield.supervisor.CodexWorker", DependentWorker)
-    monkeypatch.setattr("flowfield.supervisor.preflight", no_preflight)
+    monkeypatch.setattr("flowfield.supervisor.CodexAgent", DependentWorker)
     monkeypatch.setattr("flowfield.supervisor.process_stamp", lambda pid: "fixture-process")
 
     async def journey():
@@ -434,6 +440,7 @@ def test_destination_save_creates_missing_branch_and_preserves_existing_branch(t
     original = integration.settings("harbor")
     head = baseline(repo)
     request = IntegrationConfig(
+        runtime="local",
         expected_revision=original.revision,
         target_branch="new-delivery",
         checks=[CHECK],

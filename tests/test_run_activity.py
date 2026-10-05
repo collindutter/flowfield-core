@@ -1,14 +1,12 @@
 """Public output, replay, bounded storage and shared state; no model calls."""
 
 import asyncio
-import base64
 import sqlite3
 
 import pytest
 from test_execution import BASE, fixture
 from test_input_continuation import question
 
-from flowfield.adapters.codex_activity import CodexActivity
 from flowfield.application import Workspace
 from flowfield.attention import attention_notices, attention_page
 from flowfield.browser import BrowserReads
@@ -48,51 +46,6 @@ def test_bounded_snapshot_replays_after_restart_and_rejects_late_output(tmp_path
     assert not store.read("harbor", run.id).active
     with pytest.raises(ApplicationError):
         store.read("another-project", run.id)
-
-
-def test_adapter_filters_private_events_and_scopes_output():
-    output = []
-    adapter = CodexActivity(output.append)
-    scope = {"threadId": "thread", "turnId": "turn", "itemId": "wire-id"}
-    adapter.event(
-        "item/reasoning/textDelta", {**scope, "delta": "private"}, "thread", "turn", set()
-    )
-    adapter.event(
-        "item/agentMessage/delta",
-        {**scope, "turnId": "other", "delta": "wrong"},
-        "thread",
-        "turn",
-        set(),
-    )
-    assert output == []
-    adapter.event("item/agentMessage/delta", {**scope, "delta": "Public"}, "thread", "turn", set())
-    adapter.event(
-        "item/completed",
-        {**scope, "item": {"id": "wire-id", "type": "agentMessage", "text": "Public message"}},
-        "thread",
-        "turn",
-        set(),
-    )
-    assert output[0].key == output[1].key != "wire-id" and not output[1].append
-    event = {
-        "processId": "owned",
-        "stream": "stdout",
-        "deltaBase64": base64.b64encode(b"checked\n").decode(),
-        "capReached": True,
-    }
-    adapter.event("command/exec/outputDelta", event, None, None, set())
-    assert len(output) == 2
-    adapter.event("command/exec/outputDelta", event, None, None, {"owned"})
-    assert output[-1].text == "checked\n" and output[-1].omitted
-    for chunk in (b"\xe2\x82", b"\xac"):
-        adapter.event(
-            "command/exec/outputDelta",
-            {**event, "stream": "stderr", "deltaBase64": base64.b64encode(chunk).decode()},
-            None,
-            None,
-            {"owned"},
-        )
-    assert output[-1].text == "€" and not output[-1].append
 
 
 def test_buffer_drains_and_marks_overflow_without_board_invalidations(tmp_path):

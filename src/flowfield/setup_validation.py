@@ -3,7 +3,6 @@
 import asyncio
 import fcntl
 import os
-from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 from typing import Literal
@@ -13,10 +12,7 @@ from pydantic import Field
 
 from flowfield.adapters import git_checkout, local_checks
 from flowfield.adapters import git_integration as gitops
-from flowfield.adapters.codex_environment import configuration, preflight, run_checks
-from flowfield.adapters.codex_worker import CodexWorker
-from flowfield.adapters.local_environment import LocalEnvironment
-from flowfield.adapters.local_execution import LocalAttempt, LocalHost
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import Workspace, now
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import CheckResult, Record
@@ -126,6 +122,7 @@ class SetupValidation:
                     )
                 settings = Integrations(self.workspace).settings(project_id)
                 self.workspace._current(settings.revision, request.expected_revision)
+                settings.require_local()
                 if not settings.target_branch or not settings.checks:
                     raise ApplicationError(
                         "setup_missing", "Choose a destination and validation commands first.", 409
@@ -141,29 +138,13 @@ class SetupValidation:
                 )
                 self.active.add(project_id)
                 self._save(value)
-                client: CodexWorker | None = None
                 try:
-                    prepare: Callable[[], LocalAttempt | LocalEnvironment] = (
-                        partial(
-                            LocalHost(os.environ).prepare,
-                            self.workspace.directory / "setup-work",
-                            repo,
-                            value.id,
-                            commit,
-                        )
-                        if settings.runtime == "local"
-                        else partial(
-                            LocalEnvironment.prepare,
-                            self.workspace.directory / "setup-work",
-                            repo,
-                            value.id,
-                            commit,
-                            settings.environment,
-                            [
-                                self.workspace.directory,
-                                *[Path(p.path) for p in self.workspace.projects()],
-                            ],
-                        )
+                    prepare = partial(
+                        LocalHost(os.environ).prepare,
+                        self.workspace.directory / "setup-work",
+                        repo,
+                        value.id,
+                        commit,
                     )
                     preparing = asyncio.create_task(asyncio.to_thread(prepare))
                     try:
@@ -175,55 +156,25 @@ class SetupValidation:
                         value.workspace = str(environment.checkout)
                         raise
                     value.workspace = str(environment.checkout)
-                    if isinstance(environment, LocalAttempt):
 
-                        def record_process(pid: int | None) -> None:
-                            value.pid = pid
-                            self._save(value)
+                    def record_process(pid: int | None) -> None:
+                        value.pid = pid
+                        self._save(value)
 
-                        value.setup = await local_checks.run_checks(
+                    value.setup = await local_checks.run_checks(
+                        environment,
+                        settings.setup_commands,
+                        settings.setup_timeout_seconds,
+                        record_process,
+                    )
+                    self._save(value)
+                    if not any(c.exit_code for c in value.setup):
+                        value.checks = await local_checks.run_checks(
                             environment,
-                            settings.setup_commands,
-                            settings.setup_timeout_seconds,
+                            settings.checks,
+                            settings.check_timeout_seconds,
                             record_process,
                         )
-                        self._save(value)
-                        if not any(c.exit_code for c in value.setup):
-                            value.checks = await local_checks.run_checks(
-                                environment,
-                                settings.checks,
-                                settings.check_timeout_seconds,
-                                record_process,
-                            )
-                    else:
-                        provisional = CodexWorker(environment.checkout)
-                        client = CodexWorker(
-                            environment.checkout, configuration(environment, provisional.binary)
-                        )
-                        await client.start()
-                        assert client.process
-                        value.pid = client.process.pid
-
-                        def save_commands(commands: list[str]) -> None:
-                            value.commands = commands
-                            self._save(value)
-
-                        client.on_commands = save_commands
-                        self._save(value)
-                        await preflight(
-                            client,
-                            environment,
-                            self.workspace.directory,
-                            [Path(p.path) for p in self.workspace.projects()],
-                        )
-                        value.setup = await run_checks(
-                            client, settings.setup_commands, settings.setup_timeout_seconds
-                        )
-                        self._save(value)
-                        if not any(c.exit_code for c in value.setup):
-                            value.checks = await run_checks(
-                                client, settings.checks, settings.check_timeout_seconds
-                            )
                     clean = await asyncio.to_thread(gitops.unchanged, environment, commit)
                     passed = clean and not any(c.exit_code for c in [*value.setup, *value.checks])
                     value.status = "passed" if passed else "failed"
@@ -233,9 +184,7 @@ class SetupValidation:
                         else (
                             "Setup or validation changed source files; inspect the preserved copy."
                             if not clean
-                            else command_problem(
-                                value.setup, value.checks, local=settings.runtime == "local"
-                            )
+                            else command_problem(value.setup, value.checks)
                         )
                     )
                 except asyncio.CancelledError:
@@ -258,17 +207,6 @@ class SetupValidation:
                         )
                     )
                 finally:
-                    if client:
-                        await client.stop()
-                        if not client.cleanup_confirmed:
-                            value.status = "uncertain"
-                            value.problem = (
-                                "Command cleanup is uncertain. Inspect preserved processes before "
-                                "repeating validation."
-                            )
-                        else:
-                            value.pid = None
-                            value.commands = []
                     self._save(value)
                     self.active.discard(project_id)
                 return self.get(project_id) or value
@@ -283,9 +221,7 @@ class SetupValidation:
         await asyncio.gather(*jobs, return_exceptions=True)
 
 
-def command_problem(
-    setup: list[CheckResult], checks: list[CheckResult], *, local: bool = False
-) -> str:
+def command_problem(setup: list[CheckResult], checks: list[CheckResult]) -> str:
     """Name the observed failure and give bounded, evidence-based next steps."""
     phase, failed = next(
         (phase, check)
@@ -295,36 +231,13 @@ def command_problem(
     )
     output = failed.output.lower()
     detail = f"{phase} command failed (exit {failed.exit_code}): {failed.command[:200]}. "
-    if local:
-        if "command not found" in output or failed.exit_code == 127:
-            return detail + (
-                "Install the tool on the service host or add reproducible project dependency "
-                "setup. Check the PATH used to start Flowfield, then validate again."
-            )
-        if "library not loaded" in output or "error while loading shared libraries" in output:
-            return detail + "Check the installed tool's library dependencies on the service host."
-        if "permission denied" in output or "operation not permitted" in output:
-            return detail + "Check the service user's access to the path named in the output."
-        return (
-            detail
-            + "Review the command output, correct the command or project, and validate again."
-        )
-    if "library not loaded" in output or "error while loading shared libraries" in output:
-        return detail + (
-            "The executable's runtime library could not load. Check the library path in "
-            "the command output and the declared tool/read paths, or choose an executable "
-            "whose dependencies are accessible. Host-shell success does not validate the "
-            "managed environment. Save settings and validate again."
-        )
     if "command not found" in output or failed.exit_code == 127:
         return detail + (
-            "Check the command name and declare its executable in Environment tools. "
-            "Save settings and validate again."
+            "Install the tool on the service host or add reproducible project dependency "
+            "setup. Check the PATH used to start Flowfield, then validate again."
         )
+    if "library not loaded" in output or "error while loading shared libraries" in output:
+        return detail + "Check the installed tool's library dependencies on the service host."
     if "permission denied" in output or "operation not permitted" in output:
-        return detail + (
-            "Check the denied path in the output against the declared tool/read paths. "
-            "Use only the access needed by the command; protected state remains excluded. "
-            "Save settings and validate again."
-        )
+        return detail + "Check the service user's access to the path named in the output."
     return detail + "Review the command output, correct the command or project, and validate again."

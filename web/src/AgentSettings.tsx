@@ -194,7 +194,7 @@ export function AgentSettingsEditor({
           ? "Coordinator Chat is not active yet."
           : local
             ? "Native tool decisions never approve code delivery. Replies use read-only access."
-            : "Legacy workers retain disabled tool approvals. Select Local in Integration settings to use native modes."}
+            : "Select Local in Integration settings before starting workers or choosing native modes."}
       </p>
       {(catalog.error || (!catalog.loading && !catalog.data?.length)) && (
         <Alert>

@@ -1,10 +1,12 @@
 """Outcome declarations and shared remedies preserve approval and task scope."""
 
+import os
+
 import pytest
 from pydantic import ValidationError
 from test_results import approve, current, fixture
 
-from flowfield.adapters.local_environment import LocalEnvironment
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import TaskEdit
 from flowfield.attention import attention_counts, attention_page
 from flowfield.errors import ApplicationError
@@ -12,7 +14,7 @@ from flowfield.execution_models import QueueEdit, WorkerResult, WorkerSubmission
 from flowfield.integration_models import IntegrationConfig
 from flowfield.result_brief import result_brief
 from flowfield.result_models import ResultReview
-from flowfield.supervisor import worker_tools
+from flowfield.worker_tools import worker_tools
 
 
 def test_model_must_explicitly_account_for_the_agreed_outcome():
@@ -61,7 +63,7 @@ def test_partial_work_cannot_complete_or_approve_but_continues_on_same_task(tmp_
     assert run and run.task_id == old_run.task_id and run.predecessor_id == old_run.id
     assert run.feedback == partial.report.remaining_work
     service.execution.started("harbor", run.id)
-    env = LocalEnvironment.prepare(service.workspace.directory, repo, run.id, run.base_commit)
+    env = LocalHost(os.environ).prepare(service.workspace.directory, repo, run.id, run.base_commit)
     if completion == "code":
         (env.checkout / "result.txt").write_text("Both requested behaviors implemented")
     commit, _ = env.snapshot(run.base_commit)
@@ -136,6 +138,7 @@ def test_failed_setup_offers_settings_then_retry_after_settings_change(tmp_path)
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch=settings.target_branch,
             checks=settings.checks,
@@ -149,6 +152,7 @@ def test_failed_setup_offers_settings_then_retry_after_settings_change(tmp_path)
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch=settings.target_branch,
             checks=settings.checks,

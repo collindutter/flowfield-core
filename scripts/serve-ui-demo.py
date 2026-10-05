@@ -16,7 +16,8 @@ from types import SimpleNamespace
 import uvicorn
 
 from flowfield import supervisor as worker_module
-from flowfield.adapters.local_environment import LocalEnvironment, git
+from flowfield.adapters.git_workspace import git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.api import create_app
 from flowfield.application import MilestoneCreate, ProjectSetup, TaskCreate, TaskPublish, Workspace
 from flowfield.execution import Execution
@@ -145,6 +146,7 @@ def seed(root):
     Integrations(ws).configure(
         project.id,
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch=git(repo, "branch", "--show-current").decode().strip(),
             checks=[f"{node} --test test.mjs"],
@@ -197,12 +199,15 @@ def seed(root):
         head = Integrations(ws).head(project.id)
         run = execution.claim(project.id, head, {head: set()})
         assert run and run.task_id == item.id
-        env = LocalEnvironment.prepare(root / "state", repo, run.id, run.base_commit)
+        env = LocalHost(os.environ).prepare(root / "state", repo, run.id, run.base_commit)
         execution.save_local(
             run.id,
             {
-                key: str(getattr(env, key))
-                for key in ("root", "checkout", "runtime", "common_git", "python_runtime")
+                "runtime_kind": "local",
+                **{
+                    key: str(getattr(env, key))
+                    for key in ("root", "checkout", "runtime", "common_git")
+                },
             },
         )
         execution.started(project.id, run.id)
@@ -333,21 +338,47 @@ class DemoWorker:
     supports_activity = True
     binary = Path("/usr/bin/true")
 
-    def __init__(self, cwd, config=None):
+    def __init__(self, directory, cwd, environment):
         self.cwd = cwd
+        self.cleanup_confirmed = True
         self.process = None
         self.on_tool = self.on_usage = self.on_commands = self.on_activity = None
         self.stopping = False
 
-    async def start(self):
+    async def start(self, servers):
+        from contextlib import AsyncExitStack
+
+        import httpx
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamable_http_client
+
+        self.stack = AsyncExitStack()
+        server = servers[0]
+        client = await self.stack.enter_async_context(
+            httpx.AsyncClient(headers={h.name: h.value for h in server.headers}, trust_env=False)
+        )
+        read, write, _ = await self.stack.enter_async_context(
+            streamable_http_client(server.url, http_client=client)
+        )
+        session = await self.stack.enter_async_context(ClientSession(read, write))
+        await session.initialize()
+
+        async def call(name, arguments):
+            result = await session.call_tool(name, arguments)
+            assert not result.isError, result
+            return result.content[0].text
+
+        self.on_tool = call
+        self.tools = [{"name": tool.name} for tool in (await session.list_tools()).tools]
+        self.session = SimpleNamespace(session_id="fixture-" + self.cwd.parent.name)
         self.process = SimpleNamespace(pid=os.getpid())
 
-    async def models(self):
-        return [
-            ModelOption(
-                id="demo-scripted", name="Simulated worker · no model calls", efforts=["none"]
-            )
-        ]
+    async def configure(self, choice, *, discussion=False):
+        self.choice = choice
+        return choice
+
+    async def prompt(self, text, on_permission):
+        return await self.run(self.choice.model, self.choice.effort, text, self.tools)
 
     async def run(self, model, effort, prompt, tools):
         brief = json.loads(prompt)
@@ -431,11 +462,13 @@ class DemoWorker:
         return True
 
     async def close(self):
-        pass
+        await self.stack.aclose()
 
 
-async def demo_preflight(*args):
-    pass  # No harness/model is launched. This demo is not worker-isolation evidence.
+async def demo_models(*args):
+    return [
+        ModelOption(id="demo-scripted", name="Simulated worker · no model calls", efforts=["none"])
+    ]
 
 
 def main():
@@ -450,8 +483,8 @@ def main():
             parser.error("Choose a new directory, or --resume an existing demo; nothing was reset.")
     else:
         seed(root)
-    worker_module.CodexWorker = DemoWorker
-    worker_module.preflight = demo_preflight
+    worker_module.CodexAgent = DemoWorker
+    worker_module.model_options = demo_models
     worker_module.process_stamp = lambda pid: "simulated-demo-process"
     app = create_app(data_dir=root / "state")
     original = app.router.lifespan_context

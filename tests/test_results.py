@@ -1,13 +1,15 @@
 """Real Git result/approval/delivery invariants; no model calls."""
 
 import asyncio
+import os
 from pathlib import Path
 
 import pytest
 from project_fixtures import adopt
 
 from flowfield.adapters import git_integration as gitops
-from flowfield.adapters.local_environment import LocalEnvironment, baseline, git
+from flowfield.adapters.git_workspace import baseline, git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import ProjectSetup, TaskCreate, TaskProgress, TaskPublish, Workspace
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import QueueEdit, ReviewAction, SettingsEdit, WorkerResult
@@ -45,6 +47,7 @@ def fixture(
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="integration",
             create_from="main",
@@ -72,7 +75,7 @@ def fixture(
     run = service.execution.claim("harbor", base, {base: set()})
     assert run
     service.execution.started("harbor", run.id)
-    env = LocalEnvironment.prepare(workspace.directory, repo, run.id, base)
+    env = LocalHost(os.environ).prepare(workspace.directory, repo, run.id, base)
     if changed:
         (env.checkout / "result.txt").write_text("implemented\n")
     commit, _ = env.snapshot(base)

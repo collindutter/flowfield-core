@@ -2,10 +2,12 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from flowfield.adapters.git_integration import run_checks
-from flowfield.adapters.local_environment import LocalEnvironment, baseline, git
+from flowfield.adapters.git_workspace import baseline, git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import MilestoneCreate, ProjectSetup, TaskCreate, TaskPublish, Workspace
 from flowfield.execution import Execution
 from flowfield.execution_models import QueueEdit, SettingsEdit, WorkerResult
@@ -52,6 +54,7 @@ def main() -> None:
     integration.configure(
         project.id,
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="integration",
             create_from="main",
@@ -96,12 +99,14 @@ def main() -> None:
     run = execution.claim(project.id, head, {head: set()})
     assert run and run.task_id == "loader"
     execution.started(project.id, run.id)
-    env = LocalEnvironment.prepare(workspace.directory, repo, run.id, head)
+    env = LocalHost(os.environ).prepare(workspace.directory, repo, run.id, head)
     execution.save_local(
         run.id,
         {
-            key: str(getattr(env, key))
-            for key in ("root", "checkout", "runtime", "common_git", "python_runtime")
+            "runtime_kind": "local",
+            **{
+                key: str(getattr(env, key)) for key in ("root", "checkout", "runtime", "common_git")
+            },
         },
     )
     (env.checkout / "catalog.py").write_text(
@@ -151,7 +156,7 @@ def main() -> None:
     )
     results = Results(workspace)
     if args.conflict:
-        target_env = LocalEnvironment.prepare(workspace.directory, repo, "target-input", head)
+        target_env = LocalHost(os.environ).prepare(workspace.directory, repo, "target-input", head)
         (target_env.checkout / "catalog.py").write_text(
             "def load_catalog(path):\n    return {'books': []}\n"
         )

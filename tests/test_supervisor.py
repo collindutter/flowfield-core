@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 from test_execution import fixture
 
-from flowfield.adapters.local_environment import baseline, git
+from flowfield.adapters.git_workspace import baseline, git
 from flowfield.application import TaskPublish
-from flowfield.execution_models import QueueEdit, RunAction, SettingsEdit, Usage
+from flowfield.execution_models import QueueEdit, RunAction, SettingsEdit
 from flowfield.integration_models import IntegrationConfig
 from flowfield.result_models import ResultReview
 from flowfield.supervisor import Supervisor
@@ -19,20 +19,53 @@ class FakeWorker:
     supports_activity = True
     binary = Path("/test/codex/bin/codex")
 
-    def __init__(self, cwd, config=None):
+    def __init__(self, directory, cwd, environment):
         self.cwd = cwd
+        self.cleanup_confirmed = True
+        self.on_activity = None
         self.process = None
         self.on_tool = None
         self.on_usage = None
         self.on_commands = None
         self.stopping = False
 
-    async def start(self):
+    async def start(self, servers):
+        from contextlib import AsyncExitStack
+
+        import httpx
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamable_http_client
+
+        self.stack = AsyncExitStack()
+        server = servers[0]
+        client = await self.stack.enter_async_context(
+            httpx.AsyncClient(headers={h.name: h.value for h in server.headers}, trust_env=False)
+        )
+        read, write, _ = await self.stack.enter_async_context(
+            streamable_http_client(server.url, http_client=client)
+        )
+        session = await self.stack.enter_async_context(ClientSession(read, write))
+        await session.initialize()
+
+        async def call(name, arguments):
+            result = await session.call_tool(name, arguments)
+            assert not result.isError, result
+            return result.content[0].text
+
+        self.on_tool = call
+        self.tools = [{"name": tool.name} for tool in (await session.list_tools()).tools]
+        self.session = SimpleNamespace(session_id="fixture-" + self.cwd.parent.name)
         self.process = SimpleNamespace(pid=os.getpid())
+
+    async def configure(self, choice, *, discussion=False):
+        self.choice = choice
+        return choice
+
+    async def prompt(self, text, on_permission):
+        return await self.run(self.choice.model, self.choice.effort, text, self.tools)
 
     async def run(self, model, effort, prompt, tools):
         assert {t["name"] for t in tools} == {
-            "run_command",
             "read_context",
             "search_context",
             "update_stages",
@@ -41,7 +74,6 @@ class FakeWorker:
         }
         assert model == "test-model" and effort == "low"
         (self.cwd / "result.txt").write_text("implemented")
-        self.on_usage(Usage(total_tokens=12, complete=True))
         await self.on_tool(
             "submit_result",
             {"outcome": "complete", "summary": "Implemented", "checks": "Fake fixture checks"},
@@ -53,16 +85,11 @@ class FakeWorker:
         return True
 
     async def close(self):
-        pass
-
-
-async def no_preflight(*args):
-    pass  # Isolation is covered by the separately invoked real harness probe.
+        await self.stack.aclose()
 
 
 def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
-    monkeypatch.setattr("flowfield.supervisor.CodexWorker", FakeWorker)
-    monkeypatch.setattr("flowfield.supervisor.preflight", no_preflight)
+    monkeypatch.setattr("flowfield.supervisor.CodexAgent", FakeWorker)
     monkeypatch.setattr("flowfield.supervisor.process_stamp", lambda pid: "fixture-process")
     execution = fixture(tmp_path)
     repo = tmp_path / "harbor"
@@ -83,6 +110,7 @@ def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="integration",
             create_from="HEAD",
@@ -113,7 +141,7 @@ def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
                 break
             await asyncio.sleep(0.05)
         run = execution.page("harbor").items[0]
-        assert run.status == "in_review" and run.usage.total_tokens == 12
+        assert run.status == "in_review" and run.usage.total_tokens is None
         from flowfield.run_activity import RunActivity
 
         activity = RunActivity(execution.workspace).read("harbor", run.id)
@@ -178,7 +206,6 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
             await self.release.wait()
             if self.stopping:
                 return {"status": "interrupted"}
-            self.on_usage(Usage(total_tokens=10 + self.index, complete=True))
             await self.on_tool(
                 "submit_result",
                 {"outcome": "complete", "summary": "Independent change", "checks": "Fixture"},
@@ -191,8 +218,7 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
                 self.release.set()
             return True
 
-    monkeypatch.setattr("flowfield.supervisor.CodexWorker", ControlledWorker)
-    monkeypatch.setattr("flowfield.supervisor.preflight", no_preflight)
+    monkeypatch.setattr("flowfield.supervisor.CodexAgent", ControlledWorker)
     monkeypatch.setattr("flowfield.supervisor.process_stamp", lambda pid: "fixture-process")
     execution = fixture(tmp_path, count=3, cap=2)
     repo = tmp_path / "harbor"
@@ -213,6 +239,7 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="integration",
             create_from="main",
@@ -280,14 +307,14 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
             await asyncio.sleep(1.1)  # Cross scheduler ticks with one occupied slot at cap one.
             assert len(workers) == 2
             assert execution.get("harbor", second.id).status == "running"
-            assert execution.get("harbor", first.id).usage.total_tokens == 10
+            assert execution.get("harbor", first.id).usage.total_tokens is None
 
             queue(False)
             workers[1].release.set()
             await until(lambda: result(second.task_id) and result(second.task_id).status == "ready")
             await asyncio.sleep(1.1)
             assert len(workers) == 2 and execution.occupancy("harbor").active == 0
-            assert execution.get("harbor", second.id).usage.total_tokens == 11
+            assert execution.get("harbor", second.id).usage.total_tokens is None
 
             queue(True)
             await until(lambda: len(workers) == 3)

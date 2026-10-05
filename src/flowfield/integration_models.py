@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import Field
 
 from flowfield.environment_models import EnvironmentConfig
+from flowfield.errors import ApplicationError
 from flowfield.execution_models import CheckResult, Record
 
 DELIVERY_BLOCKERS = frozenset(
@@ -39,6 +40,16 @@ class IntegrationSettings(Record):
     setup_timeout_seconds: int = 120
     check_timeout_seconds: int = 60
 
+    def require_local(self) -> None:
+        if self.runtime != "local":
+            raise ApplicationError(
+                "local_adoption_required",
+                "Select Local in Integration settings before starting workers, setup checks or new "
+                "validation/inspection copies. Local uses service-host tools and credentials; "
+                "historical attempts remain available.",
+                409,
+            )
+
 
 class IntegrationConfig(Record):
     expected_revision: int = Field(ge=1)
@@ -46,7 +57,6 @@ class IntegrationConfig(Record):
     target_branch: str = Field(min_length=1, max_length=200)
     create_from: str | None = Field(default=None, min_length=1, max_length=200)
     checks: list[str] = Field(min_length=1, max_length=10)
-    environment: EnvironmentConfig = Field(default_factory=EnvironmentConfig)
     setup_commands: list[str] = Field(default_factory=list, max_length=10)
     setup_timeout_seconds: int = Field(default=120, ge=1, le=900)
     check_timeout_seconds: int = Field(default=60, ge=1, le=900)

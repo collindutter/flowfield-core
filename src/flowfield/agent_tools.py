@@ -119,8 +119,7 @@ def worker_scope(bridge: WorkerBridge) -> ScopedTools:
                 name=item["name"], description=item["description"], inputSchema=item["inputSchema"]
             )
             for item in worker_tools()
-            if item["name"] != "run_command"
-            and (
+            if (
                 bridge.run.purpose == "work"
                 or item["name"] not in {"ask_question", "update_stages"}
             )

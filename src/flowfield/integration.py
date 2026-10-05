@@ -8,9 +8,8 @@ from uuid import uuid4
 
 from flowfield.adapters import git_checkout
 from flowfield.adapters import git_integration as gitops
-from flowfield.adapters.local_environment import LocalEnvironment, contains, git
+from flowfield.adapters.git_workspace import contains, git
 from flowfield.adapters.local_execution import LocalHost
-from flowfield.adapters.toolchain import validate_tools
 from flowfield.application import Workspace, now
 from flowfield.errors import ApplicationError
 from flowfield.execution import Execution
@@ -70,15 +69,6 @@ class Integrations:
                 current = self._settings(db, project_id)
                 self.workspace._current(current.revision, request.expected_revision)
                 runtime = request.runtime or current.runtime
-                if runtime == "legacy":
-                    validate_tools(
-                        request.environment,
-                        [
-                            self.workspace.directory,
-                            repository,
-                            *[Path(p.path) for p in self.workspace.projects()],
-                        ],
-                    )
                 if request.create_from:
                     base = gitops.resolve(repository, request.create_from)
                     # Creation is explicit and never resets an existing branch.
@@ -98,7 +88,7 @@ class Integrations:
                     runtime=runtime,
                     target_branch=request.target_branch,
                     checks=request.checks,
-                    environment=current.environment if runtime == "local" else request.environment,
+                    environment=current.environment,
                     setup_commands=request.setup_commands,
                     setup_timeout_seconds=request.setup_timeout_seconds,
                     check_timeout_seconds=request.check_timeout_seconds,
@@ -297,28 +287,15 @@ class Integrations:
                     current_version.integration_id = record.id
                     results._save(db, current_version)
             try:
+                settings.require_local()
                 record.candidate_commit = gitops.candidate(
                     repository, before, record.result_commit, record.id
                 )
-                environment = (
-                    LocalHost(os.environ).prepare(
-                        self.workspace.directory / "integration-work",
-                        repository,
-                        record.id,
-                        record.candidate_commit,
-                    )
-                    if settings.runtime == "local"
-                    else LocalEnvironment.prepare(
-                        self.workspace.directory / "integration-work",
-                        repository,
-                        record.id,
-                        record.candidate_commit,
-                        settings.environment,
-                        [
-                            self.workspace.directory,
-                            *[Path(p.path) for p in self.workspace.projects()],
-                        ],
-                    )
+                environment = LocalHost(os.environ).prepare(
+                    self.workspace.directory / "integration-work",
+                    repository,
+                    record.id,
+                    record.candidate_commit,
                 )
                 record.workspace = str(environment.checkout)
                 self._save(record)

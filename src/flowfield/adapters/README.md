@@ -9,19 +9,16 @@ this boundary; the service owns assignments, input delivery, approval and integr
   workers or wake an inactive conversation.
 - `codex_agent.py` resolves the installed standalone bridge and native choices over ACP.
   Local workers use native coding tools and a revocable, run-bound Flowfield MCP endpoint.
-- `codex_worker.py` retains the legacy restricted App Server path for unadopted projects, with explicit
-  model/effort, usage and verified interruption. `codex_activity.py` translates allowed
-  public events into bounded application activity; raw/private diagnostics are excluded.
-- `local_execution.py` prepares explicitly adopted Local attempts; `local_environment.py`
-  retains the legacy runtime. Git adapters own
+- `local_execution.py` prepares explicitly adopted Local attempts. Git adapters own
   worktrees, candidate checks and delivery. The supervisor reserves work, freezes input,
   starts workers and reconciles recovery through the shared application operations.
 
 The ACP path separates `GitWorkspace` (checkout and result capture),
 `LocalHost`/`LocalAttempt` (explicit host environment and per-attempt scratch state),
-and `LocalProcess` (owned POSIX process groups). The existing native worker still uses
-its original runtime/settings through `local_environment.py`; no persisted settings
-or active runs are automatically converted to broader host access.
+and `LocalProcess` (owned POSIX process groups). New managed execution requires explicit
+Local adoption. The native worker, tool inventory and forced language runtime are retired.
+`historical_workspace.py` reads saved legacy locations/diffs; it cannot prepare or launch
+work. Persisted settings and active runs are never silently converted to broader host access.
 
 `LocalHost` preserves the supplied HOME, PATH and harness configuration, without a
 tool inventory or mandatory language runtime. Its input is the intended launch
@@ -38,8 +35,7 @@ and a retained PID alone cannot establish process ownership after restart. Retai
 and uncertain execution until reconciliation; never kill processes by name. Worktrees
 share Git metadata. Local capture allows commits descending from the original baseline
 only in the detached checkout, then creates the reviewed result from that original parent.
-A changed checkout binding, branch or unrelated ancestry fails explicitly. Legacy capture
-retains its original HEAD invariant. Native tools must not modify shared branches/refs.
+A changed checkout binding, branch or unrelated ancestry fails explicitly. Historical commits remain unchanged. Native tools must not modify shared branches/refs.
 
 Managed answers continue through service-owned attempts, preserving assignment and answer
 bindings. Saved input, reservation and execution remain distinct facts. Worker continuation

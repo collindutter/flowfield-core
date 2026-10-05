@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from flowfield.adapters.local_environment import git
+from flowfield.adapters.git_workspace import git
 
 
 def captured_changes(checkout: Path, before: str, after: str) -> str:

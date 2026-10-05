@@ -9,7 +9,7 @@ from test_execution import BASE, fixture, result
 from test_input_continuation import question
 from test_results import approve, current
 from test_results import fixture as result_fixture
-from test_supervisor import FakeWorker, no_preflight
+from test_supervisor import FakeWorker
 
 from flowfield.application import TaskCreate, TaskEdit, TaskPublish, Workspace
 from flowfield.conversation import Conversation
@@ -305,8 +305,7 @@ def test_supervisor_owns_discussion_and_never_delivers_its_edits(tmp_path, monke
             )
             return {"status": "completed"}
 
-    monkeypatch.setattr("flowfield.supervisor.CodexWorker", DiscussionWorker)
-    monkeypatch.setattr("flowfield.supervisor.preflight", no_preflight)
+    monkeypatch.setattr("flowfield.supervisor.CodexAgent", DiscussionWorker)
     monkeypatch.setattr("flowfield.supervisor.process_stamp", lambda _: "fixture-process")
     Replies(service.workspace).submit("harbor", "work", message(service.workspace, "work"))
     queue(service.execution, True)

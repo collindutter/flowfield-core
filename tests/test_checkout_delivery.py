@@ -4,7 +4,7 @@ import pytest
 from test_results import approve, current, fixture
 
 from flowfield.adapters import git_checkout
-from flowfield.adapters.local_environment import baseline, git
+from flowfield.adapters.git_workspace import baseline, git
 from flowfield.application import Workspace
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import RunAction
@@ -139,7 +139,10 @@ def test_checkout_retry_cannot_transfer_approval_to_changed_destination(tmp_path
         service.integrations.configure(
             "harbor",
             IntegrationConfig(
-                expected_revision=settings.revision, target_branch="integration", checks=["true"]
+                runtime="local",
+                expected_revision=settings.revision,
+                target_branch="integration",
+                checks=["true"],
             ),
         )
     else:

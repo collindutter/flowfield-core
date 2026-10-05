@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from flowfield.adapters.local_environment import git
+from flowfield.adapters.git_workspace import git
 from flowfield.application import Workspace
 from flowfield.errors import ApplicationError
 from flowfield.integration import Integrations

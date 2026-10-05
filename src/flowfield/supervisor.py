@@ -14,12 +14,9 @@ from flowfield.adapters import git_integration as gitops
 from flowfield.adapters import local_checks
 from flowfield.adapters.acp_session import PermissionRequest
 from flowfield.adapters.codex_agent import CodexAgent, model_options
-from flowfield.adapters.codex_environment import configuration, preflight, run_checks
-from flowfield.adapters.codex_worker import CodexWorker
-from flowfield.adapters.git_workspace import GitWorkspace
-from flowfield.adapters.local_environment import LocalEnvironment, contains, git
+from flowfield.adapters.git_workspace import GitWorkspace, contains, git
+from flowfield.adapters.historical_workspace import HistoricalWorkspace
 from flowfield.adapters.local_execution import LocalAttempt, LocalHost
-from flowfield.adapters.toolchain import toolchain
 from flowfield.agent_models import AgentChoice
 from flowfield.application import Workspace
 from flowfield.errors import ApplicationError
@@ -43,7 +40,7 @@ from flowfield.run_activity import ActivityRecorder, ActivityUpdate
 from flowfield.setup_validation import SetupValidation
 from flowfield.storage import acquire_lock
 from flowfield.worker_context import brief_context
-from flowfield.worker_tools import WorkerBridge, worker_tools
+from flowfield.worker_tools import WorkerBridge
 
 
 def process_stamp(pid: int) -> str:
@@ -60,7 +57,7 @@ class Supervisor:
         self.results = Results(workspace)
         self.setup_validation = SetupValidation(workspace)
         self.delivery_jobs: dict[str, asyncio.Task[None]] = {}
-        self.clients: dict[str, CodexWorker | CodexAgent] = {}
+        self.clients: dict[str, CodexAgent] = {}
         self.permissions = Permissions(workspace)
         self.jobs: dict[str, asyncio.Task[None]] = {}
         self.setup_jobs: dict[str, asyncio.Task[list[CheckResult]]] = {}
@@ -172,6 +169,7 @@ class Supervisor:
                     await asyncio.to_thread(self.integrations.refresh_availability, project.id)
                     if not self.execution.settings(project.id).enabled:
                         continue
+                    self.integrations.settings(project.id).require_local()
                     repository = Path(project.path)
                     head = await asyncio.to_thread(self.integrations.head, project.id)
                     available = await asyncio.to_thread(
@@ -208,8 +206,8 @@ class Supervisor:
             )
 
     async def _execute(self, run: Run, repository: Path) -> None:
-        client: CodexWorker | CodexAgent | None = None
-        environment: LocalEnvironment | LocalAttempt | None = None
+        client: CodexAgent | None = None
+        environment: LocalAttempt | None = None
         scope_stack = contextlib.AsyncExitStack()
         activity: ActivityRecorder | None = None
         applied_agent: AgentChoice | None = None
@@ -220,6 +218,12 @@ class Supervisor:
         input_checkpoint: str | None = None
         starting_commit = run.input_base_commit or run.base_commit
         try:
+            if run.runtime != "local":
+                raise ApplicationError(
+                    "local_adoption_required",
+                    "Select Local in Integration settings before starting new work.",
+                    409,
+                )
             sections = self.execution.assignment(run.project_id, run.id)
             for prerequisite in json.loads(sections["prerequisites"]):
                 if prerequisite["commit"] and not await asyncio.to_thread(
@@ -230,97 +234,46 @@ class Supervisor:
                         "This retry's code baseline lacks a prerequisite result. "
                         "Integrate the required code before starting a fresh attempt.",
                     )
-            if run.runtime == "local":
-                from flowfield.adapters.agent_mcp import serve_scope
-                from flowfield.agent_tools import worker_scope
+            from flowfield.adapters.agent_mcp import serve_scope
+            from flowfield.agent_tools import worker_scope
 
-                environment = await asyncio.to_thread(
-                    LocalHost(os.environ).prepare,
-                    self.workspace.directory,
-                    repository,
-                    run.id,
-                    starting_commit,
-                )
-                metadata: dict[str, Any] = {
-                    "runtime_kind": "local",
-                    "root": str(environment.root),
-                    "checkout": str(environment.checkout),
-                    "runtime": str(environment.runtime),
-                    "common_git": str(environment.common_git),
-                }
-                self.execution.save_local(run.id, metadata)
-                client = CodexAgent(
-                    self.workspace.directory, environment.checkout, environment.launch_environment()
-                )
-                self.clients[run.id] = client
-                bridge = WorkerBridge(self.execution, run, client)
-                server = await scope_stack.enter_async_context(serve_scope(worker_scope(bridge)))
-                # Persist before launch: after a crash, missing PID is not a cleanup receipt.
-                metadata["native_launch_started"] = True
-                self.execution.save_local(run.id, metadata)
-                await client.start([server])
-                assert client.process
-                metadata.update(
-                    pid=client.process.pid,
-                    process_stamp=await asyncio.to_thread(process_stamp, client.process.pid),
-                )
-                self.execution.save_local(run.id, metadata)
-                choice = (
-                    run.agent_settings.choice
-                    if run.agent_settings
-                    else AgentChoice(model=run.model, effort=run.effort)
-                )
-                applied_agent = await client.configure(
-                    choice, discussion=run.purpose == "discussion"
-                )
-            else:
-                environment = await asyncio.to_thread(
-                    LocalEnvironment.prepare,
-                    self.workspace.directory,
-                    repository,
-                    run.id,
-                    starting_commit,
-                    run.environment,
-                    [self.workspace.directory, *[Path(p.path) for p in self.workspace.projects()]],
-                )
-                self.execution.save_local(
-                    run.id,
-                    {
-                        "root": str(environment.root),
-                        "checkout": str(environment.checkout),
-                        "runtime": str(environment.runtime),
-                        "common_git": str(environment.common_git),
-                        "python_runtime": str(environment.python_runtime),
-                    },
-                )
-                provisional = CodexWorker(environment.checkout)
-                config = configuration(environment, provisional.binary)
-                client = CodexWorker(environment.checkout, config)
-                assert isinstance(client, CodexWorker)
-                self.clients[run.id] = client
-                await client.start()
-                assert client.process
-                self.execution.save_local(
-                    run.id,
-                    {
-                        "root": str(environment.root),
-                        "checkout": str(environment.checkout),
-                        "runtime": str(environment.runtime),
-                        "common_git": str(environment.common_git),
-                        "python_runtime": str(environment.python_runtime),
-                        "pid": client.process.pid,
-                        "process_stamp": await asyncio.to_thread(process_stamp, client.process.pid),
-                    },
-                )
-                client.on_commands = lambda commands: self.execution.save_local(
-                    run.id, {**self.execution.local(run.id), "commands": commands}
-                )
-                await preflight(
-                    client,
-                    environment,
-                    self.workspace.directory,
-                    [Path(p.path) for p in self.workspace.projects()],
-                )
+            environment = await asyncio.to_thread(
+                LocalHost(os.environ).prepare,
+                self.workspace.directory,
+                repository,
+                run.id,
+                starting_commit,
+            )
+            metadata: dict[str, Any] = {
+                "runtime_kind": "local",
+                "root": str(environment.root),
+                "checkout": str(environment.checkout),
+                "runtime": str(environment.runtime),
+                "common_git": str(environment.common_git),
+            }
+            self.execution.save_local(run.id, metadata)
+            client = CodexAgent(
+                self.workspace.directory, environment.checkout, environment.launch_environment()
+            )
+            self.clients[run.id] = client
+            bridge = WorkerBridge(self.execution, run, client)
+            server = await scope_stack.enter_async_context(serve_scope(worker_scope(bridge)))
+            # Persist before launch: after a crash, missing PID is not a cleanup receipt.
+            metadata["native_launch_started"] = True
+            self.execution.save_local(run.id, metadata)
+            await client.start([server])
+            assert client.process
+            metadata.update(
+                pid=client.process.pid,
+                process_stamp=await asyncio.to_thread(process_stamp, client.process.pid),
+            )
+            self.execution.save_local(run.id, metadata)
+            choice = (
+                run.agent_settings.choice
+                if run.agent_settings
+                else AgentChoice(model=run.model, effort=run.effort)
+            )
+            applied_agent = await client.configure(choice, discussion=run.purpose == "discussion")
             if getattr(client, "supports_activity", False):
                 activity = ActivityRecorder(self.workspace, run.project_id, run.id)
                 client.on_activity = activity.emit
@@ -329,25 +282,21 @@ class Supervisor:
                 )
             if self.execution.get(run.project_id, run.id).status == "stopping":
                 raise ApplicationError("worker_stopping", "Stop requested; work preserved.", 409)
-            if isinstance(environment, LocalAttempt):
-                setup_job = asyncio.create_task(
-                    local_checks.run_checks(
-                        environment,
-                        run.setup_commands,
-                        run.setup_timeout_seconds,
-                        lambda pid: self.execution.save_local(
-                            run.id, {**self.execution.local(run.id), "setup_process": pid}
-                        ),
-                    )
+            setup_job = asyncio.create_task(
+                local_checks.run_checks(
+                    environment,
+                    run.setup_commands,
+                    run.setup_timeout_seconds,
+                    lambda pid: self.execution.save_local(
+                        run.id, {**self.execution.local(run.id), "setup_process": pid}
+                    ),
                 )
-                self.setup_jobs[run.id] = setup_job
-                try:
-                    setup = await setup_job
-                finally:
-                    self.setup_jobs.pop(run.id, None)
-            else:
-                assert isinstance(client, CodexWorker)
-                setup = await run_checks(client, run.setup_commands, run.setup_timeout_seconds)
+            )
+            self.setup_jobs[run.id] = setup_job
+            try:
+                setup = await setup_job
+            finally:
+                self.setup_jobs.pop(run.id, None)
             self.execution.record_setup(run.project_id, run.id, setup)
             if any(check.exit_code for check in setup):
                 raise ApplicationError(
@@ -362,10 +311,6 @@ class Supervisor:
                     "Setup changed source files. Fix setup commands; inspect preserved changes.",
                 )
             self.execution.started(run.project_id, run.id, applied_agent=applied_agent)
-            if isinstance(client, CodexWorker):
-                bridge = WorkerBridge(self.execution, run, client)
-                client.on_tool = bridge.call
-                client.on_usage = lambda usage: self.execution.usage(run.project_id, run.id, usage)
             sections = self.execution.assignment(run.project_id, run.id)
             brief: dict[str, Any] = {
                 "task": sections["title"],
@@ -375,9 +320,6 @@ class Supervisor:
                 "decision_sequence": run.decision_sequence,
                 "completion": run.completion,
                 "target_branch": run.target_branch,
-                "configured_tools": toolchain(environment.runtime)["tools"]
-                if isinstance(environment, LocalEnvironment)
-                else None,
                 **brief_context(sections, discussion=run.purpose == "discussion"),
                 "instructions": (
                     "Read complete description/feedback pages when listed as truncated. "
@@ -403,8 +345,8 @@ class Supervisor:
                     "context before implementing. read_context provides complete "
                     "sections in pages; search_context searches only this frozen assignment. "
                     "New discoveries are observations, not authority to change intent. "
-                    "Configured tools supplement the private Python runtime and system "
-                    "utilities. Discover commands on PATH; install project dependencies "
+                    "Use the local host's installed tools and native harness permissions. "
+                    "Discover commands on PATH; install project dependencies "
                     "in "
                     "this checkout/runtime when needed. Keep manifests, lockfiles and setup "
                     "instructions reproducible so a clean validation/inspection copy works. "
@@ -412,10 +354,11 @@ class Supervisor:
                     "installation. Missing machine-wide tools/access need a focused question. "
                     "Repository guidance begins at the worktree root; "
                     "do not search parent directories. "
-                    "Use run_command to inspect AGENTS.md and "
-                    "source files. Python is on PATH in your private runtime. Do not "
-                    "commit; the service will capture every tracked/nonignored file "
-                    "after execution stops, validate it, and deliver only after human approval. "
+                    "Use native tools to inspect AGENTS.md and source files. Keep work on this "
+                    "detached checkout; do not switch branches or change shared refs. Local "
+                    "commits are allowed; the service captures the final tracked/nonignored tree "
+                    "against the assigned baseline after execution stops, validates it, "
+                    "and delivers only after human approval. "
                     "Complete the whole agreed outcome. Features deliver usable behavior; "
                     "bugs need regression evidence; maintenance preserves stated constraints; "
                     "investigations report findings, evidence, uncertainty and recommendations. "
@@ -452,74 +395,40 @@ class Supervisor:
                     "an unavailable interactive test. Reassess the whole agreed outcome and retain "
                     "other unfinished requirements. Human test evidence is never code approval."
                 )
-            if isinstance(client, CodexAgent):
-                brief.pop("configured_tools", None)
-                brief["flowfield_connection"] = server.name
-                brief["instructions"] = (
-                    f"Use only the {server.name} MCP connection for Flowfield operations; "
-                    "it is bound to this worker attempt. Other Flowfield connections and the "
-                    "Flowfield CLI belong to standalone coordination; do not use them. "
-                    "Keep your assigned worker role when reading repository guidance. "
-                    + str(brief["instructions"])
-                    .replace(
-                        "Configured tools supplement the private Python runtime "
-                        "and system utilities. ",
-                        "Use the local host's installed tools and native harness permissions. ",
-                    )
-                    .replace(
-                        "Use run_command to inspect AGENTS.md and source files. "
-                        "Python is on PATH in your private runtime. ",
-                        "Use your native tools to inspect AGENTS.md and source files. ",
-                    )
-                    .replace(
-                        "Do not commit; the service will capture every tracked/nonignored file ",
-                        "Keep work on this detached checkout; do not switch branches or change "
-                        "shared refs. Local commits are allowed; the service captures the final "
-                        "tree against the assigned baseline ",
-                    )
-                )
+            brief["flowfield_connection"] = server.name
+            brief["instructions"] = (
+                f"Use only the {server.name} MCP connection for Flowfield operations; "
+                "it is bound to this worker attempt. Other Flowfield connections and the "
+                "Flowfield CLI belong to standalone coordination; do not use them. "
+                "Keep your assigned worker role when reading repository guidance. "
+                + str(brief["instructions"])
+            )
             try:
-                if isinstance(client, CodexAgent):
-                    assert client.session.session_id
-                    async with self.permissions.turn(
-                        run.project_id,
-                        "worker",
-                        session_id=client.session.session_id,
-                        turn_id=run.id,
-                        run_id=run.id,
-                    ) as turn:
+                assert client.session.session_id
+                async with self.permissions.turn(
+                    run.project_id,
+                    "worker",
+                    session_id=client.session.session_id,
+                    turn_id=run.id,
+                    run_id=run.id,
+                ) as turn:
 
-                        async def request_permission(request: PermissionRequest) -> str | None:
-                            return await turn.request(
-                                request.tool_id,
-                                request.title,
-                                [
-                                    PermissionOption.model_validate(
-                                        {"id": i, "label": label, "kind": kind}
-                                    )
-                                    for i, label, kind in request.options
-                                ],
-                                details=request.details,
-                            )
-
-                        outcome = await client.prompt(
-                            json.dumps(brief, ensure_ascii=False),
-                            None if run.purpose == "discussion" else request_permission,
-                        )
-                else:
-                    outcome = await asyncio.wait_for(
-                        client.run(
-                            run.model,
-                            run.effort,
-                            json.dumps(brief, ensure_ascii=False),
+                    async def request_permission(request: PermissionRequest) -> str | None:
+                        return await turn.request(
+                            request.tool_id,
+                            request.title,
                             [
-                                tool
-                                for tool in worker_tools()
-                                if run.purpose == "work"
-                                or tool["name"] not in ("update_stages", "ask_question")
+                                PermissionOption.model_validate(
+                                    {"id": i, "label": label, "kind": kind}
+                                )
+                                for i, label, kind in request.options
                             ],
-                        ),
-                        900,
+                            details=request.details,
+                        )
+
+                    outcome = await client.prompt(
+                        json.dumps(brief, ensure_ascii=False),
+                        None if run.purpose == "discussion" else request_permission,
                     )
             except TimeoutError as error:
                 raise ApplicationError(
@@ -602,14 +511,13 @@ class Supervisor:
         finally:
             if client:
                 await client.close()
-                if isinstance(client, CodexAgent):
-                    self.execution.save_local(
-                        run.id,
-                        {
-                            **self.execution.local(run.id),
-                            "native_cleanup_confirmed": client.cleanup_confirmed,
-                        },
-                    )
+                self.execution.save_local(
+                    run.id,
+                    {
+                        **self.execution.local(run.id),
+                        "native_cleanup_confirmed": client.cleanup_confirmed,
+                    },
+                )
             try:
                 await scope_stack.aclose()
             except (Exception, asyncio.CancelledError):
@@ -734,7 +642,7 @@ class Supervisor:
             ),
         )
 
-    def environment(self, run_id: str) -> LocalEnvironment | LocalAttempt | None:
+    def environment(self, run_id: str) -> HistoricalWorkspace | LocalAttempt | None:
         data = self.execution.local(run_id)
         if not data:
             return None
@@ -744,12 +652,7 @@ class Supervisor:
                 GitWorkspace(Path(data["root"]), Path(data["checkout"]), Path(data["common_git"])),
                 Path(data["runtime"]),
             )
-        return LocalEnvironment(
-            *[
-                Path(data[key])
-                for key in ("root", "checkout", "runtime", "common_git", "python_runtime")
-            ]
-        )
+        return HistoricalWorkspace(Path(data["checkout"]), Path(data["runtime"]))
 
     def location(self, project_id: str, run_id: str) -> RunLocation:
         run = self.execution.get(project_id, run_id)

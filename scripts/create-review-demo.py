@@ -6,11 +6,13 @@ Run before serving this new state directory; existing directories are never over
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-from flowfield.adapters.local_environment import LocalEnvironment, baseline, git
+from flowfield.adapters.git_workspace import baseline, git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import ProjectSetup, TaskCreate, TaskPublish, Workspace
 from flowfield.execution import Execution
 from flowfield.execution_models import QueueEdit, ReviewAction, SettingsEdit, Usage, WorkerResult
@@ -56,6 +58,7 @@ def main() -> None:
     Integrations(workspace).configure(
         project.id,
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="integration",
             create_from="HEAD",
@@ -96,12 +99,15 @@ def main() -> None:
     def capture(revised: bool = False):
         run = execution.claim(project.id, head, {head: set()})
         assert run and run.task_id == "catalog"
-        env = LocalEnvironment.prepare(root / "state", repo, run.id, run.base_commit)
+        env = LocalHost(os.environ).prepare(root / "state", repo, run.id, run.base_commit)
         execution.save_local(
             run.id,
             {
-                key: str(getattr(env, key))
-                for key in ("root", "checkout", "runtime", "common_git", "python_runtime")
+                "runtime_kind": "local",
+                **{
+                    key: str(getattr(env, key))
+                    for key in ("root", "checkout", "runtime", "common_git")
+                },
             },
         )
         execution.started(project.id, run.id)

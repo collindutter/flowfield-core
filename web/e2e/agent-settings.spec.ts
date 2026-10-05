@@ -312,6 +312,9 @@ test("Local adoption is explicit and preserves drafts across project tabs", asyn
     async (route) => {
       if (route.request().method() === "PUT") {
         expect(route.request().postDataJSON().runtime).toBe("local");
+        expect(route.request().postDataJSON()).not.toHaveProperty(
+          "environment",
+        );
         settings = { ...settings, revision: 2, runtime: "local" };
       }
       await route.fulfill({ json: settings });
@@ -320,9 +323,10 @@ test("Local adoption is explicit and preserves drafts across project tabs", asyn
   await page.goto("/projects/local-adoption/edit/integration");
   const selection = page.getByLabel("Use Local host");
   await expect(selection).not.toBeChecked();
-  await expect(page.getByLabel("Executable paths")).toHaveValue(
-    "pnpm=/old/pnpm",
-  );
+  await expect(page.getByLabel("Executable paths")).toHaveCount(0);
+  await expect(
+    page.getByText("Select Local before running workers", { exact: false }),
+  ).toBeVisible();
   await selection.check();
   await expect(page.getByLabel("Executable paths")).toHaveCount(0);
   await page.getByRole("tab", { name: "Info", exact: true }).click();

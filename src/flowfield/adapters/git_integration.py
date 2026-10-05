@@ -2,16 +2,12 @@
 
 import asyncio
 import fcntl
-import os
-import signal
-import subprocess
-import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
 from flowfield.adapters import git_checkout, local_checks
-from flowfield.adapters.local_environment import LocalEnvironment, contains, git
+from flowfield.adapters.git_workspace import contains, git
 from flowfield.adapters.local_execution import LocalAttempt
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import CheckResult
@@ -150,59 +146,12 @@ def correction_seed(repository: Path, before: str, source: str, identity: str) -
 
 
 def run_checks(
-    environment: LocalEnvironment | LocalAttempt, commands: list[str], timeout: int = 60
+    environment: LocalAttempt, commands: list[str], timeout: int = 60
 ) -> list[CheckResult]:
-    if isinstance(environment, LocalAttempt):
-        return asyncio.run(local_checks.run_checks(environment, commands, timeout))
-    reports = []
-    for command in commands:
-        # Explicit project check commands are trusted local code, not a security sandbox.
-        # Separate cwd/HOME/tmp/Python protect normal builds from sharing worker artifacts.
-        with tempfile.TemporaryFile() as output:
-            process = subprocess.Popen(
-                ["/bin/sh", "-c", command],
-                cwd=environment.checkout,
-                env={
-                    **{
-                        key: value
-                        for key, value in os.environ.items()
-                        if not key.startswith("GIT_") and key not in ("PYTHONPATH", "PYTHONHOME")
-                    },
-                    **environment.shell_environment(),
-                },
-                stdin=subprocess.DEVNULL,
-                stdout=output,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
-            try:
-                code = process.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait()
-                code = 124
-            finally:
-                # Do not leave background children from a validation command running.
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            output.seek(0)
-            content = output.read(12001)
-        reports.append(
-            CheckResult(
-                command=command,
-                exit_code=code,
-                output=content[:12000].decode(errors="replace"),
-                truncated=len(content) > 12000,
-            )
-        )
-        if code:
-            break
-    return reports
+    return asyncio.run(local_checks.run_checks(environment, commands, timeout))
 
 
-def unchanged(environment: LocalEnvironment | LocalAttempt, commit: str) -> bool:
+def unchanged(environment: LocalAttempt, commit: str) -> bool:
     snapshot, _ = environment.snapshot(commit)
     return git(environment.checkout, "rev-parse", snapshot + "^{tree}") == git(
         environment.checkout, "rev-parse", commit + "^{tree}"

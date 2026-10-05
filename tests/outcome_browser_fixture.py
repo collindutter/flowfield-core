@@ -1,12 +1,14 @@
 """Outcome/recovery browser states; synthetic reports, real Git, model queue stays paused."""
 
+import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 from project_fixtures import adopt
 
-from flowfield.adapters.local_environment import LocalEnvironment, git
+from flowfield.adapters.git_workspace import git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import ProjectSetup, TaskCreate, TaskPreparation, Workspace
 from flowfield.execution_models import SettingsEdit, WorkerResult
 from flowfield.integration_models import IntegrationConfig
@@ -40,6 +42,7 @@ for kind in ("report", "partial", "checks", "setup"):
     service.integrations.configure(
         project,
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="delivery",
             create_from="main",
@@ -69,7 +72,7 @@ for kind in ("report", "partial", "checks", "setup"):
         run = service.execution.claim(project, head, service._available(project, repo, head))
     assert run
     service.execution.started(project, run.id)
-    env = LocalEnvironment.prepare(workspace.directory, repo, run.id, run.base_commit)
+    env = LocalHost(os.environ).prepare(workspace.directory, repo, run.id, run.base_commit)
     if kind != "report":
         (env.checkout / "result.txt").write_text("Useful change")
     commit, _ = env.snapshot(run.base_commit)

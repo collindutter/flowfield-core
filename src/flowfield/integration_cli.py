@@ -77,7 +77,6 @@ def register(project_app: typer.Typer) -> None:
                     "expected_revision": current["revision"],
                     "target_branch": target,
                     "runtime": "local" if local else None,
-                    "environment": current["environment"],
                     "create_from": create_from,
                     "checks": check,
                     "setup_commands": setup or [],

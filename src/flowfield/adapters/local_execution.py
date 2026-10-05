@@ -44,9 +44,6 @@ class LocalAttempt:
     def snapshot(self, parent: str) -> tuple[str, list[str]]:
         return self.workspace.snapshot(parent, allow_local_commits=True)
 
-    def shell_environment(self) -> dict[str, str]:
-        return self.launch_environment()
-
     def location(self, base: str, result: str | None) -> RunLocation:
         prefix = f"git -C {shlex.quote(str(self.checkout))}"
         return RunLocation(

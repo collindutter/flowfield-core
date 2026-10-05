@@ -1,4 +1,4 @@
-"""Project-declared machine capabilities, independent of a model or harness."""
+"""Historical restricted-runtime settings. Retained for reading saved records only."""
 
 import re
 from pathlib import Path

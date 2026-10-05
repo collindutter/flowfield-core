@@ -4014,7 +4014,8 @@ test("integration settings create an explicit local target without changing the 
   await expect(
     settings.getByRole("checkbox", { name: "Create this branch" }),
   ).toHaveCount(0);
-  await expect(settings.getByLabel("Executable paths")).toBeVisible();
+  await expect(settings.getByLabel("Executable paths")).toHaveCount(0);
+  await settings.getByLabel("Use Local host").check();
   await expect(settings.getByLabel("Seconds per setup command")).toBeVisible();
   await settings
     .getByLabel("Validation commands", { exact: true })
@@ -4068,7 +4069,7 @@ test("integration settings create an explicit local target without changing the 
       ).json()
     ).run_command,
   ).toBe("python app.py");
-  // Deterministic UI projection only: real sandbox validation is a separate opt-in probe.
+  // Deterministic UI projection; backend tests execute real Local setup commands.
   await page.route(
     `**/api/projects/${project}/setup-validation`,
     async (route) => {

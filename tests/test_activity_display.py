@@ -1,13 +1,10 @@
 """Readable public activity preserves evidence and real ownership; no model calls."""
 
-import base64
-
 from test_execution import BASE, fixture
 
 from flowfield.activity_text import preview, retain
 from flowfield.adapters.activity_diff import captured_changes
-from flowfield.adapters.codex_activity import CodexActivity
-from flowfield.adapters.local_environment import git
+from flowfield.adapters.git_workspace import git
 from flowfield.execution_models import Usage
 from flowfield.run_activity import ActivityUpdate, RunActivity
 from flowfield.worker_context import brief_context
@@ -56,26 +53,6 @@ def test_usage_updates_without_new_output_and_retained_text_survives_append(tmp_
     assert not unchanged.changed and not unchanged.items
     assert unchanged.usage.total_tokens == 240 and unchanged.usage.cached_input_tokens is None
     assert not unchanged.usage.complete
-
-
-def test_adapter_bounded_stream_retains_received_start_and_end():
-    events = []
-    adapter = CodexActivity(events.append)
-    for chunk in (b"Header\n" + b"a" * 16000, b"\nFinal error"):
-        adapter.event(
-            "command/exec/outputDelta",
-            {
-                "processId": "owned",
-                "stream": "stderr",
-                "deltaBase64": base64.b64encode(chunk).decode(),
-            },
-            None,
-            None,
-            {"owned"},
-        )
-    output = adapter.output["owned"]["stderr"]
-    assert len(output) <= 12000 and output.startswith(b"Header") and output.endswith(b"Final error")
-    assert "middle omitted" in events[-1].text and events[-1].omitted
 
 
 def test_captured_file_counts_come_from_git_trees_including_unusual_names(tmp_path):

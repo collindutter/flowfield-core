@@ -4,7 +4,7 @@ import shlex
 import tempfile
 from pathlib import Path
 
-from flowfield.adapters.local_environment import git
+from flowfield.adapters.git_workspace import git
 from flowfield.errors import ApplicationError
 from flowfield.integration_models import CheckoutBinding
 

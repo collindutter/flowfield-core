@@ -2565,7 +2565,6 @@ export interface components {
       create_from?: string | null;
       /** Checks */
       checks: string[];
-      environment?: components["schemas"]["EnvironmentConfig"];
       /** Setup Commands */
       setup_commands?: string[];
       /**

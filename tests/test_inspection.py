@@ -14,9 +14,9 @@ import pytest
 from test_result_recovery import target_change
 from test_results import approve, current, fixture
 
-from flowfield.adapters.local_environment import LocalEnvironment, baseline, git
+from flowfield.adapters.git_workspace import baseline, git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import TaskEdit, TaskReconcile
-from flowfield.environment_models import EnvironmentConfig
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import QueueEdit, WorkerResult
 from flowfield.inspection import Inspections
@@ -137,7 +137,7 @@ def test_feedback_successor_preserves_earlier_copy_and_approval_binding(tmp_path
     head = service.integrations.head("harbor")
     run = service.execution.claim("harbor", head, service._available("harbor", repo, head))
     assert service.execution.assignment("harbor", run.id)["description"] == task.body
-    env = LocalEnvironment.prepare(service.workspace.directory, repo, run.id, run.base_commit)
+    env = LocalHost(os.environ).prepare(service.workspace.directory, repo, run.id, run.base_commit)
     (env.checkout / "result.txt").write_text("useful successor")
     commit, _ = env.snapshot(run.base_commit)
     service.execution.finish(
@@ -179,18 +179,18 @@ def test_settings_revisions_stale_requests_and_failed_preparation_preserve_evide
             "harbor", InspectionPrepare(result_id=version.id, expected_revision=999)
         )
     assert inspections.latest("harbor", version.id) is None
-    actual = LocalEnvironment.prepare
+    actual = LocalHost.prepare
 
     def interrupted(*args):
         actual(*args)
         raise OSError("simulated crash after files")
 
-    monkeypatch.setattr(LocalEnvironment, "prepare", interrupted)
+    monkeypatch.setattr(LocalHost, "prepare", interrupted)
     failed = prepare(inspections, version)
     assert failed.status == "failed"
-    retained = service.workspace.directory / "inspection-work/environments" / failed.id
+    retained = service.workspace.directory / "inspection-work/local-attempts" / failed.id
     assert retained.exists()
-    monkeypatch.setattr(LocalEnvironment, "prepare", actual)
+    monkeypatch.setattr(LocalHost, "prepare", actual)
     fresh = prepare(Inspections(service.workspace), version)
     assert fresh.id != failed.id and fresh.status == "ready" and retained.exists()
     # A crash before the ready receipt is durable and never repurposes the half-prepared copy.
@@ -243,7 +243,7 @@ def test_node_setup_and_run_artifacts_stay_in_inspection_copy(tmp_path):
     if not npm:
         pytest.skip("Node/npm toolchain needed for the explicit Node inspection test")
     service, repo, original = fixture(tmp_path, checks=["test -f package.json"])
-    env = LocalEnvironment.prepare(
+    env = LocalHost(os.environ).prepare(
         service.workspace.directory, repo, "node-source", original.result_commit
     )
     (env.checkout / ".gitignore").write_text("node_modules/\noutput.txt\n")
@@ -293,14 +293,14 @@ def test_node_setup_and_run_artifacts_stay_in_inspection_copy(tmp_path):
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=integration.revision,
             target_branch="integration",
             checks=["npm start"],
-            environment=EnvironmentConfig(tools={"node": shutil.which("node"), "npm": npm}),
             setup_commands=["npm ci --offline --ignore-scripts --no-audit --no-fund"],
         ),
     )
-    # Runtime toolchain is deliberately explicit; validation uses only its configured test here.
+    # Local validation runs only the configured check; inspection installs its own dependencies.
     # Preparation tests real npm independently; model/worker Node capability is a later live layer.
     service.results.process("harbor")
     version = current(service)
@@ -465,11 +465,11 @@ def test_saved_launcher_quotes_paths_and_environment_and_preserves_setup_failure
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch=settings.target_branch,
             checks=settings.checks,
-            environment=EnvironmentConfig(variables={"GREETING": value}),
-            setup_commands=['printf "%s" "$GREETING" > setup-output'],
+            setup_commands=[f"printf %s {shlex.quote(value)} > setup-output"],
         ),
     )
     service.results.process("harbor")
@@ -493,6 +493,7 @@ def test_saved_launcher_quotes_paths_and_environment_and_preserves_setup_failure
     service.integrations.configure(
         "harbor",
         IntegrationConfig(
+            runtime="local",
             expected_revision=settings.revision,
             target_branch=settings.target_branch,
             checks=settings.checks,

@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from flowfield.adapters import git_integration as gitops
-from flowfield.adapters.local_environment import git
+from flowfield.adapters.git_workspace import git
 from flowfield.application import Workspace, now
 from flowfield.errors import ApplicationError
 from flowfield.execution import Execution

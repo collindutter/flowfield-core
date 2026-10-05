@@ -1,12 +1,14 @@
 """Real Git browser fixture with synthetic reports and persistently paused model scheduling."""
 
+import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 from project_fixtures import adopt
 
-from flowfield.adapters.local_environment import LocalEnvironment, git
+from flowfield.adapters.git_workspace import git
+from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import ProjectSetup, TaskCreate, TaskPreparation, Workspace
 from flowfield.execution_models import SettingsEdit, WorkerResult
 from flowfield.inspection import Inspections
@@ -36,6 +38,7 @@ if sys.argv[2] == "create":
     service.integrations.configure(
         project,
         IntegrationConfig(
+            runtime="local",
             expected_revision=1,
             target_branch="delivery",
             create_from="main",
@@ -65,7 +68,7 @@ with patch.object(service.execution, "_settings", return_value=settings):
     run = service.execution.claim(project, head, service._available(project, repo, head))
 assert run
 service.execution.started(project, run.id)
-env = LocalEnvironment.prepare(workspace.directory, repo, run.id, run.base_commit)
+env = LocalHost(os.environ).prepare(workspace.directory, repo, run.id, run.base_commit)
 message = "First greeting" if sys.argv[2] == "create" else "Useful successor"
 (env.checkout / "app.py").write_text(f"print({message!r})\n")
 commit, _ = env.snapshot(run.base_commit)
