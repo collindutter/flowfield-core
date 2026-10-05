@@ -94,7 +94,9 @@ tested migrations and recovery; a version bump does not permit discarding user s
 
 Every push to main runs the `Tests` workflow: Python 3.12 tests on Linux/macOS, Python and
 frontend quality checks, generated API validation, Mintlify validation, Chromium journeys
-and clean installed-package checks. Live model calls are separate from CI.
+and clean installed-package checks. Standalone Codex bridge bundles are built and checked
+on macOS/Linux arm64/x64 without models; see [bridge builds](bridges/codex-acp/README.md).
+Live model calls are separate from CI.
 
 ### Prepare and rehearse
 
@@ -118,6 +120,8 @@ and prints outgoing commits; it does not run checks or change files/refs.
 The `Release` workflow in `.github/workflows/workflow.yml` also supports a manual run on
 main. It runs CI, builds distributions once, and verifies those same artifacts on Linux/macOS.
 Manual runs stop after verification. Artifacts and checksums remain available for 30 days.
+Standalone bridge ZIPs and checksum sidecars come from the checked platform builds;
+publication attaches those original artifacts alongside the Python distributions.
 
 ### Publish
 

@@ -21,8 +21,43 @@ Upstream's Apache-2.0 license remains with the generated source. The ACP identit
 
 The generated entry point is `.work/upstream/dist/index.js`. It uses Node and the
 locked Codex dependency (0.159.1); `CODEX_PATH` can select an explicitly installed
-native binary. Distribution of a standalone bridge executable belongs to the managed
-worker installation change. This build does not alter Flowfield's installed runtime.
+native binary. This source build does not alter Flowfield's installed runtime.
+
+## Standalone packages
+
+Build the source above, then run `node bridges/codex-acp/package.mjs` with Bun 1.3.11
+on PATH (or set `FLOWFIELD_BUILD_BUN` to that compiler's absolute path). The compiler
+version and bridge identity live in `src/flowfield/adapters/codex_bridge.json`.
+This follows upstream's [Bun standalone build](https://bun.sh/docs/bundler/executables).
+Node, Bun and zip are build tools; the resulting executable includes its JS runtime.
+It invokes the host's Codex, honoring `CODEX_PATH`, rather than shipping another Codex
+installation. Native Codex login/configuration remain separate.
+
+Packages for macOS/Linux arm64/x64 are built and tested on matching CI runners.
+`.work/packages/` contains a ZIP and SHA-256 sidecar for each build. Archives include
+the executable, exact manifest/file checksums, Apache license and dependency/runtime
+notices. Project `.env`, bunfig, tsconfig and package.json are not auto-loaded by the
+standalone runtime. The managed launcher removes bridge wire logging because it can
+contain scoped MCP credentials; it retains native configuration and host environment.
+
+```sh
+uv run scripts/check_codex_acp.py /path/to/bundle.zip --bundle --cleanup
+flowfield harness install codex --bundle /path/to/bundle.zip --sha256 CHECKSUM
+flowfield harness status codex --json
+```
+
+The bundle probe installs into disposable state and runs without Node/Bun on PATH.
+CI checks completion, cancellation, background termination and refused cleanup against
+a fake native peer. It does not invoke models. Installation itself starts no executable.
+The installer uses immutable generation directories and an atomic selection pointer;
+failed downloads, wrong platforms, checksum failures and malformed archives preserve
+the previous installation. Old executable paths remain available to existing attempts.
+Normal installation selects assets from the installed Flowfield version's GitHub release,
+never a moving latest tag. Local bundles require an explicit trusted SHA-256.
+
+The release workflow attaches those same tested archives after its normal publishing
+gates. Manual rehearsal and main-branch CI retain artifacts without publishing a release.
+Runtime installation does not select ACP in the scheduler or adopt Local for a project.
 
 An explicit **model-free** native probe launches only a disposable thread and sleep
 command, verifies that command exits, and removes its isolated HOME/CODEX_HOME:

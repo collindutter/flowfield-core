@@ -6,7 +6,13 @@ import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const revision = "68d7d2d5ddfc0ed5746f9f6130892dda685e65dd";
+const spec = JSON.parse(
+  await readFile(
+    join(root, "../../src/flowfield/adapters/codex_bridge.json"),
+    "utf8",
+  ),
+);
+const revision = spec.upstream_revision;
 const archiveHash =
   "3778cf2b1bbaa656d684bfa6b177ac5d5fd9202aee48623b8200e3b216ade0f6";
 const work = join(root, ".work");
@@ -54,7 +60,7 @@ index = index.replace(
 );
 index = index.replace(
   "console.log(`${packageJson.name} ${packageJson.version}`);",
-  'console.log("flowfield-codex-acp 2.1.1-flowfield.1");',
+  `console.log("flowfield-codex-acp ${spec.version}");`,
 );
 index = index.replace(
   "    const acpJsonStream = createJsonStream(process.stdin, process.stdout);",
@@ -83,7 +89,7 @@ index = index.replace(
   "cleanup.run(() => getAgent().initialize(ctx.params))",
   `cleanup.run(async () => {
             const result = await getAgent().initialize(ctx.params);
-            return {...result, agentInfo: {...result.agentInfo, name: "flowfield-codex-acp", version: "2.1.1-flowfield.1"}, agentCapabilities: {...result.agentCapabilities,
+            return {...result, agentInfo: {...result.agentInfo, name: "flowfield-codex-acp", version: "${spec.version}"}, agentCapabilities: {...result.agentCapabilities,
                 _meta: {...result.agentCapabilities?._meta, "flowfield.cleanup": capability}}};
         })`,
 );
@@ -129,6 +135,10 @@ index = index.replace(
 );
 await writeFile(join(source, "src/index.ts"), index);
 await cp(join(root, "cleanup.mjs"), join(source, "src/flowfield-cleanup.mjs"));
+await writeFile(
+  join(source, "src/flowfield-standalone.ts"),
+  'export {};\nprocess.env["CODEX_PATH"] ||= "codex";\nawait import("./index");\n',
+);
 await cp(
   join(root, "cleanup.d.mts"),
   join(source, "src/flowfield-cleanup.d.mts"),

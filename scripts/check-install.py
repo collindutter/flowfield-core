@@ -126,6 +126,17 @@ def main() -> None:
             assert importlib.metadata.version("flowfield-core") == expected
             assert Path(flowfield.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
         assert json.loads(command("version", "--json")) == {"version": version}
+        runtime = subprocess.run(
+            [executable, "harness", "status", "codex", "--json"],
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert runtime.returncode == 1
+        assert json.loads(runtime.stderr)["error"]["code"] == "bridge_missing"
+        assert not state.exists()
 
         def read(path: str) -> bytes:
             with opener.open(base + path, timeout=2) as response:

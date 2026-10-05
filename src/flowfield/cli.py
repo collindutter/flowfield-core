@@ -1,6 +1,7 @@
 """Public workspace commands and explicit offline storage maintenance."""
 
 import json
+import os
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -25,6 +26,7 @@ task_app = typer.Typer(no_args_is_help=True)
 milestone_app = typer.Typer(no_args_is_help=True)
 inbox_app = typer.Typer(no_args_is_help=True)
 integration_app = typer.Typer(no_args_is_help=True)
+harness_app = typer.Typer(no_args_is_help=True)
 app.add_typer(project_app, name="project", help="Adopt existing projects and update their details.")
 app.add_typer(task_app, name="task", help="Capture, prioritize and track tasks.")
 app.add_typer(inbox_app, name="inbox", help="Read questions, answer them, and apply decisions.")
@@ -32,6 +34,7 @@ app.add_typer(
     milestone_app, name="milestone", help="Group related tasks without gates or dependencies."
 )
 app.add_typer(integration_app, name="integration", help="Connect and check coding harnesses.")
+app.add_typer(harness_app, name="harness", help="Install and check locally managed agent runtimes.")
 Json = Annotated[bool, typer.Option("--json", help="Emit clean JSON; operation errors use stderr.")]
 
 
@@ -109,6 +112,46 @@ def connection_command(
             typer.echo("In Codex, ask: Use Flowfield to list my projects.")
 
     output(run, json_output, display)
+
+
+@harness_app.command("install")
+def harness_install(
+    ctx: typer.Context,
+    harness: str,
+    bundle: Annotated[
+        Path | None, typer.Option(help="Install a verified local release bundle.")
+    ] = None,
+    sha256: Annotated[str | None, typer.Option(help="Required SHA-256 for a local bundle.")] = None,
+    json_output: Json = False,
+) -> None:
+    """Install the compatible agent runtime; does not enable workers or change project access."""
+    from flowfield.adapters import codex_install
+
+    def run() -> dict[str, Any]:
+        if harness != "codex":
+            raise ApplicationError("unsupported_harness", "Only codex installation is supported.")
+        if (bundle is None) != (sha256 is None):
+            raise ApplicationError("invalid_request", "Use --bundle and --sha256 together.")
+        if bundle is not None and sha256 is not None:
+            codex_install.install(ctx.obj.directory, bundle.expanduser(), sha256)
+        else:
+            codex_install.download_install(ctx.obj.directory)
+        return codex_install.status(ctx.obj.directory, os.environ)
+
+    output(run, json_output, lambda value: typer.echo(value["message"]))
+
+
+@harness_app.command("status")
+def harness_status(ctx: typer.Context, harness: str, json_output: Json = False) -> None:
+    """Check the installed runtime and Codex path without starting an agent."""
+    from flowfield.adapters import codex_install
+
+    def run() -> dict[str, Any]:
+        if harness != "codex":
+            raise ApplicationError("unsupported_harness", "Only codex installation is supported.")
+        return codex_install.status(ctx.obj.directory, os.environ)
+
+    output(run, json_output, lambda value: typer.echo(value["message"]))
 
 
 @integration_app.command()

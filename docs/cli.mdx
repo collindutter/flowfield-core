@@ -133,6 +133,27 @@ flowfield integration disconnect codex
 
 See [Codex](/integrations/codex) for project setup and fresh-session verification.
 
+## Managed runtime installation
+
+```sh
+flowfield harness install codex
+flowfield harness status codex
+```
+
+Install downloads the standalone ACP executable matching your Flowfield release and
+platform, verifies its checksum, and saves it in the selected data directory. It uses
+your existing Codex installation. Node and Bun are not required to run the bridge.
+Status checks installed files and the Codex path without starting an agent.
+
+For a locally built or downloaded bundle:
+
+```sh
+flowfield harness install codex --bundle /path/to/bundle.zip --sha256 CHECKSUM
+```
+
+Both commands work with the service stopped and accept `--json`. Installation preserves
+previous executable paths and does not enable queues or change project access settings.
+
 ## Automation
 
 Add `--json` to data commands for structured output. Errors go to stderr with a nonzero

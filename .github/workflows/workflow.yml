@@ -127,6 +127,19 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: release-assets
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: codex-bridge-*
+          path: bridge-assets
+          merge-multiple: true
+      - name: Verify tested standalone bundles
+        working-directory: bridge-assets
+        run: |
+          set -- ./*.zip
+          test "$#" -eq 4
+          set -- ./*.sha256
+          test "$#" -eq 4
+          for checksum in ./*.sha256; do shasum -a 256 -c "$checksum"; done
       - name: Verify original artifact bytes
         working-directory: dist
         run: shasum -a 256 -c ../SHA256SUMS
@@ -140,6 +153,6 @@ jobs:
             gh release create "$RELEASE_TAG" --verify-tag --draft \
               --title "Flowfield $RELEASE_TAG" --notes-file release-notes.md
           fi
-          gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz SHA256SUMS --clobber
+          gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz SHA256SUMS bridge-assets/*.zip bridge-assets/*.sha256 --clobber
           gh release edit "$RELEASE_TAG" --draft=false --notes-file release-notes.md
           printf 'Published flowfield-core and GitHub release %s\n' "$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"

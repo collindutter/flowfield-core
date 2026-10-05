@@ -19,6 +19,7 @@ from pathlib import Path
 
 from flowfield.adapters.acp_session import AcpSession
 from flowfield.adapters.codex_cleanup import quiesce, require_cleanup
+from flowfield.adapters.codex_install import install
 from flowfield.adapters.git_workspace import baseline, git
 from flowfield.adapters.local_execution import LocalHost
 
@@ -26,7 +27,7 @@ from flowfield.adapters.local_execution import LocalHost
 async def probe(
     bridge: Path,
     scratch: Path,
-    node: str,
+    node: str | None,
     mode: str,
     scenario: str = "complete",
     cleanup: bool = False,
@@ -59,12 +60,22 @@ async def probe(
             "HOME": str(home),
             "CODEX_HOME": str(home),
             "CODEX_PATH": str(launcher),
-            "PATH": os.path.dirname(node),
+            "PATH": os.path.dirname(node) if node else str(scratch / "no-tools"),
             "FLOWFIELD_TEST_RPC_RECORD": str(record),
             "FLOWFIELD_TEST_SCENARIO": scenario,
         }
     )
     attempt = host.prepare(scratch / "state", repo, "probe", baseline(repo))
+    unexpected_logs = scratch / "unexpected-bridge-logs"
+    if node is None:
+        # A compiled runtime must not acquire another configuration layer from cwd.
+        (attempt.workspace.checkout / ".env").write_text(f"APP_SERVER_LOGS={unexpected_logs}\n")
+        (attempt.workspace.checkout / "bunfig.toml").write_text(
+            'preload = ["./must-not-load.js"]\n'
+        )
+        (attempt.workspace.checkout / "must-not-load.js").write_text(
+            'throw new Error("Unexpected runtime preload");\n'
+        )
     events = []
     started = asyncio.Event()
 
@@ -77,7 +88,7 @@ async def probe(
         event, request_timeout=10, turn_timeout=10, cleanup=quiesce if cleanup else None
     )
     await client.start(
-        [node, str(bridge)],
+        [node, str(bridge)] if node else [str(bridge)],
         cwd=attempt.workspace.checkout,
         mcp_servers=[],
         env=attempt.launch_environment(),
@@ -97,6 +108,8 @@ async def probe(
         stopped = await client.close(timeout=15)
     if cleanup and stopped.owned_work_stopped is not (scenario != "cleanup-refused"):
         raise AssertionError("Unexpected managed cleanup receipt")
+    if unexpected_logs.exists():
+        raise AssertionError("The runtime loaded project dotenv settings")
     messages = [json.loads(line) for line in record.read_text().splitlines()]
     thread = next(item["params"] for item in messages if item.get("method") == "thread/start")
     turn = next(item["params"] for item in messages if item.get("method") == "turn/start")
@@ -140,6 +153,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bridge", type=Path)
     parser.add_argument(
+        "--bundle",
+        action="store_true",
+        help="Install a packaged executable and verify it outside the checkout",
+    )
+    parser.add_argument(
+        "--standalone", action="store_true", help="Run a compiled executable without Node on PATH"
+    )
+    parser.add_argument(
         "--mode", default="workspace-write", choices=["workspace-write", "read-only", "agent"]
     )
     parser.add_argument(
@@ -151,15 +172,19 @@ def main():
         choices=["complete", "cancel", "slow-shutdown", "background", "cleanup-refused"],
     )
     args = parser.parse_args()
-    node = shutil.which("node")
-    if node is None or not args.bridge.is_file():
+    node = None if args.standalone or args.bundle else shutil.which("node")
+    if (node is None and not (args.standalone or args.bundle)) or not args.bridge.is_file():
         parser.error("An installed Node executable and bridge file are required")
     with tempfile.TemporaryDirectory(prefix="flowfield-acp-probe-") as directory:
+        bridge = args.bridge.resolve()
+        if args.bundle:
+            checksum = Path(str(bridge) + ".sha256").read_text().split()[0]
+            bridge = install(Path(directory) / "installed", bridge, checksum)
         print(
             json.dumps(
                 asyncio.run(
                     probe(
-                        args.bridge.resolve(),
+                        bridge,
                         Path(directory),
                         node,
                         args.mode,
