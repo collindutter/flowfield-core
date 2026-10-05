@@ -73,6 +73,7 @@ test("mobile drawer, surface tabs and viewport changes keep the composer usable"
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
   const message = page.getByRole("textbox", { name: "Message coordinator" });
   await message.fill("Mobile draft");
   const conversation = page.locator(".fixture-conversation");

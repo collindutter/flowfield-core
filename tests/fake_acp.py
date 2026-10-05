@@ -72,7 +72,29 @@ async def main():
 
     async def prompt(request):
         control = json.loads(request["params"]["prompt"][0]["text"])
-        if "managed" in sys.argv:
+        if "coordinator" in sys.argv:
+            assert control["flowfield_connection"] == servers[0]["name"]
+            assert control["flowfield_connection"] in control["instructions"]
+            assert CONFIG[2]["currentValue"] == "read-only"
+            if "continuity" in control["human_message"]:
+                assert control["recent_conversation"]
+            control = {
+                "mode": os.environ.get("FLOWFIELD_TEST_SCENARIO", "normal"),
+                "calls": [
+                    {
+                        "name": "create_task",
+                        "arguments": {
+                            "task": {
+                                "id": "chat-task",
+                                "title": "Captured from Coordinator Chat",
+                                "body": "An agreed outcome",
+                                "author": "human",
+                            }
+                        },
+                    }
+                ],
+            }
+        elif "managed" in sys.argv:
             assert control["flowfield_connection"] == servers[0]["name"]
             assert control["flowfield_connection"] in control["instructions"]
             assert "run_command" not in control["instructions"]

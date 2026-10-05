@@ -59,6 +59,9 @@ class Supervisor:
         self.delivery_jobs: dict[str, asyncio.Task[None]] = {}
         self.clients: dict[str, CodexAgent] = {}
         self.permissions = Permissions(workspace)
+        from flowfield.coordinator import Coordinator
+
+        self.coordinator = Coordinator(self)
         self.jobs: dict[str, asyncio.Task[None]] = {}
         self.setup_jobs: dict[str, asyncio.Task[list[CheckResult]]] = {}
         self.catalog_job: asyncio.Task[list[ModelOption]] | None = None
@@ -75,6 +78,7 @@ class Supervisor:
                 pass
             self.execution.restart()
             self.permissions.restart()
+            self.coordinator.store.restart()
             recovery = asyncio.create_task(asyncio.to_thread(self.integrations.restart))
             try:
                 await asyncio.shield(recovery)
@@ -273,7 +277,7 @@ class Supervisor:
                 if run.agent_settings
                 else AgentChoice(model=run.model, effort=run.effort)
             )
-            applied_agent = await client.configure(choice, discussion=run.purpose == "discussion")
+            applied_agent = await client.configure(choice, read_only=run.purpose == "discussion")
             if getattr(client, "supports_activity", False):
                 activity = ActivityRecorder(self.workspace, run.project_id, run.id)
                 client.on_activity = activity.emit
@@ -678,8 +682,9 @@ class Supervisor:
         return self.execution.get(project_id, run_id)
 
     async def close(self) -> None:
-        self.permissions.close()
         self.closing = True
+        await self.coordinator.close()
+        self.permissions.close()
         if self.catalog_job and not self.catalog_job.done():
             self.catalog_job.cancel()
             await asyncio.gather(self.catalog_job, return_exceptions=True)

@@ -1,0 +1,50 @@
+---
+title: Coordinator Chat
+description: Plan work and capture tasks beside the board.
+---
+
+Coordinator Chat is the conversation beside your project's board. Discuss an outcome,
+ask it to capture and prepare tasks, or reconcile saved project answers. Task links open
+the same feeds you use for questions and review.
+
+## Start a conversation
+
+Install and authenticate [Codex](/integrations/codex), including the managed ACP runtime.
+In project **Integration** settings, select **Use Local host** and save. Local uses the
+service host's tools, credentials and native harness configuration. In **Coordinator**
+settings, choose a model and reasoning effort.
+
+Choose **Start conversation**, write your message, and select **Send** (or press
+Command/Ctrl+Enter). Opening a project or creating a conversation starts no model.
+The coordinator reads project files using Codex's read-only mode and changes work through
+project-scoped Flowfield tools. Code changes belong to task workers. Answer worker questions
+and approve exact code results in their task feeds.
+
+Use **Settings** below the chat input to override the project model and effort for this
+conversation. **Use project defaults** clears the override. Changes apply to the next turn;
+turn settings show the applied choice, or the requested choice if startup failed. Standalone coding-agent settings are separate.
+
+## Follow and stop
+
+Replies stream into the conversation. Expand **Activity** for public tool activity;
+private reasoning is never displayed. One coordinator turn can run per project, independently
+of worker slots. You can write your next draft while it runs, then send when it finishes.
+
+**Stop** ends the selected coordinator turn. Saved task changes remain, and task workers
+continue independently. If a connection fails, the retained turn explains whether it stopped
+or needs recovery. Flowfield never replays an interrupted prompt. If native cleanup could not
+be confirmed, stop the remaining coordinator process on the host before choosing
+**Confirm coordinator stopped**.
+
+## Continue later
+
+Messages, public output and turn settings are saved by the service. The conversation menu
+opens retained history; **New conversation** starts a fresh discussion. Older messages load
+on demand. Long public output is bounded and omissions are marked.
+
+Each turn starts a fresh native session with up to eight recent exchanges within a bounded
+context budget, plus tools for reading current project state. This is application conversation
+history, not a resumed native session. Record important ongoing intent in tasks and decisions.
+
+Resize the chat and work panes on a wide screen. On narrow screens, switch between
+**Coordinator** and **Work**; switching preserves the current draft.

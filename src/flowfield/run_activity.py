@@ -3,7 +3,7 @@
 import asyncio
 import re
 import sqlite3
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -60,6 +60,27 @@ def clean(text: str) -> str:
     return re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", text)
 
 
+def update_activity(page: RunActivityPage, updates: list[ActivityUpdate]) -> None:
+    entries = {entry.key: entry for entry in page.items}
+    for update in updates:
+        old = entries.get(update.key)
+        text = (old.text if old and update.append else "") + clean(update.text)
+        omitted = update.omitted or len(text) > MAX_TEXT or bool(old and old.omitted)
+        entries[update.key] = RunActivityEntry(
+            key=update.key, kind=update.kind, text=retain(text, MAX_TEXT), omitted=omitted
+        )
+    page.items = list(entries.values())
+    while len(page.items) > MAX_ENTRIES or sum(len(e.text) for e in page.items) > MAX_TOTAL:
+        page.items.pop(0)
+        page.omitted = True
+    page.revision += 1
+    page.supported = True
+
+
+class ActivityStore(Protocol):
+    def write(self, project: str, run: str, updates: list[ActivityUpdate]) -> None: ...
+
+
 class RunActivity:
     def __init__(self, workspace: "Workspace"):
         self.workspace = workspace
@@ -76,20 +97,7 @@ class RunActivity:
                 return  # Late output cannot mutate a closed/uncertain attempt.
             saved = db.execute("SELECT data FROM run_activity WHERE run_id=?", (run,)).fetchone()
             page = RunActivityPage.model_validate_json(saved[0]) if saved else RunActivityPage()
-            entries = {entry.key: entry for entry in page.items}
-            for update in updates:
-                old = entries.get(update.key)
-                text = (old.text if old and update.append else "") + clean(update.text)
-                omitted = update.omitted or len(text) > MAX_TEXT or bool(old and old.omitted)
-                entries[update.key] = RunActivityEntry(
-                    key=update.key, kind=update.kind, text=retain(text, MAX_TEXT), omitted=omitted
-                )
-            page.items = list(entries.values())
-            while len(page.items) > MAX_ENTRIES or sum(len(e.text) for e in page.items) > MAX_TOTAL:
-                page.items.pop(0)
-                page.omitted = True
-            page.revision += 1
-            page.supported = True
+            update_activity(page, updates)
             db.execute(
                 "INSERT INTO run_activity VALUES (?,?,?) ON CONFLICT(run_id) DO UPDATE SET "
                 "revision=excluded.revision,data=excluded.data",
@@ -120,8 +128,10 @@ class RunActivity:
 class ActivityRecorder:
     """Coalesce deltas before SQLite; bound queued output even when storage is slow."""
 
-    def __init__(self, workspace: "Workspace", project: str, run: str):
-        self.store, self.project, self.run = RunActivity(workspace), project, run
+    def __init__(
+        self, workspace: "Workspace", project: str, run: str, *, store: ActivityStore | None = None
+    ):
+        self.store, self.project, self.run = store or RunActivity(workspace), project, run
         self.pending: list[ActivityUpdate] = []
         self.lost = False
         self.closed = False

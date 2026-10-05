@@ -79,6 +79,15 @@ class LocalHost:
 
     def restore(self, run_id: str, workspace: GitWorkspace, runtime: Path) -> LocalAttempt:
         """Rebuild launch variables from the current host without persisting credentials."""
+        variables = self.launch_environment(workspace.checkout, runtime / "tmp")
+        variables.update(
+            FLOWFIELD_RUN_ID=run_id,
+            FLOWFIELD_WORKSPACE=str(workspace.checkout),
+            FLOWFIELD_RUNTIME_DIR=str(runtime),
+        )
+        return LocalAttempt(run_id, workspace, runtime, MappingProxyType(variables))
+
+    def launch_environment(self, cwd: Path, temporary: Path) -> dict[str, str]:
         # Git location variables from a parent process must not redirect commands to
         # another checkout/index. Keep native Git configuration and credential helpers.
         variables = {
@@ -96,12 +105,9 @@ class LocalHost:
             }
         }
         variables.update(
-            PWD=str(workspace.checkout),
-            TMPDIR=str(runtime / "tmp"),
-            TMP=str(runtime / "tmp"),
-            TEMP=str(runtime / "tmp"),
-            FLOWFIELD_RUN_ID=run_id,
-            FLOWFIELD_WORKSPACE=str(workspace.checkout),
-            FLOWFIELD_RUNTIME_DIR=str(runtime),
+            PWD=str(cwd),
+            TMPDIR=str(temporary),
+            TMP=str(temporary),
+            TEMP=str(temporary),
         )
-        return LocalAttempt(run_id, workspace, runtime, MappingProxyType(variables))
+        return variables

@@ -45,6 +45,8 @@ COORDINATOR_TOOLS = frozenset(
         "list_questions",
         "get_question",
         "ask_question",
+        "apply_answer",
+        "follow_up_question",
         "get_task_conversation",
         "get_conversation_source",
         "get_task_stages",

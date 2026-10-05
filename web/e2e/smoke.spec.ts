@@ -5874,7 +5874,7 @@ test("update notifications persist, dismiss across browsers and share manual dis
   await secondContext.close();
 });
 
-test("workspace navigation, mobile board and appearance work without a coordinator pane", async ({
+test("workspace navigation, mobile board and appearance work beside the coordinator", async ({
   page,
   request,
 }) => {
@@ -5896,7 +5896,7 @@ test("workspace navigation, mobile board and appearance work without a coordinat
   ).toBeVisible();
   await expect(
     page.getByRole("separator", { name: "Resize coordinator and work" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await expect(
     page.getByRole("tab", { name: "Coordinator", exact: true }),
   ).toHaveCount(0);

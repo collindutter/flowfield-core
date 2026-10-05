@@ -44,8 +44,9 @@ class IntegrationSettings(Record):
         if self.runtime != "local":
             raise ApplicationError(
                 "local_adoption_required",
-                "Select Local in Integration settings before starting workers, setup checks or new "
-                "validation/inspection copies. Local uses service-host tools and credentials; "
+                "Select Local in Integration settings before Coordinator Chat, workers, setup "
+                "checks or new validation/inspection copies. Local uses service-host tools "
+                "and credentials; "
                 "historical attempts remain available.",
                 409,
             )

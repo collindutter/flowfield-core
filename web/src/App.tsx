@@ -4,6 +4,7 @@ import { TaskNeeds, TaskState, hasTaskNeeds } from "./TaskNeeds";
 import { SetupInstructions } from "./SetupInstructions";
 import { taskTab } from "./navigation";
 import { NotificationButton, useNotifications } from "./Notifications";
+import { CoordinatorChat, type ChatDrafts } from "./CoordinatorChat";
 import { WorkspaceFrame } from "./WorkspaceFrame";
 import { ThemeMenu } from "./ThemeMenu";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -70,6 +71,8 @@ type Selection = { kind: "task" | "milestone" | "project"; id?: string };
 type WorkRecord = Project | Milestone | Task;
 
 export function App() {
+  const [chatDrafts] = useState<ChatDrafts>(() => new Map());
+  const [chatSettingsDirty, setChatSettingsDirty] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -95,6 +98,7 @@ export function App() {
     setUnsaved,
     overlayDirty,
     setOverlayDirty,
+    chatSettingsDirty,
   );
   useBrowserNotifications(changeLocation);
   const projectId = params.projectId;
@@ -152,11 +156,17 @@ export function App() {
   }, [connected]);
   useEffect(() => {
     function guard(e: BeforeUnloadEvent) {
-      if (unsaved || overlayDirty) e.preventDefault();
+      if (
+        unsaved ||
+        overlayDirty ||
+        chatSettingsDirty ||
+        [...chatDrafts.values()].some((value) => value.text)
+      )
+        e.preventDefault();
     }
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
-  }, [unsaved, overlayDirty]);
+  }, [unsaved, overlayDirty, chatSettingsDirty, chatDrafts]);
   function navigate(action: () => void) {
     action();
   }
@@ -196,6 +206,17 @@ export function App() {
               </span>
             </p>
           </>
+        }
+        coordinator={
+          connected && projectId && !notFound ? (
+            <CoordinatorChat
+              key={projectId}
+              projectId={projectId}
+              refresh={`${refresh}:${projectRefresh[projectId] ?? 0}`}
+              drafts={chatDrafts}
+              onSettingsDirty={setChatSettingsDirty}
+            />
+          ) : undefined
         }
         work={
           <>

@@ -42,6 +42,7 @@ from flowfield.browser import browser_router
 from flowfield.changes import Changes
 from flowfield.context_api import context_router
 from flowfield.conversation_api import conversation_router
+from flowfield.coordinator_api import coordinator_router
 from flowfield.errors import ApplicationError
 from flowfield.execution_api import execution_router
 from flowfield.guidance import Guidance, GuidanceChange, GuidanceView
@@ -246,6 +247,7 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
 
     app.include_router(execution_router(supervisor))
     app.include_router(agent_router(supervisor))
+    app.include_router(coordinator_router(supervisor))
     app.include_router(integration_router(supervisor))
     app.include_router(result_router(supervisor))
     app.include_router(inspection_router(lambda: supervisor().workspace))

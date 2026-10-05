@@ -68,11 +68,32 @@ def explicit_local_runtime(db: sqlite3.Connection) -> None:
         )
 
 
+def coordinator_chat(db: sqlite3.Connection) -> None:
+    db.execute(
+        "CREATE TABLE coordinator_conversations (number INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "id TEXT NOT NULL UNIQUE, project_id TEXT NOT NULL REFERENCES projects(id), "
+        "created_at TEXT NOT NULL)"
+    )
+    db.execute(
+        "CREATE TABLE coordinator_turns (number INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "id TEXT NOT NULL UNIQUE, project_id TEXT NOT NULL REFERENCES projects(id), "
+        "conversation_id TEXT NOT NULL REFERENCES coordinator_conversations(id), "
+        "status TEXT NOT NULL, data TEXT NOT NULL)"
+    )
+    db.execute("CREATE INDEX coordinator_projects ON coordinator_conversations(project_id,number)")
+    db.execute("CREATE INDEX coordinator_history ON coordinator_turns(conversation_id,number)")
+    db.execute(
+        "CREATE UNIQUE INDEX coordinator_active ON coordinator_turns(project_id) "
+        "WHERE status IN ('starting','running','stopping','uncertain')"
+    )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
     Migration(32, agent_preferences_and_permissions),
     Migration(33, explicit_local_runtime),
+    Migration(34, coordinator_chat),
 )
 
 

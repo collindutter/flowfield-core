@@ -1,0 +1,298 @@
+"""Durable browser coordination using real ACP subprocesses and scoped MCP, without models."""
+
+import asyncio
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+from test_execution import BASE, fixture
+from test_managed_local import FAKE, configured
+
+from flowfield import migrations
+from flowfield.agent_models import AgentChoice, AgentSettingsEdit
+from flowfield.agent_settings import AgentSettings
+from flowfield.api import create_app
+from flowfield.application import Workspace
+from flowfield.coordinator_models import CoordinatorSend
+from flowfield.coordinator_store import CoordinatorStore
+from flowfield.errors import ApplicationError
+from flowfield.run_activity import MAX_TOTAL, ActivityUpdate
+from flowfield.supervisor import Supervisor
+
+
+def setup(tmp_path, monkeypatch, scenario="normal", flags=()):
+    service, repo, _ = configured(tmp_path, monkeypatch, scenario=scenario)
+    monkeypatch.setattr(
+        "flowfield.adapters.codex_agent.command",
+        lambda directory, env: (
+            [
+                sys.executable,
+                str(FAKE),
+                "managed",
+                "coordinator",
+                "cleanup",
+                "close-session",
+                *flags,
+            ],
+            dict(env),
+        ),
+    )
+    AgentSettings(service.workspace).edit(
+        "harbor",
+        "coordinator",
+        AgentSettingsEdit(
+            expected_revision=1, selection=AgentChoice(model="test-model", effort="low")
+        ),
+    )
+    conversation = service.coordinator.store.new("harbor")
+    return service, conversation
+
+
+def message(text="Capture the agreed task"):
+    return CoordinatorSend(id=uuid4().hex, text=text)
+
+
+async def settled(service, turn):
+    job = service.coordinator.jobs.get(turn.id)
+    if job:
+        await asyncio.wait_for(asyncio.shield(job), 15)
+    return service.coordinator.store.get("harbor", turn.id)
+
+
+def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch)
+    request = message()
+
+    async def exercise():
+        turn = service.coordinator.send("harbor", conversation.id, request)
+        duplicate = service.coordinator.send("harbor", conversation.id, request)
+        assert duplicate.id == turn.id and len(service.coordinator.jobs) == 1
+        with pytest.raises(ApplicationError, match="active turn"):
+            service.coordinator.send("harbor", conversation.id, message())
+        completed = await settled(service, turn)
+        assert completed.status == "completed", completed.notice
+        assert completed.applied.choice.mode == "read-only"
+        assert completed.settings.choice.mode is None
+        assert service.workspace.task("harbor", "chat-task").updated_by == "agent"
+        assert not (tmp_path / "harbor" / "result.txt").exists()
+        public = completed.model_dump_json()
+        assert "finished" in public and "PRIVATE" not in public and "WRONG SESSION" not in public
+        assert "do-not-persist-host-secrets" not in public
+        second = service.coordinator.send("harbor", conversation.id, message("Check continuity"))
+        assert (await settled(service, second)).status == "completed"
+        assert service.coordinator.send("harbor", conversation.id, request).id == turn.id
+        assert not service.coordinator.jobs
+        await service.close()
+
+    asyncio.run(exercise())
+    restored = CoordinatorStore(Workspace(service.workspace.directory))
+    page = restored.page("harbor", conversation.id)
+    assert len(page.items) == 2 and page.active is None
+    new = restored.new("harbor")
+    assert new.id != conversation.id
+    with pytest.raises(ApplicationError, match="current conversation"):
+        restored.reserve("harbor", conversation.id, message())
+
+
+@pytest.mark.parametrize("immediate,flags", [(True, ()), (False, ()), (False, ("slow-start",))])
+def test_stop_during_startup_or_stream_does_not_stop_worker(
+    tmp_path, monkeypatch, immediate, flags
+):
+    service, conversation = setup(tmp_path, monkeypatch, scenario="wait", flags=flags)
+    run = service.execution.claim("harbor", BASE, {BASE: set()})
+    service.execution.started("harbor", run.id)
+
+    async def exercise():
+        turn = service.coordinator.send("harbor", conversation.id, message())
+        if not immediate:
+            async with asyncio.timeout(10):
+                while not service.coordinator.store.get("harbor", turn.id).native_started:
+                    await asyncio.sleep(0.01)
+            if not flags:
+                async with asyncio.timeout(10):
+                    while not service.coordinator.store.get("harbor", turn.id).activity.items:
+                        await asyncio.sleep(0.02)
+        stopped = await service.coordinator.stop("harbor", turn.id)
+        assert stopped.status in ("stopped", "uncertain"), stopped
+        assert service.execution.get("harbor", run.id).status == "running"
+        assert service.execution.settings("harbor").enabled
+        assert not service.permissions.turns
+        assert service.coordinator.store.page("harbor", conversation.id).items[0].id == turn.id
+        await service.coordinator.close()
+
+    asyncio.run(exercise())
+
+
+def test_uncertain_cleanup_blocks_new_work_until_explicit_recovery(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch, flags=("cleanup-uncertain",))
+
+    async def exercise():
+        turn = service.coordinator.send("harbor", conversation.id, message())
+        current = await settled(service, turn)
+        assert current.status == "uncertain"
+        with pytest.raises(ApplicationError):
+            service.coordinator.send("harbor", conversation.id, message())
+        recovered = service.coordinator.store.confirm_stopped("harbor", turn.id)
+        assert recovered.status == "interrupted"
+        assert service.coordinator.store.page("harbor", conversation.id).active is None
+        with pytest.raises(ApplicationError):
+            service.coordinator.store.confirm_stopped("harbor", turn.id)
+        await service.close()
+
+    asyncio.run(exercise())
+
+
+def test_atomic_reservation_frozen_settings_and_bounded_late_output(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch)
+    store = service.coordinator.store
+
+    def reserve(_):
+        try:
+            return store.reserve("harbor", conversation.id, message())[0]
+        except ApplicationError as error:
+            return error.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(reserve, range(2)))
+    assert results.count("coordinator_busy") == 1
+    turn = next(r for r in results if not isinstance(r, str))
+    AgentSettings(service.workspace).edit(
+        "harbor",
+        "coordinator",
+        AgentSettingsEdit(
+            expected_revision=1, selection=AgentChoice(model="different", effort="high")
+        ),
+        conversation.id,
+    )
+    assert store.get("harbor", turn.id).settings.choice.model == "test-model"
+    store.write(
+        "harbor",
+        turn.id,
+        [ActivityUpdate(key=str(i), kind="agent", text="x" * 10000) for i in range(200)],
+    )
+    saved = store.get("harbor", turn.id)
+    assert sum(len(item.text) for item in saved.activity.items) <= MAX_TOTAL
+    assert saved.activity.omitted
+    store.restart()
+    saved = store.get("harbor", turn.id)
+    assert saved.status == "interrupted"
+    store.write("harbor", turn.id, [ActivityUpdate(key="late", kind="agent", text="late")])
+    assert store.get("harbor", turn.id) == saved
+    with pytest.raises(ApplicationError):
+        store.reserve("harbor", conversation.id, CoordinatorSend(id=turn.id, text="changed"))
+
+
+def test_crash_recovery_never_replays_and_schema33_upgrade(tmp_path, monkeypatch):
+    with monkeypatch.context() as old:
+        old.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:-1])
+        workspace = fixture(tmp_path).workspace
+        project = workspace.project("harbor")
+    upgraded = Workspace(workspace.directory)
+    assert upgraded.schema_version == 34 and upgraded.project("harbor") == project
+    service = Supervisor(upgraded)
+    # No native launch or model selection occurs when history is read/created.
+    conversation = service.coordinator.store.new("harbor")
+    assert service.coordinator.store.page("harbor", conversation.id).items == []
+    with pytest.raises(ApplicationError, match="Local"):
+        service.coordinator.store.reserve("harbor", conversation.id, message())
+    with upgraded.connection(write=True) as db:
+        db.execute("UPDATE integration_settings SET data=json_set(data,'$.runtime','local')")
+    # A separate configured fixture produces real native-start recovery evidence.
+    other, chat = setup(tmp_path / "other", monkeypatch)
+    turn, _ = other.coordinator.store.reserve("harbor", chat.id, message())
+    with other.workspace.connection(write=True) as db:
+        turn.native_started = True
+        other.coordinator.store._save(db, turn)
+    restored = CoordinatorStore(Workspace(other.workspace.directory))
+    restored.restart()
+    assert restored.get("harbor", turn.id).status == "uncertain"
+    assert not other.coordinator.jobs
+
+
+def test_browser_reads_are_model_free_and_cross_project_scoped(tmp_path, monkeypatch):
+    execution = fixture(tmp_path)
+    monkeypatch.setattr(
+        "flowfield.adapters.codex_agent.command",
+        lambda *args: pytest.fail("Read launched a harness"),
+    )
+    app = create_app(data_dir=execution.workspace.directory)
+    with TestClient(app, base_url="http://localhost") as client:
+        history = client.get("/api/projects/harbor/coordinator")
+        assert history.status_code == 200 and history.json()["items"] == []
+        conversation = client.post("/api/projects/harbor/coordinator").json()
+        path = f"/api/projects/harbor/coordinator/{conversation['id']}"
+        assert client.get(path).json()["items"] == []
+        assert client.get(path.replace("harbor", "elsewhere")).status_code == 404
+        assert client.post(path + "/messages", json=message().model_dump()).status_code == 409
+        assert client.get(path + "/settings").status_code == 200
+
+
+def test_history_pages_and_duplicate_retry_at_capacity(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch)
+    store = service.coordinator.store
+    for index in range(23):
+        request = message(f"Message {index}")
+        turn, _ = store.reserve("harbor", conversation.id, request)
+        with service.workspace.connection(write=True) as db:
+            turn.status = "completed"
+            store._save(db, turn)
+    page = store.page("harbor", conversation.id)
+    assert len(page.items) == 20 and page.items[-1].text == "Message 22"
+    earlier = store.page("harbor", conversation.id, page.next_before)
+    assert [turn.text for turn in earlier.items] == ["Message 0", "Message 1", "Message 2"]
+    assert store.reserve("harbor", conversation.id, request, available=False)[1] is False
+    with pytest.raises(ApplicationError, match="slots are busy"):
+        store.reserve("harbor", conversation.id, message(), available=False)
+    for _ in range(21):
+        store.new("harbor")
+    history = store.history("harbor")
+    assert len(history.items) == 20
+    assert store.history("harbor", history.next_before).items[-1].id == conversation.id
+
+
+def test_scoped_coordinator_applies_saved_answer_without_code_approval(tmp_path):
+    from test_questions import ask
+    from test_questions import setup as questions_setup
+
+    from flowfield.agent_tools import coordinator_scope
+    from flowfield.questions import QuestionAnswer
+
+    workspace, questions = questions_setup(tmp_path)
+    question = ask(questions)
+    questions.answer(
+        "harbor",
+        question.id,
+        QuestionAnswer(
+            expected_revision=question.revision, answer="All filtered rows, capped at 10,000."
+        ),
+    )
+
+    async def exercise():
+        grant = await coordinator_scope(workspace, "harbor")
+        assert not {
+            "review_result",
+            "answer_question",
+            "configure_workers",
+            "initialize_project",
+        } & set(grant.tools)
+        result = await grant.call(
+            "apply_answer",
+            {
+                "question_id": question.id,
+                "application": {
+                    "expected_revision": 2,
+                    "expected_task_revision": 1,
+                    "body": "Export all filtered rows, capped at 10,000.",
+                    "decision": "Apply the human's saved row limit.",
+                    "author": "human",
+                },
+            },
+        )
+        assert not result.isError, result
+        assert workspace.task("harbor", "HAR-2").body.endswith("10,000.")
+        assert workspace.task("harbor", "HAR-2").updated_by == "agent"
+        grant.revoke()
+
+    asyncio.run(exercise())

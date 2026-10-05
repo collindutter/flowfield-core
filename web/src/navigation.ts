@@ -107,6 +107,7 @@ export function useWorkspaceNavigation(
   setUnsaved: (value: boolean) => void,
   overlayDirty: boolean,
   setOverlayDirty: (value: boolean) => void,
+  chatSettingsDirty = false,
 ) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -116,7 +117,10 @@ export function useWorkspaceNavigation(
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       !bypass.current &&
-      ((overlayDirty && currentLocation.pathname !== nextLocation.pathname) ||
+      ((chatSettingsDirty &&
+        currentLocation.pathname.split("/")[2] !==
+          nextLocation.pathname.split("/")[2]) ||
+        (overlayDirty && currentLocation.pathname !== nextLocation.pathname) ||
         (unsaved &&
           editorIdentity(currentLocation.pathname) !==
             editorIdentity(nextLocation.pathname))),

@@ -9,8 +9,10 @@ export function useFeedScroll(
   ready: boolean,
   target: string | undefined,
   targetReady: boolean,
+  scrollPane?: HTMLDivElement | null,
 ) {
-  const pane = useOverlayBody();
+  const overlayPane = useOverlayBody();
+  const pane = scrollPane ?? overlayPane;
   const control = useRef({
     ready: false,
     following: true,

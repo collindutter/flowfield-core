@@ -196,7 +196,7 @@ export function WorkspaceFrame({
     () => window.matchMedia(compactQuery).matches,
     () => false,
   );
-  const [surface, setSurface] = useState("coordinator");
+  const [surface, setSurface] = useState("work");
   const [sidebarOpen, setSidebarOpen] = useState(
     () =>
       !document.cookie
@@ -277,6 +277,7 @@ export function WorkspaceFrame({
                   value="coordinator"
                   aria-label="Coordinator"
                   className="workspace-pane"
+                  data-inactive={compact && surface !== "coordinator"}
                   inert={compact && surface !== "coordinator"}
                   aria-hidden={compact && surface !== "coordinator"}
                 >
@@ -301,6 +302,7 @@ export function WorkspaceFrame({
                   value="work"
                   aria-label="Project work"
                   className="workspace-pane"
+                  data-inactive={compact && surface !== "work"}
                   inert={compact && surface !== "work"}
                   aria-hidden={compact && surface !== "work"}
                 >

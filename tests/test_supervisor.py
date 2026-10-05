@@ -57,7 +57,7 @@ class FakeWorker:
         self.session = SimpleNamespace(session_id="fixture-" + self.cwd.parent.name)
         self.process = SimpleNamespace(pid=os.getpid())
 
-    async def configure(self, choice, *, discussion=False):
+    async def configure(self, choice, *, read_only=False):
         self.choice = choice
         return choice
 

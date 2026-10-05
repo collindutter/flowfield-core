@@ -107,12 +107,14 @@ export function AgentSettingsEditor({
   refresh,
   onDirty,
   coordinator = false,
+  conversation = false,
 }: {
   projectId: string;
   path: string;
   refresh: unknown;
   onDirty: (value: boolean) => void;
   coordinator?: boolean;
+  conversation?: boolean;
 }) {
   const resource = useResource<Settings>(path, refresh);
   const runtime = useResource<components["schemas"]["IntegrationSettings"]>(
@@ -144,7 +146,12 @@ export function AgentSettingsEditor({
     if (data)
       setDraft({
         revision: draft?.revision ?? data.revision,
-        selection: { harness: "codex", model, effort, mode: mode || null },
+        selection: {
+          harness: "codex",
+          model,
+          effort,
+          mode: coordinator ? null : mode || null,
+        },
       });
   }
   async function save(reset = false) {
@@ -162,7 +169,7 @@ export function AgentSettingsEditor({
       setDraft(null);
       setNotice(
         reset
-          ? coordinator
+          ? coordinator && !conversation
             ? "Default cleared."
             : "Using project defaults."
           : "Settings saved.",
@@ -177,21 +184,27 @@ export function AgentSettingsEditor({
     <ContentStack space="section">
       <p>
         {coordinator
-          ? "Defaults for built-in Coordinator Chat when it becomes available. These do not change your standalone coding agent."
+          ? "Model and effort for the next Coordinator Chat turn. Running turns keep their settings. These do not change your standalone coding agent."
           : "Changes apply to the next worker attempt, including replies and retries. Running attempts keep their settings."}
       </p>
-      {!coordinator && (
+      {(!coordinator || conversation) && (
         <p className="detail-metadata">
-          {data?.selection ? "Task override" : "Using project defaults"}
+          {data?.selection
+            ? conversation
+              ? "Conversation override"
+              : "Task override"
+            : "Using project defaults"}
           {data?.effective
             ? ` · Codex · ${data.effective.choice.model} · ${data.effective.choice.effort}`
-            : " · Choose a model in project worker settings first."}
+            : coordinator
+              ? " · Choose a model in project coordinator settings first."
+              : " · Choose a model in project worker settings first."}
         </p>
       )}
       <p className="detail-metadata">
         Harness: Codex.{" "}
         {coordinator
-          ? "Coordinator Chat is not active yet."
+          ? "Coordinator Chat uses read-only files and scoped planning tools. Code approval stays with you."
           : local
             ? "Native tool decisions never approve code delivery. Replies use read-only access."
             : "Select Local in Integration settings before starting workers or choosing native modes."}
@@ -226,7 +239,7 @@ export function AgentSettingsEditor({
             model={model}
             effort={effort}
             mode={mode}
-            modesEnabled={local}
+            modesEnabled={local && !coordinator}
             models={catalog.data ?? []}
             loading={catalog.loading}
             change={change}
@@ -251,7 +264,9 @@ export function AgentSettingsEditor({
               disabled={stale || (!data?.selection && !draft)}
               onClick={() => void save(true)}
             >
-              {coordinator ? "Clear default" : "Use project defaults"}
+              {coordinator && !conversation
+                ? "Clear default"
+                : "Use project defaults"}
             </Button>
           </div>
         </fieldset>

@@ -5,7 +5,7 @@
   "colors": { "primary": "#2563eb" },
   "navigation": {
     "groups": [
-      { "group": "Start here", "pages": ["getting-started", "concepts"] },
+      { "group": "Start here", "pages": ["getting-started", "concepts", "coordinator"] },
       { "group": "Reference", "pages": ["cli", "installation", "storage"] },
       { "group": "Integrations", "pages": ["integrations/overview", "integrations/codex"] }
     ]

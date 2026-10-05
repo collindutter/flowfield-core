@@ -42,8 +42,10 @@ bindings. Saved input, reservation and execution remain distinct facts. Worker c
 uses preserved workspaces and deliberate context; it does not promise a persistent harness
 session. The browser reads application activity, never provider messages directly.
 
-Mid-run steering, embedded coordinator sessions and additional production harnesses
-remain future work. Deterministic adapters test application behavior without model calls.
+The embedded coordinator uses the same ACP adapter in read-only native mode with scoped
+planning tools. Each turn owns a fresh native session and temporary directory. Application
+history supplies a bounded handoff; native sessions are not implicitly resumed or replayed.
+Mid-run steering and additional production harnesses remain future work. Deterministic adapters test application behavior without model calls.
 The installed service requires no Node runtime.
 
 Local setup, validation and inspection use the same host/tooling model. Saved inspection

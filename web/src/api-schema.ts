@@ -1275,6 +1275,110 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/{project_id}/coordinator": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** History */
+    get: operations["history_api_projects__project_id__coordinator_get"];
+    put?: never;
+    /** New */
+    post: operations["new_api_projects__project_id__coordinator_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/coordinator/{conversation_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Page */
+    get: operations["page_api_projects__project_id__coordinator__conversation_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/coordinator/{conversation_id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Send */
+    post: operations["send_api_projects__project_id__coordinator__conversation_id__messages_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/coordinator/turns/{turn_id}/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop */
+    post: operations["stop_api_projects__project_id__coordinator_turns__turn_id__stop_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/coordinator/turns/{turn_id}/confirm-stopped": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Recover */
+    post: operations["recover_api_projects__project_id__coordinator_turns__turn_id__confirm_stopped_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/coordinator/{conversation_id}/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Settings */
+    get: operations["settings_api_projects__project_id__coordinator__conversation_id__settings_get"];
+    /** Edit */
+    put: operations["edit_api_projects__project_id__coordinator__conversation_id__settings_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/integration": {
     parameters: {
       query?: never;
@@ -2140,6 +2244,83 @@ export interface components {
       text: string;
       /** Next Offset */
       next_offset: number | null;
+    };
+    /** CoordinatorConversation */
+    CoordinatorConversation: {
+      /** Id */
+      id: string;
+      /** Number */
+      number: number;
+      /** Created At */
+      created_at: string;
+    };
+    /** CoordinatorHistory */
+    CoordinatorHistory: {
+      /** Items */
+      items: components["schemas"]["CoordinatorConversation"][];
+      /** Next Before */
+      next_before: number | null;
+    };
+    /** CoordinatorPage */
+    CoordinatorPage: {
+      conversation: components["schemas"]["CoordinatorConversation"];
+      /** Items */
+      items: components["schemas"]["CoordinatorTurn"][];
+      /** Next Before */
+      next_before: number | null;
+      active: components["schemas"]["CoordinatorTurn"] | null;
+    };
+    /** CoordinatorSend */
+    CoordinatorSend: {
+      /** Id */
+      id: string;
+      /** Text */
+      text: string;
+    };
+    /** CoordinatorTurn */
+    CoordinatorTurn: {
+      /** Id */
+      id: string;
+      /**
+       * Number
+       * @default 0
+       */
+      number: number;
+      /** Project Id */
+      project_id: string;
+      /** Conversation Id */
+      conversation_id: string;
+      /** Text */
+      text: string;
+      /** Created At */
+      created_at: string;
+      /**
+       * Status
+       * @default starting
+       * @enum {string}
+       */
+      status:
+        | "starting"
+        | "running"
+        | "stopping"
+        | "completed"
+        | "stopped"
+        | "failed"
+        | "interrupted"
+        | "uncertain";
+      settings: components["schemas"]["EffectiveAgent"];
+      applied: components["schemas"]["EffectiveAgent"] | null;
+      activity: components["schemas"]["RunActivityPage"];
+      /**
+       * Notice
+       * @default
+       */
+      notice: string;
+      /**
+       * Native Started
+       * @default false
+       */
+      native_started: boolean;
     };
     /** Correction */
     Correction: {
@@ -7457,6 +7638,272 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PermissionRecord"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  history_api_projects__project_id__coordinator_get: {
+    parameters: {
+      query?: {
+        before?: number | null;
+      };
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CoordinatorHistory"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  new_api_projects__project_id__coordinator_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CoordinatorConversation"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  page_api_projects__project_id__coordinator__conversation_id__get: {
+    parameters: {
+      query?: {
+        before?: number | null;
+      };
+      header?: never;
+      path: {
+        project_id: string;
+        conversation_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CoordinatorPage"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  send_api_projects__project_id__coordinator__conversation_id__messages_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        conversation_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CoordinatorSend"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CoordinatorTurn"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  stop_api_projects__project_id__coordinator_turns__turn_id__stop_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        turn_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CoordinatorTurn"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  recover_api_projects__project_id__coordinator_turns__turn_id__confirm_stopped_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        turn_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CoordinatorTurn"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  settings_api_projects__project_id__coordinator__conversation_id__settings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        conversation_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentSettingsView"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  edit_api_projects__project_id__coordinator__conversation_id__settings_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        conversation_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AgentSettingsEdit"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentSettingsView"];
         };
       };
       /** @description Validation Error */
