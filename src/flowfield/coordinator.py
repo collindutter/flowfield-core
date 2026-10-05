@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from flowfield.activity_text import retain
 from flowfield.adapters.agent_mcp import serve_scope
 from flowfield.adapters.codex_agent import CodexAgent
 from flowfield.adapters.local_execution import LocalHost
@@ -15,6 +16,7 @@ from flowfield.agent_tools import coordinator_scope
 from flowfield.coordinator_models import CoordinatorSend, CoordinatorTurn
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
+from flowfield.reads import size
 from flowfield.run_activity import ActivityRecorder
 
 if TYPE_CHECKING:
@@ -67,7 +69,8 @@ class Coordinator:
     def _prompt(self, turn: CoordinatorTurn, server: str) -> str:
         page = self.store.page(turn.project_id, turn.conversation_id, before=turn.number)
         history: list[dict[str, str]] = []
-        remaining = 48000
+        remaining = 48000 - 2  # JSON array delimiters; budget encoded UTF-8, not characters.
+        abridged = False
         for previous in reversed(page.items):
             entry = {
                 "human": previous.text,
@@ -76,17 +79,33 @@ class Coordinator:
                     e.text for e in previous.activity.items if e.kind == "agent"
                 ),
             }
-            size = len(json.dumps(entry))
-            if size > remaining or len(history) >= 8:
+            if len(history) >= 8:
                 break
+            if size(entry) + 2 > remaining:
+                if history:
+                    break
+                # Always carry the latest exchange, even when its output exceeds the
+                # entire handoff budget. Retain both the opening and conclusion.
+                original = dict(entry)
+                limit = max(len(entry["human"]), len(entry["coordinator"]))
+                while size(entry) + 2 > remaining:
+                    limit //= 2
+                    for field in ("human", "coordinator"):
+                        entry[field] = retain(original[field], limit)
+                abridged = True
+            abridged |= previous.activity.omitted or any(
+                item.omitted for item in previous.activity.items if item.kind == "agent"
+            )
             history.insert(0, entry)
-            remaining -= size
+            remaining -= size(entry) + 2
         return json.dumps(
             {
                 "instructions": f"Use the {server} MCP connection.\n" + GUIDANCE,
                 "project_id": turn.project_id,
                 "flowfield_connection": server,
-                "history_is_partial": bool(page.next_before or len(history) < len(page.items)),
+                "history_is_partial": bool(
+                    abridged or page.next_before or len(history) < len(page.items)
+                ),
                 "recent_conversation": history,
                 "human_message": turn.text,
             },

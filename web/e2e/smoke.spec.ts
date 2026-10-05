@@ -68,10 +68,16 @@ test("board failures retain readable context and recover through their alert", a
   await expect(alert).toContainText("Could not refresh the board");
   await expect(card).toBeVisible();
   fail = false;
-  await alert.getByRole("button", { name: "Refresh board" }).click();
-  await expect(
-    page.getByRole("link", { name: /New work after recovery/ }),
-  ).toBeVisible();
+  const recovered = page.getByRole("link", { name: /New work after recovery/ });
+  // Another live project event can recover the read before the retry click.
+  // Both paths must restore the new work, without losing the existing card.
+  await expect(async () => {
+    if (!(await recovered.isVisible()))
+      await alert
+        .getByRole("button", { name: "Refresh board" })
+        .click({ timeout: 1000 });
+    await expect(recovered).toBeVisible();
+  }).toPass({ timeout: 5000 });
   await expect(alert).toHaveCount(0);
 });
 
@@ -1569,6 +1575,17 @@ test("Needs you carries a free-text answer from browser to coordinator applicati
     page.getByRole("link", { name: "Needs your answer", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".task-card .task-needs:empty")).toHaveCount(0);
+  let releaseInput!: () => void;
+  const inputReady = new Promise<void>((resolve) => {
+    releaseInput = resolve;
+  });
+  await page.route(
+    `**/api/projects/${project_id}/tasks/*/input-eligibility`,
+    async (route) => {
+      await inputReady;
+      await route.continue();
+    },
+  );
   await page
     .getByRole("link", { name: "Needs your answer", exact: true })
     .click();
@@ -1583,6 +1600,11 @@ test("Needs you carries a free-text answer from browser to coordinator applicati
   ).toHaveText("What should the export include?");
   await questionEntry.getByRole("img", { name: "Needs your answer" }).focus();
   await expect(page.getByRole("tooltip")).toHaveText("Needs your answer");
+  releaseInput();
+  await expect(page.getByLabel("Your answer", { exact: true })).toBeEnabled();
+  await expect(
+    questionEntry.getByRole("img", { name: "Needs your answer" }),
+  ).toBeFocused();
   await page.getByLabel("Your answer", { exact: true }).focus();
   await page.keyboard.press("Escape");
   await closeOverlay(page);

@@ -2,11 +2,14 @@
 
 import asyncio
 import json
+import shlex
+import shutil
 import sys
 from pathlib import Path
 
 import pytest
 from test_execution import fixture
+from test_results import approve
 
 from flowfield.adapters.git_workspace import baseline, git
 from flowfield.application import TaskPublish
@@ -119,6 +122,113 @@ def test_local_workers_validate_and_inspect_with_host_tools(tmp_path, monkeypatc
         assert "do-not-persist-host-secrets" not in launcher and "export HOME=" not in launcher
         assert service.workspace.task("harbor", runs[0].task_id).status != "done"
         await service.close()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("linked_checkout", [False, True], ids=["checkout", "linked-worktree"])
+def test_parallel_mixed_language_project_delivery(tmp_path, monkeypatch, linked_checkout):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Mixed-language smoke requires Node.js")
+    service, repo, settings = configured(
+        tmp_path / "Mixed project 界", monkeypatch, count=2, scenario="monorepo"
+    )
+    files = {
+        "services/api/billing.py": "VALUE = 1\n",
+        "apps/web/price.mjs": "export const value = 1;\n",
+        "docs/报价 notes.md": "Keep the public contract.\n",
+        ".gitignore": ".cache/\ndist/\n__pycache__/\n",
+        "scripts/check.py": (
+            "import json, runpy, subprocess, sys\n"
+            "from pathlib import Path\n"
+            "assert Path('.cache/setup').read_text() == str(Path.cwd())\n"
+            "api = runpy.run_path('services/api/billing.py')['VALUE']\n"
+            "web = json.loads(subprocess.check_output([sys.argv[1], '--input-type=module',\n"
+            "    '-e', \"import {value} from './apps/web/price.mjs'; console.log(value)\"]))\n"
+            "assert api in (1, 2) and web in (1, 2)\n"
+            "assert Path('docs/current').read_text() == 'Keep the public contract.\\n'\n"
+            "print(f'Python API {api}; JavaScript UI {web}')\n"
+        ),
+        "scripts/setup.py": (
+            "from pathlib import Path\n"
+            "Path('.cache').mkdir(exist_ok=True)\n"
+            "Path('.cache/setup').write_text(str(Path.cwd()))\n"
+        ),
+        "scripts/health": "#!/bin/sh\nprintf 'healthy\\n'\n",
+    }
+    for name, text in files.items():
+        path = repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    (repo / "docs/current").symlink_to("报价 notes.md")
+    (repo / "scripts/health").chmod(0o755)
+    git(repo, "add", ".")
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@invalid", "commit", "-m", "monorepo")
+    if linked_checkout:
+        source = repo.with_name("source repository")
+        repo.rename(source)
+        git(source, "checkout", "--detach")
+        git(source, "worktree", "add", str(repo), "main")
+    (repo / "dist").mkdir()
+    (repo / "dist/human-output.txt").write_text("Leave local artifacts alone")
+    python = shlex.quote(sys.executable)
+    settings = service.integrations.configure(
+        "harbor",
+        IntegrationConfig(
+            expected_revision=settings.revision,
+            target_branch="main",
+            setup_commands=[f"{python} scripts/setup.py"],
+            checks=[f"{python} scripts/check.py {shlex.quote(node)}", "./scripts/health"],
+        ),
+    )
+    base = baseline(repo)
+
+    async def exercise():
+        try:
+            checked = await service.setup_validation.check(
+                "harbor", SetupCheckRequest(expected_revision=settings.revision)
+            )
+            assert checked.status == "passed", checked.problem
+            runs = [service.execution.claim("harbor", base, {base: set()}) for _ in range(2)]
+            assert all(runs)
+            async with asyncio.timeout(45):
+                await asyncio.gather(*(service._execute(run, repo) for run in runs))
+            for run in runs:
+                current = service.execution.get("harbor", run.id)
+                assert current.status == "in_review", current.problem
+                checkout = service.environment(run.id).checkout
+                assert (checkout / ".cache/setup").read_text() == str(checkout)
+                assert not (checkout / "dist/human-output.txt").exists()
+                changed = git(repo, "diff", "--name-only", base, current.result_commit).decode()
+                expected = (
+                    "services/api/billing.py" if run.task_id == "task-0" else "apps/web/price.mjs"
+                )
+                assert changed.strip() == expected
+            assert baseline(repo) == base
+            assert not (repo / ".cache").exists()
+            # Validate and approve against the current destination for each delivery.
+            # The second worker started on the same base; its candidate must retain
+            # the first delivered change when prepared against the advanced destination.
+            for _ in runs:
+                await asyncio.to_thread(service.results.process, "harbor")
+                versions = [service.results.page("harbor", run.task_id).items[0] for run in runs]
+                ready = [version for version in versions if version.status == "ready"]
+                assert len(ready) == 1, [(version.status, version.problem) for version in versions]
+                version = ready[0]
+                approve(service, version)
+                await asyncio.to_thread(service.results.process, "harbor")
+                version = service.results.page("harbor", version.task_id).items[0]
+                assert version.status == "delivered", version.problem
+                assert service.workspace.task("harbor", version.task_id).status == "done"
+            assert (repo / "services/api/billing.py").read_text() == "VALUE = 2\n"
+            assert (repo / "apps/web/price.mjs").read_text() == "export const value = 2;\n"
+            assert (repo / "dist/human-output.txt").read_text() == "Leave local artifacts alone"
+            assert (repo / "docs/current").is_symlink()
+            assert (repo / "scripts/health").stat().st_mode & 0o111
+            assert git(repo, "status", "--porcelain") == b""
+        finally:
+            await service.close()
 
     asyncio.run(exercise())
 

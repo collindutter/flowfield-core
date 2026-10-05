@@ -76,16 +76,30 @@ class CoordinatorStore:
             return self._conversation(db, project, identity)
 
     def page(
-        self, project: str, conversation: str | None = None, before: int | None = None
+        self,
+        project: str,
+        conversation: str | None = None,
+        before: int | None = None,
+        *,
+        after: int | None = None,
     ) -> CoordinatorPage:
+        if after is not None and before is not None:
+            raise ApplicationError("invalid_cursor", "Choose either earlier or newer messages.")
         with self.workspace.connection() as db:
             self.workspace._project(db, project)
             owner = self._conversation(db, project, conversation) if conversation else None
-            rows = db.execute(
-                "SELECT data FROM coordinator_turns WHERE project_id=? "
-                "AND (? IS NULL OR number<?) ORDER BY number DESC LIMIT 21",
-                (project, before, before),
-            ).fetchall()
+            if after is not None:
+                rows = db.execute(
+                    "SELECT data FROM coordinator_turns WHERE project_id=? AND number>=? "
+                    "ORDER BY number LIMIT 20",
+                    (project, after),
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    "SELECT data FROM coordinator_turns WHERE project_id=? "
+                    "AND (? IS NULL OR number<?) ORDER BY number DESC LIMIT 21",
+                    (project, before, before),
+                ).fetchall()
             items = [CoordinatorTurn.model_validate_json(row[0]) for row in rows[:20]]
             for turn in items:
                 for entry in turn.activity.items:
@@ -93,7 +107,7 @@ class CoordinatorStore:
                     entry.abridged = entry.preview != entry.text
             return CoordinatorPage(
                 conversation=owner,
-                items=list(reversed(items)),
+                items=items if after is not None else list(reversed(items)),
                 next_before=items[-1].number if len(rows) > 20 else None,
                 active=self._active(db, project),
             )

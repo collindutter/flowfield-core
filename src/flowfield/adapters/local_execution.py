@@ -3,7 +3,7 @@
 The caller supplies the intended host environment explicitly (not a login shell
 command or a persisted bag of credentials). Each attempt owns its checkout and
 scratch directories. Native harness configuration controls access to host resources.
-Projects select this behavior explicitly; saved legacy attempts retain their meaning.
+Local is the default environment; saved legacy attempts retain their meaning.
 """
 
 import re

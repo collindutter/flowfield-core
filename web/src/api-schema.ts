@@ -7718,6 +7718,8 @@ export interface operations {
     parameters: {
       query?: {
         before?: number | null;
+        /** @description Refresh this turn and newer turns, up to 20 in ascending order. */
+        after?: number | null;
       };
       header?: never;
       path: {

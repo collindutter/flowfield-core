@@ -39,7 +39,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   const turns: Turn[] = [];
   let active: Turn | null = null;
   let sends = 0;
-  await page.route(`**${historyPath}`, (route) =>
+  await page.route(`**${historyPath}{,?*}`, (route) =>
     route.fulfill({
       json: { conversation, items: turns, active, next_before: null },
     }),
@@ -342,4 +342,108 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   await expect(
     page.getByRole("button", { name: "second · high", exact: true }),
   ).toBeVisible();
+});
+
+test("long project chat preserves loaded history while live pages advance", async ({
+  page,
+  request,
+}) => {
+  const directory = join(state, "long-chat-project");
+  mkdirSync(directory, { recursive: true });
+  await request.post("/api/projects/initialize", {
+    data: { path: directory, task_prefix: "LCH" },
+  });
+  await page.route("**/api/worker-models*", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  const historyPath = "/api/projects/long-chat-project/coordinator";
+  let count = 40;
+  const turn = (number: number): Turn => ({
+    id: `history-message-${number}`,
+    number,
+    project_id: "long-chat-project",
+    conversation_id: "saved",
+    text: `Planning exchange ${number}`,
+    created_at: new Date().toISOString(),
+    status: "completed",
+    native_started: true,
+    notice: "",
+    settings: {
+      choice: { harness: "codex", model: "test", effort: "low", mode: null },
+      source: "project",
+      default_revision: 1,
+      override_revision: null,
+    },
+    applied: null,
+    activity: {
+      revision: 1,
+      supported: true,
+      active: false,
+      changed: true,
+      omitted: false,
+      items: [],
+      usage: {
+        input_tokens: null,
+        output_tokens: null,
+        total_tokens: null,
+        cached_input_tokens: null,
+        reasoning_output_tokens: null,
+        cache_write_input_tokens: null,
+        complete: false,
+      },
+    },
+  });
+  await page.route(`**${historyPath}*`, (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const after = Number(params.get("after"));
+    if (after)
+      return route.fulfill({
+        json: {
+          items: Array.from(
+            { length: Math.min(20, count - after + 1) },
+            (_, i) => turn(after + i),
+          ),
+          active: null,
+          next_before: null,
+        },
+      });
+    const before = Number(params.get("before")) || count + 1;
+    const start = Math.max(1, before - 20);
+    return route.fulfill({
+      json: {
+        items: Array.from({ length: before - start }, (_, i) =>
+          turn(start + i),
+        ),
+        next_before: start > 1 ? start : null,
+        active: null,
+        conversation: null,
+      },
+    });
+  });
+  await page.goto("/projects/long-chat-project");
+  await page.getByRole("button", { name: "Load earlier messages" }).click();
+  const messages = page.locator(".coordinator-turn");
+  await expect(messages).toHaveCount(40);
+  count = 41;
+  await request.post("/api/projects/long-chat-project/tasks", {
+    data: { title: "Refresh project state" },
+  });
+  await expect(
+    page.getByText("Planning exchange 41", { exact: true }),
+  ).toBeAttached();
+  await expect(messages).toHaveCount(41);
+  await expect(
+    page.getByText("Planning exchange 21", { exact: true }),
+  ).toBeAttached();
+  await expect(
+    page.getByRole("button", { name: "Load earlier messages" }),
+  ).toHaveCount(0);
+  count = 100; // More than a page arrived while this browser was disconnected.
+  await request.post("/api/projects/long-chat-project/tasks", {
+    data: { title: "Reconnect with newer work" },
+  });
+  await expect(messages).toHaveCount(100);
+  await expect(
+    page.getByText("Planning exchange 60", { exact: true }),
+  ).toBeAttached();
 });

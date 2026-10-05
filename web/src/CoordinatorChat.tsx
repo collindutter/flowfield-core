@@ -17,6 +17,14 @@ type Turn = components["schemas"]["CoordinatorTurn"];
 type Choice = components["schemas"]["AgentChoice-Output"];
 export type ChatDrafts = Map<string, { id: string; text: string }>;
 
+function mergeTurns(previous: Turn[], updates: Turn[]) {
+  return [
+    ...new Map(
+      [...previous, ...updates].map((turn) => [turn.id, turn]),
+    ).values(),
+  ].sort((a, b) => a.number - b.number);
+}
+
 export function CoordinatorChat({
   projectId,
   refresh,
@@ -29,10 +37,14 @@ export function CoordinatorChat({
   onSettingsDirty: (dirty: boolean) => void;
 }) {
   const base = `projects/${projectId}/coordinator`;
-  const path = base;
+  const [history, setHistory] = useState<{ page: Page | null; items: Turn[] }>({
+    page: null,
+    items: [],
+  });
+  const latest = history.items.at(-1)?.number;
+  const path = latest ? `${base}?after=${latest}` : base;
   const [tick, setTick] = useState(0);
   const resource = useResource<Page>(path, `${refresh}:${tick}`);
-  const [earlier, setEarlier] = useState<Turn[]>([]);
   const [before, setBefore] = useState<number | null | undefined>(undefined);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -53,15 +65,16 @@ export function CoordinatorChat({
   );
   const [pane, setPane] = useState<HTMLDivElement | null>(null);
   const content = useRef<HTMLDivElement>(null);
-  const page = resource.data;
+  const page = resource.data ?? history.page;
+  if (page && history.page !== page) {
+    // Preserve already displayed pages as the latest server window moves forward.
+    setHistory({ page, items: mergeTurns(history.items, page.items) });
+    if (before === undefined) setBefore(page.next_before ?? null);
+  }
   const active = page?.active;
   const running = !!active && active.status !== "uncertain";
-  const cursor = before === undefined ? page?.next_before : before;
-  const turns = [
-    ...new Map(
-      [...earlier, ...(page?.items ?? [])].map((turn) => [turn.id, turn]),
-    ).values(),
-  ].sort((a, b) => a.number - b.number);
+  const cursor = before;
+  const turns = history.items;
   const scroll = useFeedScroll(content, !!page, undefined, true, pane);
   useEffect(() => {
     if (!running) return;
@@ -89,7 +102,7 @@ export function CoordinatorChat({
     setBusy(true);
     setError("");
     try {
-      await request(`${path}/messages`, "POST", draft);
+      await request(`${base}/messages`, "POST", draft);
       update("");
       setTick((n) => n + 1);
     } catch (e) {
@@ -124,8 +137,11 @@ export function CoordinatorChat({
     setError("");
     scroll.readingEarlier();
     try {
-      const result = await request<Page>(`${path}?before=${cursor}`);
-      setEarlier((previous) => [...result.items, ...previous]);
+      const result = await request<Page>(`${base}?before=${cursor}`);
+      setHistory((previous) => ({
+        ...previous,
+        items: mergeTurns(result.items, previous.items),
+      }));
       setBefore(result.next_before);
     } catch (e) {
       setError((e as Error).message);

@@ -19,8 +19,16 @@ def coordinator_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     router = APIRouter(prefix="/api/projects/{project_id}/coordinator")
 
     @router.get("")
-    def history(project_id: str, before: int | None = Query(None, ge=1)) -> CoordinatorPage:
-        return supervisor().coordinator.store.page(project_id, before=before)
+    def history(
+        project_id: str,
+        before: int | None = Query(None, ge=1),
+        after: int | None = Query(
+            None,
+            ge=1,
+            description="Refresh this turn and newer turns, up to 20 in ascending order.",
+        ),
+    ) -> CoordinatorPage:
+        return supervisor().coordinator.store.page(project_id, before=before, after=after)
 
     @router.post("", status_code=201)
     def new(project_id: str) -> CoordinatorConversation:

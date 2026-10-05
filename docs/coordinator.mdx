@@ -40,12 +40,15 @@ be confirmed, stop the remaining coordinator process on the host before choosing
 ## Continue later
 
 Each project has one ongoing coordinator conversation. Messages, public output and turn settings
-are saved by the service. Older messages load on demand. Long output is bounded and omissions
-are marked. Tool activity shows names, status and available commands or paths.
+are saved by the service. Older messages load on demand and stay visible as new replies arrive.
+Long output is bounded and omissions are marked. Tool activity shows names, status and
+available commands or paths.
 
 Each turn starts a fresh native session with up to eight recent exchanges within a bounded
-context budget, plus tools for reading current project state. This is application conversation
-history, not a resumed native session. Record important ongoing intent in tasks and decisions.
+context budget, plus tools for reading current project state. If the latest exchange exceeds
+that budget, its opening and conclusion are retained with the omission marked. This is
+application conversation history, not a resumed native session. Record important ongoing
+intent in tasks and decisions.
 
 Resize the chat and work panes on a wide screen. On narrow screens, switch between
 **Coordinator** and **Work**; switching preserves the current draft.

@@ -100,7 +100,13 @@ async def main():
             assert "run_command" not in control["instructions"]
             assert "private Python runtime" not in control["instructions"]
             scenario = os.environ.get("FLOWFIELD_TEST_SCENARIO", "normal")
-            if scenario != "discussion":
+            if scenario == "monorepo":
+                if control["task"].endswith(": Task 0"):
+                    Path("services/api/billing.py").write_text("VALUE = 2\n")
+                else:
+                    assert control["task"].endswith(": Task 1")
+                    Path("apps/web/price.mjs").write_text("export const value = 2;\n")
+            elif scenario != "discussion":
                 Path("result.txt").write_text(os.environ["FLOWFIELD_RUN_ID"])
             control = {
                 "mode": scenario,

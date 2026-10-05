@@ -239,6 +239,10 @@ def test_browser_reads_are_model_free_and_cross_project_scoped(tmp_path, monkeyp
     with TestClient(app, base_url="http://localhost") as client:
         history = client.get("/api/projects/harbor/coordinator")
         assert history.status_code == 200 and history.json()["items"] == []
+        assert client.get("/api/projects/harbor/coordinator?after=1").json()["items"] == []
+        assert client.get("/api/projects/harbor/coordinator?after=0").status_code == 422
+        assert client.get("/api/projects/harbor/coordinator?before=2&after=1").status_code == 400
+        assert client.get("/api/projects/elsewhere/coordinator?after=1").status_code == 404
         conversation = client.post("/api/projects/harbor/coordinator").json()
         path = f"/api/projects/harbor/coordinator/{conversation['id']}"
         assert client.get(path).json()["items"] == []
@@ -260,6 +264,16 @@ def test_history_pages_and_duplicate_retry_at_capacity(tmp_path, monkeypatch):
     assert len(page.items) == 20 and page.items[-1].text == "Message 22"
     earlier = store.page("harbor", conversation.id, page.next_before)
     assert [turn.text for turn in earlier.items] == ["Message 0", "Message 1", "Message 2"]
+    # Forward refresh includes the boundary turn, whose activity may still change,
+    # and catches up in bounded ascending pages without skipping unseen turns.
+    forward = store.page("harbor", after=1)
+    assert [turn.number for turn in forward.items] == list(range(1, 21))
+    forward = store.page("harbor", after=forward.items[-1].number)
+    assert [turn.number for turn in forward.items] == [20, 21, 22, 23]
+    assert forward.next_before is None
+    assert store.page("harbor", after=24).items == []
+    with pytest.raises(ApplicationError, match="either earlier or newer"):
+        store.page("harbor", before=20, after=1)
     assert store.reserve("harbor", conversation.id, request, available=False)[1] is False
     with pytest.raises(ApplicationError, match="slots are busy"):
         store.reserve("harbor", conversation.id, message(), available=False)
@@ -310,3 +324,45 @@ def test_scoped_coordinator_applies_saved_answer_without_code_approval(tmp_path)
         grant.revoke()
 
     asyncio.run(exercise())
+
+
+def test_long_unicode_reply_keeps_latest_exchange_in_bounded_context(tmp_path, monkeypatch):
+    import json
+
+    from flowfield.reads import size
+
+    service, conversation = setup(tmp_path, monkeypatch)
+    store = service.coordinator.store
+    previous, _ = store.reserve(
+        "harbor", conversation.id, message("Keep this requirement: " + "境" * 15000)
+    )
+    store.write(
+        "harbor",
+        previous.id,
+        [
+            ActivityUpdate(
+                key=str(index),
+                kind="agent",
+                text=("Start of reply. " if index == 0 else "")
+                + "界" * 5500
+                + (" Final decision: preserve the API." if index == 9 else ""),
+            )
+            for index in range(10)
+        ],
+    )
+    with service.workspace.connection(write=True) as db:
+        previous = store._get(db, "harbor", previous.id)
+        previous.status = "completed"
+        store._save(db, previous)
+    current, _ = store.reserve("harbor", conversation.id, message("Yes, proceed."))
+    prompt = json.loads(service.coordinator._prompt(current, "scoped-tools"))
+    assert len(prompt["recent_conversation"]) == 1
+    retained = prompt["recent_conversation"][0]
+    assert retained["human"].startswith("Keep this requirement:")
+    assert retained["coordinator"].startswith("Start of reply.")
+    assert retained["coordinator"].endswith("Final decision: preserve the API.")
+    assert "omitted" in retained["coordinator"]
+    assert size(prompt["recent_conversation"]) <= 48000
+    assert prompt["history_is_partial"] is True
+    assert prompt["human_message"] == "Yes, proceed."
+    assert store.get("harbor", previous.id).activity == previous.activity

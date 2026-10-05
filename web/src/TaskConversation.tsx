@@ -182,9 +182,15 @@ export function TaskConversation({
     null,
   );
   useEffect(() => {
-    if (composerAction && inputEnabled)
+    const focused = document.activeElement;
+    const initialFocus =
+      focused === document.body ||
+      focused?.classList.contains("entity-overlay-body");
+    // Late eligibility reads must not steal focus from evidence or other controls.
+    // Choosing a reply/draft explicitly still moves into its composer.
+    if (composerAction && inputEnabled && (chosen || initialFocus))
       input.current?.focus({ preventScroll: true });
-  }, [composerAction, inputEnabled, key]);
+  }, [composerAction, inputEnabled, key, chosen]);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
