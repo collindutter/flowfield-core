@@ -46,6 +46,7 @@ async def main():
     pending = {}
     tasks = set()
     servers = []
+    session_closed = False
 
     async def prompt(request):
         control = json.loads(request["params"]["prompt"][0]["text"])
@@ -164,6 +165,9 @@ async def main():
                     "agentCapabilities": {
                         "loadSession": "no-load" not in sys.argv,
                         "mcpCapabilities": {"http": "no-http" not in sys.argv},
+                        "sessionCapabilities": (
+                            {"close": {}} if "close-session" in sys.argv else {}
+                        ),
                     },
                 },
             )
@@ -184,8 +188,18 @@ async def main():
             task.add_done_callback(tasks.discard)
         elif method == "session/cancel":
             stopped.set()
+        elif method == "session/close":
+            if "close-failure" in sys.argv:
+                send({"id": request["id"], "error": {"code": -32000, "message": "Close failed"}})
+            elif "close-hang" not in sys.argv:
+                session_closed = True
+                reply(request, {})
         elif request.get("id") in pending:
             pending.pop(request["id"]).set_result(request.get("result"))
+    if "close-session" in sys.argv and not session_closed:
+        sys.exit(3)
+    if "slow-exit" in sys.argv:
+        await asyncio.sleep(0.1)
 
 
 if __name__ == "__main__":

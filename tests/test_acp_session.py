@@ -76,7 +76,7 @@ def test_stop_cancels_pending_permission_and_blocks_new_work(tmp_path):
             requested.set()
             await asyncio.Event().wait()
 
-        client = await start(tmp_path, [], permission=permission)
+        client = await start(tmp_path, [], "close-session", permission=permission)
         prompt = asyncio.create_task(client.prompt('{"mode":"permission"}'))
         await asyncio.wait_for(requested.wait(), 3)
         with pytest.raises(RuntimeError, match="not ready"):
@@ -85,6 +85,7 @@ def test_stop_cancels_pending_permission_and_blocks_new_work(tmp_path):
             await client.select("model", "second")
         receipt = await client.close()
         assert receipt.turn_finished and receipt.process_group_exited
+        assert receipt.session_closed is True
         assert await prompt == "cancelled"
         with pytest.raises(RuntimeError, match="not ready"):
             await client.prompt("after stop")
@@ -199,5 +200,54 @@ def test_stop_during_startup_and_cancelled_stop_caller(tmp_path):
         with pytest.raises((ConnectionError, RuntimeError)):
             await startup
         assert client.state != "ready" and client.process.returncode is not None
+
+    asyncio.run(exercise())
+
+
+def test_negotiated_session_close_and_eof_precede_process_signals(tmp_path):
+    async def exercise():
+        client = await start(tmp_path, [], "close-session", "slow-exit")
+        await client.prompt("{}")
+        receipt = await client.close(timeout=1)
+        assert receipt.session_closed is True
+        assert receipt.process_exited_gracefully
+        assert receipt.process_group_exited and receipt.turn_finished
+        assert client.process.returncode == 0 and client.state == "closed"
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("flag", ["close-failure", "close-hang"])
+def test_failed_native_session_close_retains_uncertainty(tmp_path, flag):
+    async def exercise():
+        client = await start(tmp_path, [], "close-session", flag)
+        receipt = await client.close(timeout=0.15)
+        assert receipt.session_closed is False
+        assert receipt.process_group_exited
+        assert client.state == "interrupted"
+
+    asyncio.run(exercise())
+
+
+def test_closing_one_session_does_not_interrupt_another(tmp_path):
+    async def exercise():
+        first_events, second_events = [], []
+        first = await start(tmp_path, first_events, "close-session")
+        second = await start(tmp_path, second_events, "close-session")
+        first_turn = asyncio.create_task(first.prompt('{"mode":"wait"}'))
+        second_turn = asyncio.create_task(second.prompt('{"mode":"wait"}'))
+        try:
+            async with asyncio.timeout(3):
+                while not first_events or not second_events:
+                    await asyncio.sleep(0.01)
+            receipt = await first.close(timeout=1)
+            assert receipt.session_closed and receipt.process_group_exited
+            assert await first_turn == "cancelled"
+            assert not second_turn.done()
+            assert second.state == "running" and second.process.returncode is None
+        finally:
+            await first.close(timeout=1)
+            await second.close(timeout=1)
+            await asyncio.gather(first_turn, second_turn, return_exceptions=True)
 
     asyncio.run(exercise())

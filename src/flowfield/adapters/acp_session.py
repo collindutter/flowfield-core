@@ -45,6 +45,8 @@ class PermissionRequest:
 class StopReceipt:
     turn_finished: bool
     process_group_exited: bool
+    session_closed: bool | None = None
+    process_exited_gracefully: bool = False
     # This deliberately does NOT assert that an agent's detached tools have stopped.
     # A managed worker adapter must additionally verify its execution environment.
 
@@ -318,10 +320,31 @@ class AcpSession:
             except (Exception, asyncio.CancelledError):
                 pass
         await self._cancel_permission()
+        session_closed = None
+        if (
+            self.connection
+            and self.session_id
+            and "close" in self.capabilities.get("sessionCapabilities", {})
+        ):
+            session_closed = False
+            try:
+                async with asyncio.timeout(timeout):
+                    await self.connection.close_session(self.session_id)
+                session_closed = True
+            except (Exception, asyncio.CancelledError):
+                pass
         if self.connection:
             with contextlib.suppress(Exception):
                 async with asyncio.timeout(timeout):
                     await self.connection.close()
+        # EOF gives the bridge its native shutdown path before escalating to
+        # process-group signals. In particular, Codex bridges forward EOF to the
+        # app-server. A session-close acknowledgment is not a tool-stop receipt.
+        graceful_exit = False
+        if self.process is not None:
+            with contextlib.suppress(TimeoutError):
+                async with asyncio.timeout(timeout):
+                    graceful_exit = await self.process.wait() == 0
         exited = True
         if self._local_process is not None:
             exited = await self._local_process.close(timeout=timeout)
@@ -333,5 +356,7 @@ class AcpSession:
             self._stderr.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._stderr
-        self.state = "closed" if exited and turn_finished else "interrupted"
-        return StopReceipt(turn_finished, exited)
+        self.state = (
+            "closed" if exited and turn_finished and session_closed is not False else "interrupted"
+        )
+        return StopReceipt(turn_finished, exited, session_closed, graceful_exit)

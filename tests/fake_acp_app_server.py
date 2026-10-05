@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 
@@ -12,6 +13,7 @@ def emit(message):
 
 def main():
     record = Path(os.environ["FLOWFIELD_TEST_RPC_RECORD"])
+    scenario = os.environ.get("FLOWFIELD_TEST_SCENARIO", "complete")
     model = {
         "id": "test-model",
         "model": "test-model",
@@ -78,6 +80,8 @@ def main():
                     },
                 }
             )
+            if scenario == "cancel":
+                continue
             emit(
                 {
                     "method": "turn/completed",
@@ -92,6 +96,27 @@ def main():
                     },
                 }
             )
+        elif method == "turn/interrupt":
+            emit(
+                {
+                    "method": "turn/completed",
+                    "params": {
+                        "threadId": "test-thread",
+                        "turn": {
+                            "id": "test-turn",
+                            "items": [],
+                            "status": "interrupted",
+                            "error": None,
+                        },
+                    },
+                }
+            )
+    if scenario == "slow-shutdown":
+        # The released bridge terminates its native child after two seconds.
+        # Simulate unfinished native cleanup; this is not a native Codex model test.
+        time.sleep(30)
+    with record.open("a") as output:
+        output.write(json.dumps({"probe_native_cleanup_completed": True}) + "\n")
 
 
 if __name__ == "__main__":

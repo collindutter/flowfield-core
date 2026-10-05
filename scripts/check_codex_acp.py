@@ -2,8 +2,9 @@
 
 Usage: python scripts/check_codex_acp.py /absolute/path/to/codex-acp/dist/index.js
 Requires Node only for this explicit development probe, not Flowfield at runtime.
-The probe reports native configuration forwarding; it does not enable managed work
-or establish filesystem/process enforcement.
+The probe reports native configuration and lifecycle forwarding. Use --scenario
+cancel or slow-shutdown to test interruption and forced native exit. It does not
+enable managed work or establish filesystem/process enforcement.
 """
 
 import argparse
@@ -21,7 +22,9 @@ from flowfield.adapters.git_workspace import baseline, git
 from flowfield.adapters.local_execution import LocalHost
 
 
-async def probe(bridge: Path, scratch: Path, node: str, mode: str) -> dict:
+async def probe(
+    bridge: Path, scratch: Path, node: str, mode: str, scenario: str = "complete"
+) -> dict:
     fake = Path(__file__).resolve().parents[1] / "tests/fake_acp_app_server.py"
     launcher = scratch / "codex"
     launcher.write_text(
@@ -52,11 +55,19 @@ async def probe(bridge: Path, scratch: Path, node: str, mode: str) -> dict:
             "CODEX_PATH": str(launcher),
             "PATH": os.path.dirname(node),
             "FLOWFIELD_TEST_RPC_RECORD": str(record),
+            "FLOWFIELD_TEST_SCENARIO": scenario,
         }
     )
     attempt = host.prepare(scratch / "state", repo, "probe", baseline(repo))
     events = []
-    client = AcpSession(events.append, request_timeout=10, turn_timeout=10)
+    started = asyncio.Event()
+
+    def event(value):
+        events.append(value)
+        if value.kind == "text":
+            started.set()
+
+    client = AcpSession(event, request_timeout=10, turn_timeout=10)
     await client.start(
         [node, str(bridge)],
         cwd=attempt.workspace.checkout,
@@ -65,8 +76,13 @@ async def probe(bridge: Path, scratch: Path, node: str, mode: str) -> dict:
     )
     try:
         await client.select("model", "test-model")
+        await client.select("reasoning_effort", "low")
         await client.select("mode", mode)
-        result = await client.prompt("Offline conformance probe")
+        prompt = asyncio.create_task(client.prompt("Offline conformance probe"))
+        if scenario == "cancel":
+            await asyncio.wait_for(started.wait(), 10)
+            await client.close()
+        result = await prompt
     finally:
         stopped = await client.close()
     messages = [json.loads(line) for line in record.read_text().splitlines()]
@@ -76,12 +92,31 @@ async def probe(bridge: Path, scratch: Path, node: str, mode: str) -> dict:
         "prompt_stop_reason": result,
         "text_streamed": any(event.kind == "text" for event in events),
         "process_group_exited": stopped.process_group_exited,
+        "session_closed": stopped.session_closed,
+        "bridge_exited_gracefully": stopped.process_exited_gracefully,
+        "fake_native_cleanup_completed": any(
+            item.get("probe_native_cleanup_completed") for item in messages
+        ),
+        "native_lifecycle_requests": [
+            item["method"]
+            for item in messages
+            if item.get("method")
+            in {
+                "turn/interrupt",
+                "thread/unsubscribe",
+                "thread/archive",
+                "thread/backgroundTerminals/list",
+                "thread/backgroundTerminals/terminate",
+            }
+        ],
+        "scenario": scenario,
         "selected_mode": mode,
         "attempt_cwd_forwarded": thread.get("cwd") == str(attempt.workspace.checkout),
         "native_tools_disabled": thread.get("environments") == [],
         "turn_sandbox_policy": turn.get("sandboxPolicy"),
         "turn_approval_policy": turn.get("approvalPolicy"),
         "turn_approval_reviewer": turn.get("approvalsReviewer"),
+        "turn_reasoning_effort": turn.get("effort"),
         "limits": (
             "Fake app-server only; filesystem isolation and detached command cleanup are unproven."
         ),
@@ -94,6 +129,9 @@ def main():
     parser.add_argument(
         "--mode", default="workspace-write", choices=["workspace-write", "read-only", "agent"]
     )
+    parser.add_argument(
+        "--scenario", default="complete", choices=["complete", "cancel", "slow-shutdown"]
+    )
     args = parser.parse_args()
     node = shutil.which("node")
     if node is None or not args.bridge.is_file():
@@ -101,7 +139,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix="flowfield-acp-probe-") as directory:
         print(
             json.dumps(
-                asyncio.run(probe(args.bridge.resolve(), Path(directory), node, args.mode)),
+                asyncio.run(
+                    probe(args.bridge.resolve(), Path(directory), node, args.mode, args.scenario)
+                ),
                 indent=2,
             )
         )
