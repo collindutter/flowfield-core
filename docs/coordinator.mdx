@@ -10,9 +10,12 @@ the same feeds you use for questions and review.
 ## Start a conversation
 
 Install and authenticate [Codex](/integrations/codex), including the managed ACP runtime.
-In project **Integration** settings, select **Use Local host** and save. Local uses the
+Add an existing project using **Add project → Choose directory** or `flowfield project init`.
+In project **Integration** settings, select **Use Local host** and click **Enable Local host**. Local uses the
 service host's tools, credentials and native harness configuration. In **Coordinator**
-settings, choose a model and reasoning effort.
+settings, open **Coordinator defaults**, choose a model and reasoning effort, and save.
+Worker delivery branches, setup and checks can be configured later. Built-in chat supplies
+its own MCP connection; `flowfield integration connect codex` is only for standalone sessions.
 
 Choose **Start conversation**, write your message, and select **Send** (or press
 Command/Ctrl+Enter). Opening a project or creating a conversation starts no model.

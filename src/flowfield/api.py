@@ -19,6 +19,7 @@ from flowfield.activity import (
     DecisionWithdraw,
     EntryKind,
 )
+from flowfield.adapters.directory_picker import DirectorySelection, select_directory
 from flowfield.application import (
     Board,
     Health,
@@ -127,6 +128,10 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
     @router.post("/initialize")
     def initialize(request: ProjectSetup, service: Service) -> Project:
         return service.setup_project(request)
+
+    @router.post("/select-directory")
+    def choose_directory() -> DirectorySelection:
+        return select_directory()
 
     @router.get("/{project_id}/guidance")
     def guidance(project_id: str, service: Service) -> GuidanceView:

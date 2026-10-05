@@ -18,6 +18,7 @@ from flowfield.application import Workspace
 from flowfield.coordinator_models import CoordinatorSend
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
+from flowfield.integration_models import LocalAdoption
 from flowfield.run_activity import MAX_TOTAL, ActivityUpdate
 from flowfield.supervisor import Supervisor
 
@@ -94,6 +95,25 @@ def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
     assert new.id != conversation.id
     with pytest.raises(ApplicationError, match="current conversation"):
         restored.reserve("harbor", conversation.id, message())
+
+
+def test_planning_before_worker_delivery_configuration(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch)
+    with service.workspace.connection(write=True) as db:
+        db.execute("DELETE FROM integration_settings WHERE project_id='harbor'")
+    with pytest.raises(ApplicationError, match="Select Local"):
+        service.coordinator.store.reserve("harbor", conversation.id, message())
+    service.integrations.adopt_local("harbor", LocalAdoption(expected_revision=1))
+    settings = service.integrations.settings("harbor")
+    assert settings.checks == []
+
+    async def exercise():
+        turn = service.coordinator.send("harbor", conversation.id, message())
+        assert (await settled(service, turn)).status == "completed"
+        assert service.workspace.task("harbor", "chat-task").updated_by == "agent"
+        await service.close()
+
+    asyncio.run(exercise())
 
 
 @pytest.mark.parametrize("immediate,flags", [(True, ()), (False, ()), (False, ("slow-start",))])

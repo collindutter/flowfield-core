@@ -15,6 +15,7 @@ from flowfield.integration_models import (
     IntegrationPage,
     IntegrationPrepare,
     IntegrationSettings,
+    LocalAdoption,
 )
 from flowfield.review_models import ChangedFiles, FilePatch
 from flowfield.setup_validation import SetupCheck, SetupCheckRequest
@@ -31,6 +32,10 @@ def integration_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     @router.put("/integration")
     def configure(project_id: str, request: IntegrationConfig) -> IntegrationSettings:
         return supervisor().integrations.configure(project_id, request)
+
+    @router.post("/integration/local")
+    def adopt_local(project_id: str, request: LocalAdoption) -> IntegrationSettings:
+        return supervisor().integrations.adopt_local(project_id, request)
 
     @router.get("/setup-validation")
     def setup_validation(project_id: str) -> SetupCheck | None:

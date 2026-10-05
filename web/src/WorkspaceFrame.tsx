@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectBadge } from "./ProjectBadge";
+import { Plus } from "lucide-react";
 import {
   Tooltip,
   TooltipTrigger,
@@ -106,12 +107,14 @@ function ProjectNavigation({
   onProjectSelect,
   footer,
   onHome,
+  onAddProject,
 }: {
   projects: WorkspaceProject[];
   activeProjectId: string;
   onProjectSelect: (project: WorkspaceProject) => void;
   footer?: ReactNode;
   onHome?: () => void;
+  onAddProject?: () => void;
 }) {
   const { setOpenMobile, state, isMobile } = useSidebar();
   return (
@@ -154,6 +157,20 @@ function ProjectNavigation({
             Projects
           </p>
           <SidebarMenu className="gap-2">
+            {onAddProject && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Add project"
+                  onClick={() => {
+                    onAddProject();
+                    setOpenMobile(false);
+                  }}
+                >
+                  <Plus />
+                  <span>Add project</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
             {projects.map((project) => (
               <ProjectItem
                 key={project.id}
@@ -182,6 +199,7 @@ export function WorkspaceFrame({
   work,
   footer,
   onHome,
+  onAddProject,
 }: {
   projects: WorkspaceProject[];
   activeProjectId: string;
@@ -190,6 +208,7 @@ export function WorkspaceFrame({
   work: ReactNode;
   footer?: ReactNode;
   onHome?: () => void;
+  onAddProject?: () => void;
 }) {
   const compact = useSyncExternalStore(
     subscribeCompact,
@@ -221,6 +240,7 @@ export function WorkspaceFrame({
         onProjectSelect={onProjectSelect}
         footer={footer}
         onHome={onHome}
+        onAddProject={onAddProject}
       />
       <main className="workspace-main">
         {coordinator == null ? (

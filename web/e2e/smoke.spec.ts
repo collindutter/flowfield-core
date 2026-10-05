@@ -494,7 +494,7 @@ test("CLI adoption updates the browser, task creation and initial connection rec
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Add project", exact: true }),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
   const adopted = cli([
     "project",
     "init",
@@ -4349,6 +4349,7 @@ test("existing-project adoption previews and preserves coordinator guidance", as
   await expect(
     page.getByRole("region", { name: "Project setup instructions" }),
   ).toBeVisible();
+  await page.getByText("Add a project from the CLI", { exact: true }).click();
   await expect(
     page.getByText("flowfield --port 8766 project init", { exact: true }),
   ).toBeVisible();
@@ -4356,7 +4357,7 @@ test("existing-project adoption previews and preserves coordinator guidance", as
   const adopted = cli(["project", "init", root]);
   await page.goto("/projects/" + adopted.id + "/edit/coordinator");
   await expect(
-    page.getByRole("heading", { name: "Coordinator setup", exact: true }),
+    page.getByRole("heading", { name: "Project guidance", exact: true }),
   ).toBeVisible();
   await page.getByText("Preview or copy guidance", { exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy skill" })).toBeVisible();

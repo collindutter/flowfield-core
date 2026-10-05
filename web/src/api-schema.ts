@@ -55,6 +55,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/select-directory": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Choose Directory */
+    post: operations["choose_directory_api_projects_select_directory_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/guidance": {
     parameters: {
       query?: never;
@@ -1397,6 +1414,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/{project_id}/integration/local": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Adopt Local */
+    post: operations["adopt_local_api_projects__project_id__integration_local_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/setup-validation": {
     parameters: {
       query?: never;
@@ -2349,6 +2383,11 @@ export interface components {
        */
       author: string;
     };
+    /** DirectorySelection */
+    DirectorySelection: {
+      /** Path */
+      path?: string | null;
+    };
     /** DismissNotices */
     DismissNotices: {
       /** Ids */
@@ -2870,6 +2909,11 @@ export interface components {
       purpose: "preparation" | "availability";
       /** Problem Code */
       problem_code: string | null;
+    };
+    /** LocalAdoption */
+    LocalAdoption: {
+      /** Expected Revision */
+      expected_revision: number;
     };
     /** Milestone */
     Milestone: {
@@ -4731,6 +4775,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  choose_directory_api_projects_select_directory_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DirectorySelection"];
         };
       };
     };
@@ -7960,6 +8024,41 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["IntegrationConfig"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IntegrationSettings"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  adopt_local_api_projects__project_id__integration_local_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LocalAdoption"];
       };
     };
     responses: {

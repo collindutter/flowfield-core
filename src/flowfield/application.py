@@ -488,7 +488,7 @@ class Workspace:
                     raise ApplicationError(
                         "project_conflict",
                         "Project ID is registered at another directory. "
-                        "Choose a unique --id for a new project.",
+                        "Choose a unique project ID (CLI: --id) for a new project.",
                         409,
                     )
                 if existing:

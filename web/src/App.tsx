@@ -181,6 +181,7 @@ export function App() {
         activeProjectId={projectId ?? ""}
         onProjectSelect={(project) => changeLocation(project.href)}
         onHome={() => changeLocation("/")}
+        onAddProject={() => changeLocation("/new-project")}
         footer={
           <>
             <ThemeMenu />
@@ -270,7 +271,16 @@ export function App() {
                 closeQuestion={closeQuestion}
               />
             ) : (
-              <SetupInstructions />
+              <SetupInstructions
+                added={(project) => {
+                  setProjects((items) => [
+                    ...items.filter((item) => item.id !== project.id),
+                    project,
+                  ]);
+                  setRefresh((value) => value + 1);
+                  changeLocation(projectHref(project.id));
+                }}
+              />
             )}
           </>
         }

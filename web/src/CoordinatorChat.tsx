@@ -193,7 +193,11 @@ export function CoordinatorChat({
             <WorkspaceLink to={`/projects/${projectId}/edit/coordinator`}>
               Coordinator settings
             </WorkspaceLink>{" "}
-            and select Local in Integration settings before sending.
+            and enable Use Local host in{" "}
+            <WorkspaceLink to={`/projects/${projectId}/edit/integration`}>
+              Integration settings
+            </WorkspaceLink>{" "}
+            before sending. Worker delivery can be configured later.
           </p>
         </div>
       )}

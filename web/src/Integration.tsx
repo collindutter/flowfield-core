@@ -90,8 +90,8 @@ export function IntegrationSettings({
       data-space="section"
     >
       <p>
-        Ask your coordinator to configure these settings for your project, then
-        validate them below.
+        Enable the Local environment for Coordinator Chat. Ask your coordinator
+        to help configure and validate worker delivery when you’re ready.
       </p>
       {(error || resource.error || inspection.error) && (
         <Alert variant="destructive">
@@ -100,6 +100,71 @@ export function IntegrationSettings({
           </AlertDescription>
         </Alert>
       )}
+      <DetailSection title="Execution environment">
+        <Label className="field">
+          <input
+            type="checkbox"
+            checked={local}
+            disabled={
+              busy || !resource.data || resource.data.runtime === "local"
+            }
+            onChange={(event) =>
+              setDraft({ ...fields, local: event.target.checked })
+            }
+          />
+          Use Local host
+        </Label>
+        <p>
+          Use tools, credentials and native harness configuration available to
+          the Flowfield service. Each attempt gets its own checkout and
+          temporary files. Project setup must keep databases, ports and other
+          shared resources separate, or use one worker at a time.
+        </p>
+        <p>
+          Local enables Coordinator Chat and applies to future workers, checks
+          and inspection copies. Existing attempts keep their recorded
+          environment. Native access mode is selected in Workers settings.
+        </p>
+        {!local && (
+          <p>
+            Select Local before running workers, setup checks or new result
+            copies. Historical attempts and their settings remain available.
+          </p>
+        )}
+        {resource.data?.runtime !== "local" && (
+          <Button
+            type="button"
+            size="sm"
+            disabled={!local || busy || !resource.data}
+            onClick={async () => {
+              if (!resource.data) return;
+              setBusy(true);
+              setError("");
+              try {
+                const value = await request<Settings>(path + "/local", "POST", {
+                  expected_revision: resource.data.revision,
+                });
+                resource.invalidate();
+                resource.setData({
+                  ...value,
+                  target_branch:
+                    value.target_branch ?? resource.data.target_branch,
+                });
+              } catch (failure) {
+                setError((failure as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Enable Local host
+          </Button>
+        )}
+        <p>
+          Enable Local to start planning. Configure worker delivery below when
+          you’re ready to run tasks.
+        </p>
+      </DetailSection>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -226,36 +291,6 @@ export function IntegrationSettings({
               </p>
             )}
           </ContentStack>
-          <DetailSection title="Execution environment">
-            <Label className="field">
-              <input
-                type="checkbox"
-                checked={local}
-                disabled={resource.data?.runtime === "local"}
-                onChange={(event) =>
-                  setDraft({ ...fields, local: event.target.checked })
-                }
-              />
-              Use Local host
-            </Label>
-            <p>
-              Use tools, credentials and native harness configuration available
-              to the Flowfield service. Each attempt gets its own checkout and
-              temporary files. Project setup must keep databases, ports and
-              other shared resources separate, or use one worker at a time.
-            </p>
-            <p>
-              Saving Local applies to future workers, checks and inspection
-              copies. Existing attempts keep their recorded environment. Native
-              access mode is selected in Workers settings.
-            </p>
-            {!local && (
-              <p>
-                Select Local before running workers, setup checks or new result
-                copies. Historical attempts and their settings remain available.
-              </p>
-            )}
-          </DetailSection>
           <DetailSection title="Time limits">
             <ContentStack space="section">
               <Label className="field block">

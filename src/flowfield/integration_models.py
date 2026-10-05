@@ -52,6 +52,10 @@ class IntegrationSettings(Record):
             )
 
 
+class LocalAdoption(Record):
+    expected_revision: int = Field(ge=1)
+
+
 class IntegrationConfig(Record):
     expected_revision: int = Field(ge=1)
     runtime: Literal["local"] | None = None

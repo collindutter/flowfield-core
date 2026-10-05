@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Connect your coding agent, agree on a task, and review its result.
+description: Add your project, plan in Coordinator Chat, and review your first task.
 ---
 
 Flowfield is a workspace for you and your coding agents. Plan work, run tasks in parallel,
@@ -21,7 +21,13 @@ flowfield serve
 
 Open [localhost:8765](http://127.0.0.1:8765). Keep the terminal open;
 Ctrl-C stops the service. See [Installation](/installation) for the pip alternative.
-Managed workers also need Git and an installed, signed-in Codex CLI.
+Built-in chat and managed workers need an installed, signed-in Codex CLI and the managed runtime:
+
+```sh
+flowfield harness install codex
+```
+
+Managed workers also need Git.
 
 Choose a project in the sidebar, then use **Board**, **Needs you**, **Milestones**,
 **Decisions** and **Archive** above its work. Collapse the sidebar to its project
@@ -31,33 +37,52 @@ board horizontally. Use **Coordinator** and **Work** to switch between chat and 
 
 ## Add your project
 
-In another terminal, change to an existing project's directory:
+Choose **Add project** in the sidebar, then **Choose directory**. The native folder chooser
+opens on the machine running Flowfield. Select your existing project directory and click
+**Add project**. Its name and task prefix are derived automatically; project settings let
+you adjust them. Use **Project details (optional)** to choose a name, unique ID or three-letter
+task prefix if the derived values conflict with another project.
+
+You can also register the same project from another terminal in its directory:
 
 ```sh
 flowfield project init
-flowfield project guidance preview
-flowfield project guidance install
-flowfield integration connect codex
 ```
 
-Registration adds `.flowfield/config.toml`. Guidance installation preserves existing
-instructions and adds a reference to `.agents/skills/flowfield-coordinator/SKILL.md`.
-Review the added files and commit them using your project's usual workflow before
-running workers. Flowfield adopts your project; it does not scaffold an application.
+Registration adds `.flowfield/config.toml`. Flowfield adopts your project; it does not
+create directories, initialize Git or scaffold an application. Without a desktop folder
+chooser, use the CLI option.
 
-Start a fresh Codex conversation in that directory. Ask:
+## Start planning
 
-> Use this project's Flowfield coordinator skill to read its board and give me its link.
+Open the project's settings. In **Integration**, select **Use Local host** and click
+**Enable Local host**. This uses the tools, credentials and native harness configuration
+available to the Flowfield service. You can enable it before configuring worker checks
+or a delivery branch.
 
-Check that the agent identifies the right project and returns its board link.
-See [Codex](/integrations/codex) for connection checks and troubleshooting.
+In **Coordinator**, open **Coordinator defaults**, choose your model and reasoning effort,
+and save. Close settings and choose **Start conversation** in [Coordinator Chat](/coordinator).
+Describe what you want to achieve. Chat is scoped to the selected project.
 
-For an in-browser conversation, follow [Coordinator Chat](/coordinator). External
-coordinators remain available through the project skill and MCP.
+Built-in chat supplies its own MCP connection. To plan from a standalone Codex session,
+follow [standalone coordinator setup](/integrations/codex#connect-a-standalone-coordinator)
+instead.
 
 ## Agree on work
 
-Ask your coordinator to set up worker execution for the project: choose the target
+When you’re ready to run tasks, preview and install project guidance in **Coordinator**
+settings or through the CLI:
+
+```sh
+flowfield project guidance preview
+flowfield project guidance install
+```
+
+Installation preserves existing instructions and adds a reference to
+`.agents/skills/flowfield-coordinator/SKILL.md`. Review and commit the added files under
+your project's usual rules before running workers.
+
+Ask your coordinator to help choose worker settings for the project: choose the target
 branch, dependency setup, checks and a local run command, then validate the environment.
 Choose a worker model and reasoning effort explicitly. These settings are also available
 under the settings icon beside the project name.

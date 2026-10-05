@@ -28,18 +28,16 @@ flowfield serve
 Open [localhost:8765](http://127.0.0.1:8765). The browser UI is included.
 See [Installation](https://docs.flowfield.sh/installation) for the pip alternative.
 
-From an existing project directory:
+Choose **Add project** in the sidebar and select an existing directory, or register it from a terminal:
 
 ```sh
 flowfield project init
-flowfield project guidance preview
-flowfield project guidance install
-flowfield integration connect codex
 ```
 
-Start a fresh coding conversation and ask it to read your Flowfield board.
-Managed work uses your installed, signed-in Codex CLI and an explicitly selected worker
-model. Codex is the first supported harness; further integrations are planned.
+Start planning in [Coordinator Chat](https://docs.flowfield.sh/coordinator), or connect a
+[standalone coding agent](https://docs.flowfield.sh/integrations/codex#connect-a-standalone-coordinator).
+Built-in chat and workers use your installed, signed-in Codex CLI and managed ACP runtime.
+Codex is the first supported harness; further integrations are planned.
 
 ## Documentation
 
