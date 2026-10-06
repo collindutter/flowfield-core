@@ -20,8 +20,16 @@ function ResizablePanelGroup({
   );
 }
 
-function ResizablePanel({ ...props }: ResizablePrimitive.PanelProps) {
-  return <ResizablePrimitive.Panel data-slot="resizable-panel" {...props} />;
+function ResizablePanel({ style, ...props }: ResizablePrimitive.PanelProps) {
+  // The pane's body owns scrolling. The library otherwise adds an outer auto
+  // scroller around the entire pane, including its header and composer.
+  return (
+    <ResizablePrimitive.Panel
+      data-slot="resizable-panel"
+      style={{ overflow: "hidden", ...style }}
+      {...props}
+    />
+  );
 }
 
 function ResizableHandle({

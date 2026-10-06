@@ -33,12 +33,37 @@
   gap: 8px;
   padding: 12px;
 }
-.workspace-wordmark {
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: -0.025em;
-  color: var(--foreground);
-  text-decoration: none;
+.workspace-logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: white;
+}
+.workspace-logo img {
+  display: block;
+  border-radius: inherit;
+}
+.icon-count {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--destructive);
+  color: white;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+[data-sidebar="menu-button"] {
+  position: relative;
+}
+[data-mobile="true"] .icon-count {
+  position: static;
+  margin-left: auto;
 }
 .workspace-projects {
   padding: 8px 12px;

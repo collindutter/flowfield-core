@@ -5,6 +5,11 @@ import { SetupInstructions } from "./SetupInstructions";
 import { taskTab } from "./navigation";
 import { NotificationButton, useNotifications } from "./Notifications";
 import { CoordinatorChat, type ChatDrafts } from "./CoordinatorChat";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { WorkspaceFrame } from "./WorkspaceFrame";
 import { ThemeMenu } from "./ThemeMenu";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -103,6 +108,19 @@ export function App() {
   );
   useBrowserNotifications(changeLocation);
   const projectId = params.projectId;
+  const { data: attentionCounts } = useResource<Record<string, number>>(
+    "projects/attention-counts",
+    `${refresh}:${JSON.stringify(projectRefresh)}`,
+  );
+  const connectionStatus = connected
+    ? live
+      ? "Connected"
+      : navigator.onLine
+        ? "Reconnecting…"
+        : "Disconnected"
+    : loading
+      ? "Connecting…"
+      : "Disconnected";
   useEffect(() => {
     let active = true;
     request<Project[]>("projects")
@@ -179,6 +197,7 @@ export function App() {
           id: project.id,
           name: project.name,
           href: projectHref(project.id),
+          needsYou: attentionCounts?.[project.id] ?? 0,
         }))}
         activeProjectId={projectId ?? ""}
         onProjectSelect={(project) => changeLocation(project.href)}
@@ -188,26 +207,20 @@ export function App() {
           <>
             <ThemeMenu />
             <NotificationButton />
-            <p
-              className="connection"
-              role="status"
-              title={
-                connected ? (live ? "Connected" : "Disconnected") : "Connecting"
-              }
-            >
-              <span className={live ? "live-dot" : "live-dot offline"} />
-              <span className="group-data-[collapsible=icon]:sr-only">
-                {connected
-                  ? live
-                    ? "Connected"
-                    : navigator.onLine
-                      ? "Reconnecting…"
-                      : "Disconnected"
-                  : loading
-                    ? "Connecting…"
-                    : "Disconnected"}
-              </span>
-            </p>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p
+                  className="connection"
+                  role="status"
+                  tabIndex={0}
+                  aria-label={connectionStatus}
+                >
+                  <span className={live ? "live-dot" : "live-dot offline"} />
+                  <span data-sidebar="label">{connectionStatus}</span>
+                </p>
+              </TooltipTrigger>
+              <TooltipContent side="right">{connectionStatus}</TooltipContent>
+            </Tooltip>
           </>
         }
         coordinator={
@@ -1012,7 +1025,6 @@ function ProjectBoard({
                       : "New milestone"
                     : "Project details"
               }
-              wide={selection.kind === "task"}
               suspended={!!params.overlayQuestionId}
               close={() => choose(null)}
             >

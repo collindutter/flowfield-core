@@ -38,6 +38,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/attention-counts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Project Attention Counts */
+    get: operations["project_attention_counts_api_projects_attention_counts_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/initialize": {
     parameters: {
       query?: never;
@@ -4870,6 +4887,28 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Project"][];
+        };
+      };
+    };
+  };
+  project_attention_counts_api_projects_attention_counts_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: number;
+          };
         };
       };
     };

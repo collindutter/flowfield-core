@@ -24,6 +24,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CountBadge } from "./CountBadge";
 import { ProjectBadge } from "./ProjectBadge";
 import { Plus } from "lucide-react";
 import {
@@ -33,7 +34,12 @@ import {
 } from "@/components/ui/tooltip";
 import "./workspace-frame.css";
 
-export type WorkspaceProject = { id: string; name: string; href: string };
+export type WorkspaceProject = {
+  id: string;
+  name: string;
+  href: string;
+  needsYou: number;
+};
 const compactQuery = "(max-width: 1023px)";
 function subscribeCompact(callback: () => void) {
   const query = window.matchMedia(compactQuery);
@@ -85,6 +91,7 @@ function ProjectItem({
               }}
             >
               <ProjectBadge id={project.id} name={project.name} />
+              <CountBadge count={project.needsYou} label="Needs you" />
               <span ref={text} data-sidebar="label">
                 {project.name}
               </span>
@@ -116,7 +123,7 @@ function ProjectNavigation({
   onHome?: () => void;
   onAddProject?: () => void;
 }) {
-  const { setOpenMobile, state, isMobile } = useSidebar();
+  const { setOpenMobile, isMobile } = useSidebar();
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="workspace-sidebar-header">
@@ -136,20 +143,12 @@ function ProjectNavigation({
             onHome();
             setOpenMobile(false);
           }}
-          className="workspace-wordmark group-data-[collapsible=icon]:hidden"
+          aria-label="Flowfield"
+          className="workspace-logo"
         >
-          Flowfield
+          <img src="/assets/flowfield.svg" alt="" width={32} height={32} />
         </a>
-        <SidebarTrigger
-          aria-label={
-            isMobile
-              ? "Close projects"
-              : state === "expanded"
-                ? "Collapse projects"
-                : "Expand projects"
-          }
-          aria-expanded={isMobile || state === "expanded"}
-        />
+        {isMobile && <SidebarTrigger aria-label="Close projects" />}
       </SidebarHeader>
       <SidebarContent className="group-data-[collapsible=icon]:overflow-y-auto">
         <nav aria-label="Projects" className="workspace-projects">
@@ -224,16 +223,9 @@ export function WorkspaceFrame({
     setLocation(workLocation);
     setSurface("work");
   }
-  const [sidebarOpen, setSidebarOpen] = useState(
-    () =>
-      !document.cookie
-        .split(";")
-        .some((part) => part.trim() === "sidebar_state=false"),
-  );
   return (
     <SidebarProvider
-      open={sidebarOpen}
-      onOpenChange={setSidebarOpen}
+      open={false}
       className="workspace-frame"
       style={
         {

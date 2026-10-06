@@ -647,7 +647,7 @@ test.describe("relative timestamps", () => {
   });
 });
 
-test("sidebar names disclose only clipped text and idle input opens deliberately", async ({
+test("sidebar rail names remain accessible and idle input opens deliberately", async ({
   page,
   request,
 }) => {
@@ -686,7 +686,8 @@ test("sidebar names disclose only clipped text and idle input opens deliberately
   });
   const short = sidebar.getByRole("link", { name: "Short", exact: true });
   await short.hover();
-  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await expect(page.getByRole("tooltip")).toHaveText("Short");
+  await page.keyboard.press("Escape");
   const long = sidebar.getByRole("link", { name, exact: true });
   await long.scrollIntoViewIfNeeded();
   await page.evaluate(() => new Promise(requestAnimationFrame));
@@ -702,6 +703,7 @@ test("sidebar names disclose only clipped text and idle input opens deliberately
     .getByRole("button", { name: "Open projects", exact: true })
     .click();
   await expect(long).toBeVisible();
+  await expect(long.getByLabel("Needs you: 1")).toHaveText("1");
   await long.click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("tab", { name: /^Needs you 1$/ })).toBeVisible();
@@ -809,9 +811,9 @@ test("workspace navigation, mobile board and appearance work beside the coordina
   await expect(detail).toBeVisible();
   await back.click();
   await expect(card).toBeFocused();
-  await page
-    .getByRole("button", { name: "Collapse projects", exact: true })
-    .click();
+  await expect(
+    page.getByRole("button", { name: /Collapse projects|Expand projects/ }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: /^Appearance:/ }).click();
   await page.getByRole("menuitemradio", { name: "Light", exact: true }).click();
   await expect(page.locator("html")).not.toHaveClass("dark");
@@ -830,7 +832,7 @@ test("workspace navigation, mobile board and appearance work beside the coordina
   await expect(page.locator("html")).not.toHaveClass("dark");
   await expect(
     page.getByRole("button", { name: "Expand projects", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.getByRole("button", { name: /^Appearance:/ }).click();
   await page
     .getByRole("menuitemradio", { name: "System", exact: true })
@@ -895,4 +897,62 @@ test("workspace navigation, mobile board and appearance work beside the coordina
     "aria-selected",
     "true",
   );
+});
+
+test("long task tooltips never expand the workspace scroll owners", async ({
+  page,
+  request,
+}) => {
+  await request.post("/api/projects/initialize", {
+    data: {
+      path: existingDirectory(join(state, "tooltip-overflow")),
+      task_prefix: "TOV",
+    },
+  });
+  await request.post("/api/projects/tooltip-overflow/tasks", {
+    data: {
+      title: "Long definition",
+      body: Array.from(
+        { length: 70 },
+        (_, i) => `Paragraph ${i}: a detailed outcome and its verification.\n`,
+      ).join("\n"),
+    },
+  });
+  await page.goto("/projects/tooltip-overflow/tasks/TOV-1");
+  const detail = page.getByRole("region", {
+    name: "Task details",
+    exact: true,
+  });
+  await expect(detail).toBeVisible();
+  await detail
+    .getByRole("button", { name: /Expand/ })
+    .first()
+    .click();
+  const bounds = () =>
+    page.evaluate(() =>
+      [
+        document.documentElement,
+        ...document.querySelectorAll(
+          ".workspace-pane, [data-panel], .workspace-project-view",
+        ),
+      ].map((node) => ({
+        height: node.clientHeight,
+        scroll: node.scrollHeight,
+      })),
+    );
+  const original = await bounds();
+  await expect(page.locator("[data-panel] > div").first()).toHaveCSS(
+    "overflow",
+    "hidden",
+  );
+  for (const time of await detail.locator("time").all()) {
+    await time.scrollIntoViewIfNeeded();
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await time.hover();
+    await expect(page.getByRole("tooltip")).toBeVisible();
+    expect(await bounds()).toEqual(original);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    expect(await bounds()).toEqual(original);
+  }
 });

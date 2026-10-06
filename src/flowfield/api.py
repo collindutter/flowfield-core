@@ -40,6 +40,7 @@ from flowfield.application import (
     health,
 )
 from flowfield.attachments import attachment_router
+from flowfield.attention import attention_counts
 from flowfield.browser import browser_router
 from flowfield.changes import Changes
 from flowfield.context_api import context_router
@@ -125,6 +126,14 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
     @router.get("")
     def projects(service: Service) -> list[Project]:
         return service.projects()
+
+    @router.get("/attention-counts")
+    def project_attention_counts(service: Service) -> dict[str, int]:
+        with service.connection() as db:
+            return {
+                row[0]: attention_counts(db, row[0]).get("action", 0)
+                for row in db.execute("SELECT id FROM projects ORDER BY id").fetchall()
+            }
 
     @router.post("/initialize")
     def initialize(request: ProjectSetup, service: Service) -> Project:

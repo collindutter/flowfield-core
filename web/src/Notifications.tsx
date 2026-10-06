@@ -1,3 +1,4 @@
+import { CountBadge } from "./CountBadge";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { ContentStack, DetailHeading } from "./DetailLayout";
 import { Timestamp } from "./Timestamp";
@@ -379,9 +380,7 @@ export function NotificationButton() {
       <span data-sidebar="label">
         Notifications{count ? ` (${count})` : ""}
       </span>
-      {count > 0 && (
-        <span className="hidden group-data-[collapsible=icon]:block absolute right-1 top-1 size-1.5 rounded-full bg-primary" />
-      )}
+      <CountBadge count={count} label="Notifications" />
     </SidebarMenuButton>
   );
 }
