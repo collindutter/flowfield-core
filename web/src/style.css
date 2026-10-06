@@ -749,6 +749,8 @@
     overflow: hidden;
   }
   .entity-overlay-body {
+    /* Contain absolutely positioned accessibility text within this scroller. */
+    position: relative;
     min-height: 0;
     flex: 1;
     overflow-y: auto;

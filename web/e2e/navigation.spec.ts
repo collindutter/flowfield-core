@@ -919,6 +919,20 @@ test("long task tooltips never expand the workspace scroll owners", async ({
       ).join("\n"),
     },
   });
+  const changed = await request.put(
+    "/api/projects/tooltip-overflow/tasks/TOV-1",
+    {
+      data: {
+        expected_revision: 1,
+        body: Array.from(
+          { length: 80 },
+          (_, i) =>
+            `Updated paragraph ${i}: a detailed outcome and its verification.\n`,
+        ).join("\n"),
+      },
+    },
+  );
+  expect(changed.ok()).toBe(true);
   await page.goto("/projects/tooltip-overflow/tasks/TOV-1");
   const detail = page.getByRole("region", {
     name: "Task details",
@@ -929,12 +943,17 @@ test("long task tooltips never expand the workspace scroll owners", async ({
     .getByRole("button", { name: /Expand/ })
     .first()
     .click();
+  await expect(detail.locator(".task-changes summary")).toHaveCount(2);
+  for (const summary of await detail.locator(".task-changes summary").all()) {
+    await summary.click();
+  }
+  await expect(detail.getByText("Loading changes…")).toHaveCount(0);
   const bounds = () =>
     page.evaluate(() =>
       [
         document.documentElement,
         ...document.querySelectorAll(
-          ".workspace-pane, [data-panel], .workspace-project-view",
+          ".workspace-pane, [data-panel], [data-panel] > div, .workspace-project-view",
         ),
       ].map((node) => ({
         height: node.clientHeight,
@@ -942,6 +961,7 @@ test("long task tooltips never expand the workspace scroll owners", async ({
       })),
     );
   const original = await bounds();
+  expect(original.every(({ height, scroll }) => scroll === height)).toBe(true);
   await expect(page.locator("[data-panel] > div").first()).toHaveCSS(
     "overflow",
     "hidden",
