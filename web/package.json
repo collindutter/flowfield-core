@@ -12,8 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit && eslint . && prettier --check .",
     "format": "prettier --write .",
-    "test:e2e": "playwright test && pnpm test:workspace",
-    "test:workspace": "playwright test --config playwright.workspace.config.ts"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

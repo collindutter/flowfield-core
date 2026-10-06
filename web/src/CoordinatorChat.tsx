@@ -90,6 +90,11 @@ export function CoordinatorChat({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState<boolean | undefined>();
+  const [controlsWereActive, setControlsWereActive] = useState(controlsActive);
+  if (controlsWereActive !== controlsActive) {
+    setControlsWereActive(controlsActive);
+    if (!controlsActive && settingsOpen) setSettingsOpen(false);
+  }
   const [choice, setChoice] = useState<Choice | null>(null);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [commands, setCommands] = useState<

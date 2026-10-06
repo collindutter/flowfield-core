@@ -730,6 +730,10 @@ test("single coordinator requires a saved model, labels loading and cancels dism
   await page.getByRole("tab", { name: "Work", exact: true }).click();
   await expect(model).not.toBeVisible();
   await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(model).not.toBeVisible();
+  await page
+    .getByRole("button", { name: "second · high", exact: true })
+    .click();
   await expect(model).toHaveValue("second");
   await page.keyboard.press("Escape");
   await expect(send).toBeEnabled();

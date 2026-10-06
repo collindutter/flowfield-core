@@ -194,6 +194,25 @@ def test_recovery_does_not_confuse_harness_absence_with_tool_exit(tmp_path):
     assert "does not prove" in recovered.problem
 
 
+def test_legacy_discussion_cannot_launch_a_new_process(tmp_path, monkeypatch):
+    execution = fixture(tmp_path)
+    run = execution.claim("harbor", "a" * 40, {})
+    with execution.workspace.connection(write=True) as db:
+        run.purpose = "discussion"
+        execution._save(db, run)
+
+    def unexpected_launch(*args, **kwargs):
+        raise AssertionError("A retired discussion must never launch a harness")
+
+    monkeypatch.setattr("flowfield.supervisor.CodexAgent", unexpected_launch)
+    service = Supervisor(execution.workspace)
+    asyncio.run(service._execute(run, tmp_path / "harbor"))
+    retained = execution.get("harbor", run.id)
+    assert retained.status == "failed"
+    assert retained.problem == "Continue this discussion with the coordinator."
+    assert not execution.local(run.id)
+
+
 def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch):
     """Two real worktrees, controlled harnesses, and the service's actual scheduler."""
     workers = []
@@ -222,6 +241,13 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
     monkeypatch.setattr("flowfield.supervisor.CodexAgent", ControlledWorker)
     monkeypatch.setattr("flowfield.supervisor.process_stamp", lambda pid: "fixture-process")
     execution = fixture(tmp_path, count=3, cap=2)
+    from flowfield.browser import BrowserReads
+
+    def board_statuses():
+        return {
+            task.id: task.status for task in BrowserReads(execution.workspace).board("harbor").tasks
+        }
+
     repo = tmp_path / "harbor"
     git(repo, "init", "-b", "main")
     (repo / "base.txt").write_text("base")
@@ -300,6 +326,9 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
             assert baseline(repo) == base
             by_path = {service.location("harbor", run.id).workspace: run for run in runs}
             first, second = [by_path[str(worker.cwd)] for worker in workers]
+            assert (
+                board_statuses()[first.task_id] == board_statuses()[second.task_id] == "in_progress"
+            )
 
             cap(1)
             assert not any(worker.stopping for worker in workers)
@@ -309,6 +338,8 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
             assert len(workers) == 2
             assert execution.get("harbor", second.id).status == "running"
             assert execution.get("harbor", first.id).usage.total_tokens is None
+            assert board_statuses()[first.task_id] == "in_review"
+            assert board_statuses()[second.task_id] == "in_progress"
 
             queue(False)
             workers[1].release.set()

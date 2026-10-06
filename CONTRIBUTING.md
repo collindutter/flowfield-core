@@ -52,6 +52,15 @@ under `src/flowfield/`; harness-specific behavior belongs in `src/flowfield/adap
 
 Ordinary checks use isolated disposable state and never launch live model calls.
 
+Browser journeys live in focused `web/e2e/*.spec.ts` suites and run with two workers.
+Each journey owns its project IDs, task prefixes and directories; tests must not depend
+on another test's records or order. `support.ts` shares CLI/MCP helpers and model-free
+catalog interception. Test the actual app rather than a separate mock interface.
+After building the UI, run a focused suite with
+`pnpm --dir web exec playwright test e2e/navigation.spec.ts`.
+Use `uv run pytest --durations=25` to profile backend checks before optimizing them;
+keep real Git, cleanup, concurrency and exact-approval coverage intact.
+
 ## Database changes
 
 Schema 29 is the immutable initialization baseline, captured in

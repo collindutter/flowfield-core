@@ -173,14 +173,20 @@
   }
 }
 .workspace-project-tabs {
+  display: flex;
   flex-shrink: 0;
   padding: 0 20px;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  overflow-y: hidden;
 }
 .workspace-project-tabs [role="tablist"] {
   height: 46px;
   width: max-content;
+  flex-shrink: 0;
+}
+.workspace-project-tabs [role="tab"]::after {
+  bottom: 0;
 }
 .workspace-work-content {
   flex: 1;
@@ -249,7 +255,11 @@
 .workspace-project-view {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   gap: 0;
+}
+.workspace-work-content[hidden] {
+  display: none;
 }
 .coordinator-scroll {
   flex: 1;

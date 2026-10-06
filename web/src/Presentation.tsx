@@ -27,7 +27,7 @@ export function CloseControl({
       size="icon-sm"
       variant="ghost"
       type="button"
-      className="close-control -me-2"
+      className={`close-control ${label === "Back to board" ? "-ms-2" : "-me-2"}`}
       aria-label={label}
       title={label}
       onClick={dismiss}
@@ -102,9 +102,14 @@ export function DetailHeader({
   return (
     <OverlayHeading>
       <div className="editor-heading">
-        <h2>{title}</h2>
+        {closeLabel === "Back to board" && (
+          <CloseControl label={closeLabel} close={close} />
+        )}
+        <h2 className="min-w-0 flex-1">{title}</h2>
         {actions}
-        <CloseControl label={closeLabel} close={close} />
+        {closeLabel !== "Back to board" && (
+          <CloseControl label={closeLabel} close={close} />
+        )}
       </div>
       {children}
     </OverlayHeading>

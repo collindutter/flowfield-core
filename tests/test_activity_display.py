@@ -7,7 +7,6 @@ from flowfield.adapters.activity_diff import captured_changes
 from flowfield.adapters.git_workspace import git
 from flowfield.execution_models import Usage
 from flowfield.run_activity import ActivityUpdate, RunActivity
-from flowfield.worker_context import brief_context
 
 
 def test_display_collapses_source_and_keeps_command_failure():
@@ -83,19 +82,3 @@ def test_captured_file_counts_come_from_git_trees_including_unusual_names(tmp_pa
     assert '"tab\\tname.txt": +1 / −0 lines' in summary
     assert '"binary.dat": binary change' in summary
     assert "no file changes" in captured_changes(tmp_path, after, after)
-
-
-def test_discussion_brief_keeps_question_and_sources_without_exhaustive_read_policy():
-    sections = {
-        "description": "Scope " * 1000,
-        "feedback": "Question " * 600,
-        "selected_result": "Bound result",
-        "previous_reply": "Earlier answer",
-    }
-    work, discussion = brief_context(sections), brief_context(sections, discussion=True)
-    assert len(discussion["description"]) == 1500 and len(work["description"]) == 6000
-    assert discussion["feedback"] == work["feedback"]
-    assert set(discussion["truncated_sections"]) == {"description", "feedback"}
-    assert discussion["sections"]["selected_result"] == len("Bound result")
-    assert "Read attempt_history for orientation" not in discussion["history_policy"]
-    assert "Read attempt_history for orientation" in work["history_policy"]

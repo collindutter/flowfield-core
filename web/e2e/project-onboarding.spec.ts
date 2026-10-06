@@ -119,6 +119,7 @@ test("registration conflict retains selection for a unique project ID", async ({
     .fill("PKU");
   await setup.getByRole("button", { name: "Add project", exact: true }).click();
   await expect(page).toHaveURL("/projects/picked-unique");
+  await expect(setup).not.toBeVisible();
   await page.getByRole("button", { name: "Add project", exact: true }).click();
   await expect(page).toHaveURL("/new-project");
   await expect(

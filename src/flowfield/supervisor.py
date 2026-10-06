@@ -14,7 +14,7 @@ from flowfield.adapters import git_integration as gitops
 from flowfield.adapters import local_checks
 from flowfield.adapters.acp_session import PermissionRequest
 from flowfield.adapters.codex_agent import CodexAgent, model_options
-from flowfield.adapters.git_workspace import GitWorkspace, contains, git
+from flowfield.adapters.git_workspace import GitWorkspace, contains
 from flowfield.adapters.historical_workspace import HistoricalWorkspace
 from flowfield.adapters.local_execution import LocalAttempt, LocalHost
 from flowfield.agent_models import AgentChoice
@@ -229,6 +229,10 @@ class Supervisor:
         input_checkpoint: str | None = None
         starting_commit = run.input_base_commit or run.base_commit
         try:
+            if run.purpose != "work":
+                raise ApplicationError(
+                    "discussion_retired", "Continue this discussion with the coordinator.", 409
+                )
             if run.runtime != "local":
                 raise ApplicationError(
                     "retired_runtime",
@@ -284,7 +288,7 @@ class Supervisor:
                 if run.agent_settings
                 else AgentChoice(model=run.model, effort=run.effort)
             )
-            applied_agent = await client.configure(choice, read_only=run.purpose == "discussion")
+            applied_agent = await client.configure(choice)
             if getattr(client, "supports_activity", False):
                 activity = ActivityRecorder(self.workspace, run.project_id, run.id)
                 client.on_activity = activity.emit
@@ -331,7 +335,7 @@ class Supervisor:
                 "decision_sequence": run.decision_sequence,
                 "completion": run.completion,
                 "target_branch": run.target_branch,
-                **brief_context(sections, discussion=run.purpose == "discussion"),
+                **brief_context(sections),
                 "instructions": (
                     "Read complete description/feedback pages when listed as truncated. "
                     "Read input, previous_reply, correction and validation when present. "
@@ -379,33 +383,14 @@ class Supervisor:
                     "report-only findings finish when delivered with an unchanged repository tree."
                 ),
             }
-            if run.purpose == "discussion":
-                brief["instructions"] = (
-                    "You are a service-managed worker answering a task conversation message. "
-                    "Read repository instructions at the checkout root and keep the worker role. "
-                    "Do not adopt coordinator responsibilities or invoke the Flowfield CLI. "
-                    "This is a read-only discussion, not "
-                    "authorization to change code, plans, approval or task completion. Read the "
-                    "full current question in feedback. Use the brief's context policy to retrieve "
-                    "only the evidence needed to answer it. Start with selected_result for a "
-                    "result question or previous_reply for a follow-up. Read full descriptions, "
-                    "answers/decisions and repository files when the answer depends on them. "
-                    "Do not perform an exhaustive review for a simple clarification. Lead with "
-                    "the answer, support it concisely and state uncertainty. Do not modify files "
-                    "or run setup/install/test commands. If asked for changes, explain that the "
-                    "human can use Request changes. Report uncertainty and questions in your "
-                    "reply. Use submit_result with summary as your answer, checks describing only "
-                    "what you actually inspected, and outcome complete for this reply only."
-                )
-            else:
-                brief["instructions"] += (
-                    " Feedback is bound to the preceding result. Explicit human reports of trying "
-                    "that version are human-reported evidence, not tests you "
-                    "executed. Use relevant "
-                    "human confirmation to resolve manual-test limitations; do not simply repeat "
-                    "an unavailable interactive test. Reassess the whole agreed outcome and retain "
-                    "other unfinished requirements. Human test evidence is never code approval."
-                )
+            brief["instructions"] += (
+                " Feedback is bound to the preceding result. Explicit human reports of trying "
+                "that version are human-reported evidence, not tests you "
+                "executed. Use relevant "
+                "human confirmation to resolve manual-test limitations; do not simply repeat "
+                "an unavailable interactive test. Reassess the whole agreed outcome and retain "
+                "other unfinished requirements. Human test evidence is never code approval."
+            )
             brief["flowfield_connection"] = server.name
             brief["instructions"] = (
                 f"Use only the {server.name} MCP connection for Flowfield operations; "
@@ -439,7 +424,7 @@ class Supervisor:
 
                     outcome = await client.prompt(
                         json.dumps(brief, ensure_ascii=False),
-                        None if run.purpose == "discussion" else request_permission,
+                        request_permission,
                         attachments=Attachments(self.workspace).inputs(
                             run.project_id,
                             run.task_id,
@@ -480,15 +465,6 @@ class Supervisor:
                 result = bridge.result
                 commit, ignored = await asyncio.to_thread(environment.snapshot, starting_commit)
                 assert commit
-                if run.purpose == "discussion" and await asyncio.to_thread(
-                    git, environment.checkout, "rev-parse", commit + "^{tree}"
-                ) != await asyncio.to_thread(
-                    git, environment.checkout, "rev-parse", starting_commit + "^{tree}"
-                ):
-                    raise ApplicationError(
-                        "discussion_changed_code",
-                        "This reply changed files. Changes are preserved but cannot be delivered.",
-                    )
                 # Generated-file evidence belongs to execution diagnostics, not user limitations.
                 self.execution.excluded_files(run.project_id, run.id, ignored)
                 terminal = "in_review"

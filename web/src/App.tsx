@@ -532,6 +532,22 @@ function ProjectBoard({
         : archive
           ? "archive"
           : "board";
+  function openView(value: string) {
+    navigate(() =>
+      changeLocation(
+        projectHref(projectId) + (value === "board" ? "" : "/" + value),
+      ),
+    );
+  }
+  function viewTrigger(value: string) {
+    return {
+      value,
+      // Radix does not emit a value change for the already selected tab.
+      onClick: () => {
+        if (taskRef && value === view) openView(value);
+      },
+    };
+  }
   const editorPanel = (
     <>
       {selection?.id &&
@@ -632,24 +648,19 @@ function ProjectBoard({
       </header>
       <Tabs
         className="workspace-project-view"
-        hidden={!!taskRef}
         activationMode="manual"
         value={view}
-        onValueChange={(value) =>
-          changeLocation(
-            projectHref(projectId) + (value === "board" ? "" : "/" + value),
-          )
-        }
+        onValueChange={openView}
       >
         <div className="workspace-project-tabs">
           <TabsList variant="line" aria-label="Project views">
-            <TabsTrigger value="board">
+            <TabsTrigger {...viewTrigger("board")}>
               <Columns3 /> Board
               {activeTasks.length > 0 && (
                 <span className="nav-count">{activeTasks.length}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="inbox">
+            <TabsTrigger {...viewTrigger("inbox")}>
               <Inbox /> Needs you
               {board.needs_you_count > 0 && (
                 <span className="nav-count needs-attention">
@@ -657,16 +668,16 @@ function ProjectBoard({
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="milestones">
+            <TabsTrigger {...viewTrigger("milestones")}>
               <Flag /> Milestones
               {board.milestones.length > 0 && (
                 <span className="nav-count">{board.milestones.length}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="decisions">
+            <TabsTrigger {...viewTrigger("decisions")}>
               <ListChecks /> Decisions
             </TabsTrigger>
-            <TabsTrigger value="archive">
+            <TabsTrigger {...viewTrigger("archive")}>
               <Archive /> Archive
               {board.tasks.length > activeTasks.length && (
                 <span className="nav-count">
@@ -676,7 +687,11 @@ function ProjectBoard({
             </TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value={view} className="workspace-work-content">
+        <TabsContent
+          value={view}
+          className="workspace-work-content"
+          hidden={!!taskRef}
+        >
           <div className="board-toolbar">
             {decisionsView && (
               <Button
@@ -978,47 +993,47 @@ function ProjectBoard({
             </ContentStack>
           )}
         </TabsContent>
-      </Tabs>
-      {selection?.kind === "task" && selection.id ? (
-        <EntityPane identity={selection.id} close={() => choose(null)}>
-          {editorPanel}
-        </EntityPane>
-      ) : (
-        selection && (
-          <EntityOverlay
-            identity={`${selection.kind}:${selection.id ?? "new"}`}
-            title={
-              selection.kind === "task"
-                ? selection.id
-                  ? "Task details"
-                  : "New task"
-                : selection.kind === "milestone"
+        {selection?.kind === "task" && selection.id ? (
+          <EntityPane identity={selection.id} close={() => choose(null)}>
+            {editorPanel}
+          </EntityPane>
+        ) : (
+          selection && (
+            <EntityOverlay
+              identity={`${selection.kind}:${selection.id ?? "new"}`}
+              title={
+                selection.kind === "task"
                   ? selection.id
-                    ? "Milestone details"
-                    : "New milestone"
-                  : "Project details"
-            }
-            wide={selection.kind === "task"}
-            suspended={!!params.overlayQuestionId}
-            close={() => choose(null)}
-          >
-            {selection.kind === "milestone" ? (
-              incoming ? (
-                <MilestoneDetail
-                  milestone={incoming as Milestone}
-                  close={() => choose(null)}
-                >
-                  {editorPanel}
-                </MilestoneDetail>
+                    ? "Task details"
+                    : "New task"
+                  : selection.kind === "milestone"
+                    ? selection.id
+                      ? "Milestone details"
+                      : "New milestone"
+                    : "Project details"
+              }
+              wide={selection.kind === "task"}
+              suspended={!!params.overlayQuestionId}
+              close={() => choose(null)}
+            >
+              {selection.kind === "milestone" ? (
+                incoming ? (
+                  <MilestoneDetail
+                    milestone={incoming as Milestone}
+                    close={() => choose(null)}
+                  >
+                    {editorPanel}
+                  </MilestoneDetail>
+                ) : (
+                  editorPanel
+                )
               ) : (
                 editorPanel
-              )
-            ) : (
-              editorPanel
-            )}
-          </EntityOverlay>
-        )
-      )}
+              )}
+            </EntityOverlay>
+          )
+        )}
+      </Tabs>
       {params.decisionId && (
         <EntityOverlay
           title={params.decisionId === "new" ? "New decision" : "Decision"}

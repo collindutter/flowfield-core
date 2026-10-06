@@ -782,9 +782,6 @@
     min-width: 0;
     overflow: hidden;
   }
-  .workspace-project-view[hidden] {
-    display: none;
-  }
   .entity-overlay-body {
     min-height: 0;
     flex: 1;

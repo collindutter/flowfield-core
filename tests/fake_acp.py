@@ -140,7 +140,7 @@ async def main():
                 else:
                     assert control["task"].endswith(": Task 1")
                     Path("apps/web/price.mjs").write_text("export const value = 2;\n")
-            elif scenario != "discussion":
+            else:
                 Path("result.txt").write_text(os.environ["FLOWFIELD_RUN_ID"])
             control = {
                 "mode": scenario,

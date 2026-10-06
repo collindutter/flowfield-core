@@ -143,33 +143,29 @@ def attempt_source(
     return str(row[0])
 
 
-def brief_context(sections: dict[str, str], *, discussion: bool = False) -> dict[str, object]:
+def brief_context(sections: dict[str, str]) -> dict[str, object]:
     """Fixed prompt envelope; long essentials stay mandatory paged reads, not silent truncation."""
-    limits = {"description": 1500 if discussion else 6000, "feedback": 4000}
+    limits = {"description": 6000, "feedback": 4000}
     # Small essentials previously required separate tool reads.
     # Include only complete sections within one fixed envelope; long material keeps
-    # its existing explicit page path. Discussion starts with the selected result.
+    # its existing explicit page path.
     candidates = (
-        ("selected_result", "previous_reply", "input", "earlier_answers", "human_testing")
-        if discussion
-        else (
-            "input",
-            "earlier_answers",
-            "correction",
-            "decisions",
-            "project",
-            "milestone",
-            "stages",
-            "validation",
-            "human_testing",
-            "previous_reply",
-            "prerequisites",
-            "handoff",
-            "questions",
-            "predecessor",
-            "attempt_history",
-            "prior_concerns",
-        )
+        "input",
+        "earlier_answers",
+        "correction",
+        "decisions",
+        "project",
+        "milestone",
+        "stages",
+        "validation",
+        "human_testing",
+        "previous_reply",
+        "prerequisites",
+        "handoff",
+        "questions",
+        "predecessor",
+        "attempt_history",
+        "prior_concerns",
     )
     context: dict[str, str] = {}
     for key in candidates:
@@ -189,15 +185,8 @@ def brief_context(sections: dict[str, str], *, discussion: bool = False) -> dict
         ),
         "sections": {key: len(value) for key, value in sections.items()},
         "truncated_sections": [key for key, limit in limits.items() if len(sections[key]) > limit],
-        "history_policy": (
-            "Start with the current question in feedback. Read full feedback if truncated. "
-            "Retrieve selected_result or previous_reply when the question refers to them; "
-            "read additional context/source only to resolve relevant uncertainty. "
-            "Earlier answers/decisions remain constraints when relevant; history is not authority. "
-            "Do not perform an exhaustive project review for a simple clarification."
-        )
-        if discussion
-        else "Read human_testing for exact-result observations; verify successor code separately. "
+        "history_policy": "Read human_testing for exact-result observations; "
+        "verify successor code separately. "
         "Read attempt_history for orientation; exchange_history holds originals. "
         "Read attempt_sources for report IDs; read_context section attempt:<id> retrieves them. "
         "Earlier_answers remain constraints unless the current agreement explicitly resolves them. "

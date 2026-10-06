@@ -265,11 +265,6 @@ def test_brief_includes_complete_small_essentials_and_pages_large_constraints():
     assert brief["sections"]["decisions"] == len(sections["decisions"])
     assert len(json.dumps(brief["context"])) <= 10000
     assert sections == before  # Full omitted constraints remain in the frozen source.
-    discussion = brief_context(
-        {**sections, "selected_result": '{"summary":"Exact candidate"}'}, discussion=True
-    )
-    assert discussion["context"]["selected_result"] == '{"summary":"Exact candidate"}'
-    assert "stages" not in discussion["context"]
 
 
 def test_worker_reads_only_frozen_report_sources_and_stage_updates_are_scoped(tmp_path):
