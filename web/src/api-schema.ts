@@ -1310,6 +1310,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/{project_id}/coordinator/commands/discover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Commands */
+    post: operations["commands_api_projects__project_id__coordinator_commands_discover_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/coordinator/messages": {
     parameters: {
       query?: never;
@@ -2106,6 +2123,17 @@ export interface components {
       effort: string;
       /** Mode */
       mode: string | null;
+    };
+    /** AgentCommand */
+    AgentCommand: {
+      /** Name */
+      name: string;
+      /** Description */
+      description: string;
+      /** Input Hint */
+      input_hint: string | null;
+      /** Unavailable Reason */
+      unavailable_reason: string | null;
     };
     /** AgentSettingsEdit */
     AgentSettingsEdit: {
@@ -7691,6 +7719,7 @@ export interface operations {
     parameters: {
       query?: {
         task_id?: string | null;
+        role?: ("worker" | "coordinator") | null;
         before?: number | null;
         limit?: number;
       };
@@ -7843,6 +7872,39 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["CoordinatorConversation"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  commands_api_projects__project_id__coordinator_commands_discover_post: {
+    parameters: {
+      query?: {
+        refresh?: boolean;
+      };
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentCommand"][];
         };
       };
       /** @description Validation Error */

@@ -24,10 +24,11 @@ from acp.schema import (
     TextContentBlock,
     ToolCallUpdate,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from flowfield.adapters.acp_transport import MAX_FRAME, StdioTransport
 from flowfield.adapters.local_process import LocalLaunchCancelled, LocalProcess
+from flowfield.agent_models import AgentCommand
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,9 @@ class AcpSession:
         self._spawn_lock = asyncio.Lock()
         self._close_task: asyncio.Task[StopReceipt] | None = None
         self._event_failed = False
+        self.commands: list[AgentCommand] = []
+        self.commands_received = asyncio.Event()
+        self._early_commands: tuple[str, list[AgentCommand]] | None = None
 
     async def start(
         self,
@@ -180,6 +184,10 @@ class AcpSession:
             if self.state != "starting":
                 raise RuntimeError("Agent session stopped during startup")
             self.state = "ready"
+            if self._early_commands and self._early_commands[0] == self.session_id:
+                self.commands = self._early_commands[1]
+                self.commands_received.set()
+            self._early_commands = None
         except BaseException:
             self.state = "interrupted"
             await self.close()
@@ -260,10 +268,45 @@ class AcpSession:
                 await task
 
     async def session_update(self, session_id: str, update: BaseModel, **kwargs: Any) -> None:
-        if session_id != self.session_id or self.state not in {"starting", "running"}:
-            return
         data = update.model_dump(by_alias=True, exclude_none=True)
         kind = data.pop("sessionUpdate", "")
+        if kind == "available_commands_update" and self.state in {
+            "starting",
+            "ready",
+            "configuring",
+            "running",
+        }:
+            if session_id != self.session_id and not (
+                self.state == "starting" and self.session_id is None
+            ):
+                return
+            commands = []
+            seen = set()
+            for item in data.get("availableCommands", [])[:128]:
+                try:
+                    command = AgentCommand(
+                        name=item["name"],
+                        description=item["description"][:1000],
+                        input_hint=(item.get("input") or {}).get("hint", "")[:200] or None,
+                    )
+                except (ValidationError, KeyError, TypeError):
+                    continue
+                if command.name not in seen:
+                    commands.append(command)
+                    seen.add(command.name)
+            if self.session_id is None:
+                self._early_commands = (session_id, commands)
+            else:
+                self.commands = commands
+                self.commands_received.set()
+            return
+        if session_id != self.session_id or self.state not in {
+            "starting",
+            "ready",
+            "configuring",
+            "running",
+        }:
+            return
         # Publish only allowlisted activity facts; never private reasoning or arbitrary payloads.
         if kind == "agent_message_chunk" and self.state == "running":
             content = data.get("content", {})

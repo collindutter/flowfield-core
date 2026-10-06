@@ -90,14 +90,16 @@ export function PermissionControl({
 export function AgentPermissions({
   projectId,
   taskId,
+  role,
   refresh,
 }: {
   projectId: string;
   taskId?: string;
+  role?: "worker" | "coordinator";
   refresh: unknown;
 }) {
   const [retry, setRetry] = useState(0);
-  const path = `projects/${projectId}/permissions?retry=${retry}${taskId ? `&task_id=${encodeURIComponent(taskId)}` : ""}`;
+  const path = `projects/${projectId}/permissions?retry=${retry}${taskId ? `&task_id=${encodeURIComponent(taskId)}` : ""}${role ? `&role=${role}` : ""}`;
   const page = usePage<components["schemas"]["PermissionPage"]>(path, refresh);
   const items = page.data?.items ?? [];
   const pending = page.data?.pending ?? [];

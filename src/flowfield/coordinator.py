@@ -9,14 +9,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from flowfield.activity_text import retain
+from flowfield.adapters.acp_session import PermissionRequest
 from flowfield.adapters.agent_mcp import serve_scope
-from flowfield.adapters.codex_agent import CodexAgent
+from flowfield.adapters.codex_agent import CodexAgent, command_options
 from flowfield.adapters.local_execution import LocalHost
+from flowfield.agent_models import AgentCommand
+from flowfield.agent_settings import AgentSettings
 from flowfield.agent_tools import coordinator_scope
 from flowfield.attachments import Attachments
 from flowfield.coordinator_models import CoordinatorSend, CoordinatorTurn
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
+from flowfield.permission_models import PermissionOption
 from flowfield.reads import size
 from flowfield.run_activity import ActivityRecorder, ActivityUpdate
 
@@ -31,8 +35,11 @@ messages. Follow full-text and pagination links before editing, and read current
 before every consequential write.
 Use only the named scoped MCP connection for Flowfield operations. Do not use ambient
 Flowfield connections, CLI or database files. Project identity is already bound to these tools.
-Read repository files as needed; do not edit code, run setup, install tools, launch workers or
-change Git state. Native filesystem access is read-only and escalation is unavailable.
+Use the host's tools under the selected native access mode. You may perform explicitly
+requested initial project or environment setup directly, including configuration and dependencies.
+Preserve existing files and dirty work; check active workers before changing shared resources.
+Use managed tasks for agreed implementation work rather than editing their code in the project
+checkout. Never modify worker worktrees or launch workers outside Flowfield's scheduler.
 Capture agreed work in existing tasks when possible. Brainstorming is not authorization.
 Task descriptions explain the desired outcome and completion conditions. Milestones group
 tasks; only tasks have dependencies. Read current decisions and prepare assignments with
@@ -54,6 +61,43 @@ class Coordinator:
         self.jobs: dict[str, asyncio.Task[None]] = {}
         self.finishing: set[str] = set()
         self.closing = False
+        self.command_jobs: dict[str, tuple[float, str, asyncio.Task[list[AgentCommand]]]] = {}
+
+    async def commands(self, project: str, *, refresh: bool = False) -> list[AgentCommand]:
+        if self.closing:
+            raise ApplicationError("service_stopping", "The service is stopping.", 409)
+        workspace = self.supervisor.workspace
+        cwd = workspace.project(project).path
+        settings = AgentSettings(workspace).get(project, "coordinator")
+        if not settings.effective:
+            raise ApplicationError(
+                "coordinator_settings", "Choose coordinator settings first.", 409
+            )
+        choice = settings.effective.choice
+        signature = cwd + choice.model_dump_json()
+        clock = asyncio.get_running_loop().time()
+        cached = self.command_jobs.get(project)
+        if cached and not cached[2].done():
+            if cached[1] != signature:
+                raise ApplicationError(
+                    "commands_loading", "Settings changed; reload commands shortly.", 409
+                )
+            return await asyncio.shield(cached[2])
+        if cached and not refresh and clock - cached[0] < 300 and cached[1] == signature:
+            if not cached[2].cancelled() and cached[2].exception() is None:
+                return cached[2].result()
+        if sum(not job.done() for _, _, job in self.command_jobs.values()) >= 4:
+            raise ApplicationError(
+                "commands_busy", "Command discovery is busy. Try again shortly.", 409
+            )
+        for key in list(self.command_jobs):
+            if len(self.command_jobs) < 64:
+                break
+            if self.command_jobs[key][2].done():
+                del self.command_jobs[key]
+        job = asyncio.create_task(command_options(workspace.directory, Path(cwd), choice))
+        self.command_jobs[project] = (clock, signature, job)
+        return await asyncio.shield(job)
 
     def send(self, project: str, conversation: str, request: CoordinatorSend) -> CoordinatorTurn:
         if self.closing or self.supervisor.closing:
@@ -151,11 +195,14 @@ class Coordinator:
                         current.native_started = True
                         self.store._save(db, current)
                     await client.start([server], resume=session_id, persistent=True)
-                    applied = await client.configure(turn.settings.choice, read_only=True)
+                    applied = await client.configure(turn.settings.choice)
                     attachments = Attachments(workspace).inputs(turn.project_id, None, turn.text)
                     # Reject unsupported input before saving a new session identity:
                     # native history is only materialized by its first prompt.
                     client.validate_attachments(attachments)
+                    native_command = await client.command_prompt(
+                        turn.text, has_history=session_id is not None, attachments=attachments
+                    )
                     assert client.session.session_id
                     with workspace.connection(write=True, project_id=turn.project_id) as db:
                         current = self.store._get(db, turn.project_id, turn.id)
@@ -165,22 +212,29 @@ class Coordinator:
                         current.status = "running"
                         current.session = "resumed" if session_id else "new"
                         current.applied = turn.settings.model_copy(update={"choice": applied})
-                        db.execute(
-                            "INSERT INTO coordinator_sessions VALUES (?,?,?,?) "
-                            "ON CONFLICT(project_id) DO NOTHING",
-                            (
-                                turn.project_id,
-                                turn.settings.choice.harness,
-                                client.session.session_id,
-                                project.path,
-                            ),
-                        )
+                        if not native_command:
+                            db.execute(
+                                "INSERT INTO coordinator_sessions VALUES (?,?,?,?) "
+                                "ON CONFLICT(project_id) DO NOTHING",
+                                (
+                                    turn.project_id,
+                                    turn.settings.choice.harness,
+                                    client.session.session_id,
+                                    project.path,
+                                ),
+                            )
                         self.store._save(db, current)
-                    prompt = self._prompt(turn, server.name, resumed=session_id is not None)
-                    handoff = json.loads(prompt).get("recent_conversation", [])
+                    prompt = native_command or self._prompt(
+                        turn, server.name, resumed=session_id is not None
+                    )
+                    handoff = (
+                        [] if native_command else json.loads(prompt).get("recent_conversation", [])
+                    )
                     session_note = (
                         "Agent session resumed with native conversation history."
                         if session_id
+                        else "Checking Codex without starting a conversation."
+                        if native_command
                         else "New agent session started."
                     )
                     if handoff:
@@ -197,11 +251,24 @@ class Coordinator:
                         session_id=client.session.session_id,
                         turn_id=turn.id,
                         conversation_id=turn.conversation_id,
-                    ):
-                        # Read-only coordination cannot authorize native escalation.
+                    ) as permission_turn:
+
+                        async def request_permission(request: PermissionRequest) -> str | None:
+                            return await permission_turn.request(
+                                request.tool_id,
+                                request.title,
+                                [
+                                    PermissionOption.model_validate(
+                                        {"id": i, "label": label, "kind": kind}
+                                    )
+                                    for i, label, kind in request.options
+                                ],
+                                details=request.details,
+                            )
+
                         outcome = await client.prompt(
                             prompt,
-                            None,
+                            request_permission,
                             attachments=attachments,
                         )
                     status = "completed" if outcome.get("status") == "completed" else "failed"
@@ -280,6 +347,13 @@ class Coordinator:
 
     async def close(self) -> None:
         self.closing = True
+        for _, _, job in self.command_jobs.values():
+            if not job.done():
+                job.cancel()
+        await asyncio.gather(
+            *(job for _, _, job in self.command_jobs.values()), return_exceptions=True
+        )
+        self.command_jobs.clear()
         for identity in list(self.jobs):
             with self.supervisor.workspace.connection() as db:
                 row = db.execute(

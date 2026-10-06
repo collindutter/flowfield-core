@@ -7,6 +7,7 @@ import { Timestamp } from "./Timestamp";
 import { AgentSettingsControl } from "./AgentSettings";
 import { Composer } from "./Composer";
 import { ContextRing } from "./ContextRing";
+import { AgentPermissions } from "./AgentPermissions";
 import { ActivityEntries } from "./RunActivity";
 import { useFeedScroll } from "./useFeedScroll";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,59 @@ export function CoordinatorChat({
   const [settingsOpen, setSettingsOpen] = useState<boolean | undefined>();
   const [choice, setChoice] = useState<Choice | null>(null);
   const [settingsDirty, setSettingsDirty] = useState(false);
+  const [commands, setCommands] = useState<
+    components["schemas"]["AgentCommand"][]
+  >([]);
+  const [commandsLoading, setCommandsLoading] = useState(false);
+  const [commandsError, setCommandsError] = useState("");
+  const commandsPending = useRef(false);
+  const commandsGeneration = useRef({ value: 0 });
+  const commandChoice = JSON.stringify(choice);
+  useEffect(() => {
+    commandsPending.current = false;
+    const generation = commandsGeneration.current;
+    return () => {
+      generation.value++;
+    };
+  }, [base, commandChoice]);
+  const loadCommands = useCallback(
+    async (reload = false) => {
+      if (commandsPending.current) return;
+      if (commandChoice === "null") {
+        setCommands([]);
+        setCommandsLoading(false);
+        setCommandsError("Choose model, effort and access mode first.");
+        return;
+      }
+      commandsPending.current = true;
+      const generation = commandsGeneration.current.value;
+      setCommands([]);
+      setCommandsLoading(true);
+      setCommandsError("");
+      try {
+        const discovered = await request<
+          components["schemas"]["AgentCommand"][]
+        >(
+          `${base}/commands/discover?refresh=${reload}`,
+          "POST",
+          undefined,
+          undefined,
+          90000,
+        );
+        if (generation === commandsGeneration.current.value)
+          setCommands(discovered);
+      } catch (e) {
+        if (generation === commandsGeneration.current.value)
+          setCommandsError((e as Error).message);
+      } finally {
+        if (generation === commandsGeneration.current.value) {
+          commandsPending.current = false;
+          setCommandsLoading(false);
+        }
+      }
+    },
+    [base, commandChoice],
+  );
   const dirty = useCallback(
     (value: boolean) => {
       setSettingsDirty(value);
@@ -226,6 +280,11 @@ export function CoordinatorChat({
               </div>
             </article>
           ))}
+          <AgentPermissions
+            projectId={projectId}
+            role="coordinator"
+            refresh={`${refresh}:${tick}`}
+          />
         </div>
       </div>
       <div className="coordinator-composer content-stack">
@@ -282,6 +341,12 @@ export function CoordinatorChat({
         )}
         <Composer
           projectId={projectId}
+          nativeCommands={{
+            items: commands,
+            loading: commandsLoading,
+            error: commandsError,
+            load: loadCommands,
+          }}
           active={controlsActive}
           value={draft.text}
           onChange={update}

@@ -50,6 +50,7 @@ export function Composer({
   onBusy,
   onModel,
   onStop,
+  nativeCommands,
   inputRef,
   collapsed = false,
   draftKey,
@@ -69,6 +70,12 @@ export function Composer({
   onBusy: (busy: boolean) => void;
   onModel?: () => void;
   onStop?: () => void;
+  nativeCommands?: {
+    items: components["schemas"]["AgentCommand"][];
+    loading: boolean;
+    error: string;
+    load: (refresh?: boolean) => void;
+  };
   inputRef?: Ref<HTMLTextAreaElement>;
   collapsed?: boolean;
   draftKey?: string;
@@ -91,13 +98,27 @@ export function Composer({
   const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const menu =
-    active && !collapsed && focused && !dismissed && /^\/[a-z]*$/i.test(text);
+    active &&
+    !collapsed &&
+    focused &&
+    !dismissed &&
+    /^\/(?:[a-z]*|codex [a-z0-9_.$-]*)$/i.test(text);
+  const nativeLoad = nativeCommands?.load;
+  useEffect(() => {
+    if (menu) nativeLoad?.();
+  }, [menu, nativeLoad]);
+  const nativeQuery = text.startsWith("/codex") ? text.slice(7) : text.slice(1);
+  const agentCommands = (nativeCommands?.items ?? []).filter((item) =>
+    item.name.startsWith(nativeQuery),
+  );
   const actions = [
     {
       name: "attach",
       detail: "Add a file or image",
     },
-    ...(onModel ? [{ name: "model", detail: "Choose model and effort" }] : []),
+    ...(onModel
+      ? [{ name: "model", detail: "Choose model, effort and access" }]
+      : []),
     ...(onStop ? [{ name: "stop", detail: "Stop the current turn" }] : []),
   ].filter((item) => item.name.startsWith(text.slice(1).toLowerCase()));
   useEffect(() => {
@@ -345,29 +366,81 @@ export function Composer({
               onFocusOutside={(event) => event.preventDefault()}
             >
               <Command.List aria-label="Composer commands">
-                {!actions.length && (
+                {!actions.length && !nativeCommands && (
                   <p className="detail-metadata">
                     No composer command. Esc to keep writing.
                   </p>
                 )}
-                {actions.map((item) => (
-                  <Command.Item
-                    key={item.name}
-                    value={item.name}
-                    onSelect={() => {
-                      change("");
-                      setDismissed(true);
-                      if (item.name === "attach") picker.current?.click();
-                      else if (item.name === "model") onModel?.();
-                      else onStop?.();
-                    }}
-                    onMouseDown={(event) => event.preventDefault()}
-                  >
-                    <Slash size={14} />
-                    <span>/{item.name}</span>
-                    <span className="detail-metadata">{item.detail}</span>
-                  </Command.Item>
-                ))}
+                {!!actions.length && (
+                  <Command.Group heading="Flowfield">
+                    {actions.map((item) => (
+                      <Command.Item
+                        key={item.name}
+                        value={`flowfield:${item.name}`}
+                        onSelect={() => {
+                          change("");
+                          setDismissed(true);
+                          if (item.name === "attach") picker.current?.click();
+                          else if (item.name === "model") onModel?.();
+                          else onStop?.();
+                        }}
+                        onMouseDown={(event) => event.preventDefault()}
+                      >
+                        <Slash size={14} />
+                        <span>/{item.name}</span>
+                        <span className="detail-metadata">{item.detail}</span>
+                      </Command.Item>
+                    ))}
+                  </Command.Group>
+                )}
+                {nativeCommands && (
+                  <Command.Group heading="Codex">
+                    {nativeCommands.loading ? (
+                      <p className="detail-metadata" role="status">
+                        Loading commands…
+                      </p>
+                    ) : nativeCommands.error ? (
+                      <p className="detail-metadata" role="status">
+                        {nativeCommands.error}
+                      </p>
+                    ) : !agentCommands.length ? (
+                      <p className="detail-metadata">
+                        No matching Codex commands.
+                      </p>
+                    ) : null}
+                    {!nativeCommands.loading &&
+                      !nativeCommands.error &&
+                      agentCommands.map((item) => (
+                        <Command.Item
+                          key={item.name}
+                          value={`codex:${item.name}`}
+                          disabled={!!item.unavailable_reason || disabled}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onSelect={() => {
+                            change(`/codex ${item.name} `);
+                            setDismissed(true);
+                          }}
+                        >
+                          <Slash size={14} />
+                          <span>/codex {item.name}</span>
+                          <span className="detail-metadata">
+                            {item.unavailable_reason ?? item.description}
+                            {!item.unavailable_reason && item.input_hint
+                              ? ` · ${item.input_hint}`
+                              : ""}
+                          </span>
+                        </Command.Item>
+                      ))}
+                    <Command.Item
+                      value="reload-codex-commands"
+                      disabled={nativeCommands.loading}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onSelect={() => nativeCommands.load(true)}
+                    >
+                      Reload Codex commands
+                    </Command.Item>
+                  </Command.Group>
+                )}
               </Command.List>
             </Popover.Content>
           </Popover.Portal>

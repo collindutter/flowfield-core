@@ -145,6 +145,15 @@ def coordinator_sessions(db: sqlite3.Connection) -> None:
     )
 
 
+def coordinator_access_modes(db: sqlite3.Connection) -> None:
+    # Mutable choices inherit the old restriction; historical attempts remain exact.
+    db.execute(
+        "UPDATE agent_settings SET selection=json_set(selection,'$.mode','read-only'), "
+        "revision=revision+1 WHERE role='coordinator' AND selection IS NOT NULL "
+        "AND (json_type(selection,'$.mode') IS NULL OR json_type(selection,'$.mode')='null')"
+    )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
@@ -154,6 +163,7 @@ MIGRATIONS = (
     Migration(35, project_coordinator_and_local_default),
     Migration(36, message_attachments),
     Migration(37, coordinator_sessions),
+    Migration(38, coordinator_access_modes),
 )
 
 

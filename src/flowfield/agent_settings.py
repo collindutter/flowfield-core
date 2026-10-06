@@ -80,11 +80,10 @@ class AgentSettings:
     def edit(
         self, project: str, role: AgentRole, request: AgentSettingsEdit, scope: str = ""
     ) -> AgentSettingsView:
-        if role == "coordinator" and request.selection and request.selection.mode is not None:
-            raise ApplicationError(
-                "coordinator_read_only",
-                "Coordinator Chat requires read-only filesystem access.",
-                409,
+        if role == "coordinator" and request.selection and request.selection.mode is None:
+            # Old clients selected only model/effort. Preserve their existing access.
+            request = request.model_copy(
+                update={"selection": request.selection.model_copy(update={"mode": "read-only"})}
             )
         if role == "worker" and not scope:
             raise ApplicationError(

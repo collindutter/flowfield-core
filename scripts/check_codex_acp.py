@@ -138,11 +138,16 @@ async def probe(
         try:
             await client.select("mode", mode)
             result = await client.prompt("Continue without replaying the first message")
+            resumed_text = [item.data["text"] for item in events if item.kind == "text"]
+            assert resumed_text == ["Offline native history: 2 turns"], resumed_text
+            await asyncio.wait_for(client.commands_received.wait(), 10)
+            advertised = {item.name for item in client.commands}
+            assert {"compact", "status", "skills", "mcp", "rename"} <= advertised
+            for command in ("/status", "/skills", "/mcp", "/rename Probe", "/compact"):
+                assert await client.prompt(command) == "end_turn"
         finally:
             stopped = await client.close(timeout=15)
         assert stopped.owned_work_stopped is True and stopped.process_group_exited
-        resumed_text = [item.data["text"] for item in events if item.kind == "text"]
-        assert resumed_text == ["Offline native history: 2 turns"], resumed_text
     if unexpected_logs.exists():
         raise AssertionError("The runtime loaded project dotenv settings")
     messages = [json.loads(line) for line in record.read_text().splitlines()]
@@ -156,6 +161,15 @@ async def probe(
         )
         resumes = [item["params"] for item in messages if item.get("method") == "thread/resume"]
         assert len(resumes) == 1
+        assert any(item.get("method") == "thread/compact/start" for item in messages)
+        assert any(item.get("method") == "thread/name/set" for item in messages)
+        assert (
+            sum(
+                item.get("method") == "turn/start" and item["params"]["threadId"] == "test-thread"
+                for item in messages
+            )
+            == 2
+        )
         assert resumes[0]["config"]["mcp_servers"]["flowfield_probe_session"]["url"] == (
             "http://127.0.0.1:2/renewed-scope"
         )

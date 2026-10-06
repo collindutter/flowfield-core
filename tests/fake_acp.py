@@ -37,7 +37,10 @@ if "managed" in sys.argv:
                 "name": "Mode",
                 "type": "select",
                 "currentValue": "read-only",
-                "options": [{"value": v, "name": v} for v in ("workspace-write", "read-only")],
+                "options": [
+                    {"value": v, "name": v}
+                    for v in ("workspace-write", "read-only", "agent", "agent-full-access")
+                ],
             },
         ]
     )
@@ -72,6 +75,14 @@ async def main():
     resumed = False
 
     async def prompt(request):
+        text = request["params"]["prompt"][0]["text"]
+        if text.startswith("/"):
+            assert text in {"/status", "/compact", "/skills", "/mcp"}
+            update(
+                "agent_message_chunk", content={"type": "text", "text": f"Native command: {text}"}
+            )
+            reply(request, {"stopReason": "end_turn"})
+            return
         if "expect-attachments" in sys.argv:
             blocks = request["params"]["prompt"]
             assert blocks[1] == {"type": "text", "text": "Human attachment: notes.txt"}
@@ -83,7 +94,7 @@ async def main():
         if "coordinator" in sys.argv:
             assert control["flowfield_connection"] == servers[0]["name"]
             assert control["flowfield_connection"] in control["instructions"]
-            assert CONFIG[2]["currentValue"] == "read-only"
+            assert CONFIG[2]["currentValue"] == os.environ.get("FLOWFIELD_TEST_MODE", "read-only")
             if "continuity" in control["human_message"]:
                 assert resumed and "recent_conversation" not in control
             control = {
@@ -309,7 +320,29 @@ async def main():
             ):
                 send({"id": request["id"], "error": {"code": -32000, "message": "Session missing"}})
             else:
-                reply(request, {"sessionId": "test-session", "configOptions": CONFIG})
+                if "early-commands" not in sys.argv:
+                    reply(request, {"sessionId": "test-session", "configOptions": CONFIG})
+                if "no-commands" not in sys.argv:
+                    update(
+                        "available_commands_update",
+                        availableCommands=[
+                            {"name": name, "description": f"Native {name}", "input": None}
+                            for name in (
+                                "status",
+                                "compact",
+                                "skills",
+                                "mcp",
+                                "plan",
+                                "goal",
+                                "logout",
+                                "$project-skill",
+                            )
+                            if not (name == "compact" and "no-compact" in sys.argv)
+                        ],
+                    )
+                if "early-commands" in sys.argv:
+                    await asyncio.sleep(0.01)
+                    reply(request, {"sessionId": "test-session", "configOptions": CONFIG})
         elif method == "session/set_config_option":
             if "fallback" not in sys.argv:
                 next(item for item in CONFIG if item["id"] == request["params"]["configId"])[

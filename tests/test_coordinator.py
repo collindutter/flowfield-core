@@ -79,7 +79,7 @@ def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
         with pytest.raises(ApplicationError, match="different harness or project directory"):
             service.coordinator.store.session("harbor", "codex", str(tmp_path / "elsewhere"))
         assert completed.applied.choice.mode == "read-only"
-        assert completed.settings.choice.mode is None
+        assert completed.settings.choice.mode == "read-only"
         assert service.workspace.task("harbor", "chat-task").updated_by == "agent"
         assert not (tmp_path / "harbor" / "result.txt").exists()
         public = completed.model_dump_json()

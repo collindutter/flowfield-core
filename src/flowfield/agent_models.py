@@ -34,4 +34,11 @@ class AgentSettingsEdit(AgentRecord):
     selection: AgentChoice | None = None
 
 
+class AgentCommand(AgentRecord):
+    name: str = Field(pattern=r"^\$?[a-zA-Z0-9_.-]+$", max_length=100)
+    description: str = Field(max_length=1000)
+    input_hint: str | None = Field(default=None, max_length=200)
+    unavailable_reason: str | None = None
+
+
 AgentRole = Literal["worker", "coordinator"]

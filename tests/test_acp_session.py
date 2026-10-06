@@ -6,10 +6,34 @@ import sys
 from pathlib import Path
 
 import pytest
+from acp.schema import AvailableCommandsUpdate
 
 from flowfield.adapters.acp_session import AcpSession
 
 FAKE = Path(__file__).with_name("fake_acp.py")
+
+
+@pytest.mark.parametrize("flags", [(), ("early-commands",)])
+def test_commands_arrive_before_or_after_session_and_update_while_idle(tmp_path, flags):
+    async def exercise():
+        client = await start(tmp_path, [], *flags)
+        try:
+            await asyncio.wait_for(client.commands_received.wait(), 2)
+            assert "compact" in {item.name for item in client.commands}
+            update = AvailableCommandsUpdate.model_validate(
+                {
+                    "sessionUpdate": "available_commands_update",
+                    "availableCommands": [{"name": "renamed", "description": "New command"}],
+                }
+            )
+            await client.session_update("wrong-session", update)
+            assert "compact" in {item.name for item in client.commands}
+            await client.session_update(client.session_id, update)
+            assert [item.name for item in client.commands] == ["renamed"]
+        finally:
+            await client.close()
+
+    asyncio.run(exercise())
 
 
 async def start(tmp_path, events, *flags, permission=None, load=None, resume=None):

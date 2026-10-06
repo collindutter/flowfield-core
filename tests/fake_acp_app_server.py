@@ -102,6 +102,22 @@ def main():
                 }
             }
         emit({"id": request["id"], "result": result})
+        if method == "thread/compact/start":
+            for event, status in (("turn/started", "inProgress"), ("turn/completed", "completed")):
+                emit(
+                    {
+                        "method": event,
+                        "params": {
+                            "threadId": request["params"]["threadId"],
+                            "turn": {
+                                "id": "compact-turn",
+                                "items": [],
+                                "status": status,
+                                "error": None,
+                            },
+                        },
+                    }
+                )
         if method == "turn/start":
             thread_id = request["params"]["threadId"]
             emit(

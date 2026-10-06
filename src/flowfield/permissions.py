@@ -266,6 +266,7 @@ class Permissions:
         project: str,
         *,
         task_id: str | None = None,
+        role: AgentRole | None = None,
         before: int | None = None,
         limit: int = 50,
     ) -> PermissionPage:
@@ -275,15 +276,17 @@ class Permissions:
                 task_id = self.workspace._task(db, project, task_id).id
             pending = db.execute(
                 "SELECT data FROM agent_permissions WHERE project_id=? AND status='pending' "
-                "AND (? IS NULL OR task_id=?) ORDER BY number",
-                (project, task_id, task_id),
+                "AND (? IS NULL OR task_id=?) "
+                "AND (? IS NULL OR json_extract(data,'$.role')=?) ORDER BY number",
+                (project, task_id, task_id, role, role),
             ).fetchall()
             rows = db.execute(
                 "SELECT number,data FROM agent_permissions WHERE project_id=? "
                 "AND status!='pending' "
                 "AND (? IS NULL OR task_id=?) AND (? IS NULL OR number<?) "
+                "AND (? IS NULL OR json_extract(data,'$.role')=?) "
                 "ORDER BY number DESC LIMIT ?",
-                (project, task_id, task_id, before, before, limit + 1),
+                (project, task_id, task_id, before, before, role, role, limit + 1),
             ).fetchall()
             return PermissionPage(
                 pending=[PermissionRecord.model_validate_json(row[0]) for row in pending],

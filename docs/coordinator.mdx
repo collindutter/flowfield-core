@@ -11,20 +11,29 @@ the same feeds you use for questions and review.
 
 Install and authenticate [Codex](/integrations/codex), including the managed ACP runtime.
 Add an existing project using **Add project → Choose directory** or `flowfield project init`.
-In Coordinator Chat, choose a model and reasoning effort beside the input, then save.
+In Coordinator Chat, choose a model, reasoning effort and native access mode beside the input, then save.
 Local uses the service host’s tools, credentials and native harness configuration automatically.
 Worker delivery branches, setup and checks can be configured later. Built-in chat supplies
 its own MCP connection; `flowfield integration connect codex` is only for standalone sessions.
 
 Write your message and select **Send** (or press Enter). Use Command/Ctrl+Enter or
 Shift+Enter for a new line. Opening a project
-starts no model turn. Send is available once you have saved a model and effort.
-The coordinator reads project files using Codex's read-only mode and changes work through
-project-scoped Flowfield tools. Code changes belong to task workers. Answer worker questions
-and approve exact code results in their task feeds.
+starts no model turn. Send is available once you have saved these choices.
+The coordinator manages work through project-scoped Flowfield tools. You can also ask it
+to configure the project or local environment directly, within its selected access mode.
+These setup changes affect the project directory immediately; they do not produce a task
+result for approval. Agreed implementation work belongs to task workers. Answer worker
+questions and approve exact code results in their task feeds.
 
-Use the model button beside the input to change model or effort. Changes apply to the next
+Use the model button beside the input to change model, effort or access. Changes apply to the next
 message; a running turn keeps its saved choice. Standalone coding-agent settings are separate.
+
+Access modes come from Codex, including Read only, workspace access and Auto review.
+Existing chats retain read-only access until you change it. Auto review uses Codex's native
+reviewer; permission requests that need your answer appear in the chat and **Needs you**.
+Answer one of the offered options while the turn is waiting. Stopping or ending the turn
+closes its requests. Tool permission does not approve a worker's code result.
+Default/Plan collaboration modes are separate and are not exposed here.
 
 ## Composer controls
 
@@ -41,9 +50,27 @@ remain available to download. Worker replies use separate task attempts; reattac
 when a later reply needs their contents.
 Each project has 128 MiB of attachment storage. Unsent uploads expire after 24 hours.
 
-Type `/` for a command menu: `/attach` adds files, `/model` opens model settings, and `/stop`
-stops a running turn. Use arrow keys and Enter to choose, or Escape to continue writing.
-These control the composer; native session commands such as `/compact` are not supported.
+Type `/` for commands, separated into **Flowfield** and **Codex** groups. Flowfield actions
+control the composer: `/attach` adds files, `/model` opens settings, and `/stop` stops a turn.
+Use arrow keys and Enter to choose, or Escape to continue writing.
+
+Codex commands are discovered from the installed harness without starting a model turn.
+Select a command to insert `/codex <command>`, then send it. The prefix distinguishes
+harness commands from Flowfield actions. **Reload Codex commands** refreshes the menu;
+execution always checks what the current session supports.
+
+| Command | Effect |
+| --- | --- |
+| `/codex compact` | Ask Codex to compact the ongoing native conversation. |
+| `/codex status` | Show available native session information. Usage may be unavailable immediately after resuming. |
+| `/codex mcp` | List the session's MCP connections. |
+| `/codex skills` | List skills discovered by Codex. |
+| `/codex rename <name>` | Rename the native Codex session; the Flowfield project name stays the same. |
+
+Compaction and renaming require an existing conversation. Native commands do not accept
+attachments. Other discovered commands stay disabled with a reason: Plan, autonomous goals,
+review commands and skill invocation need additional integration; signing out affects the
+host account. Worker replies currently offer only Flowfield composer actions.
 
 Hover or focus the context ring for the agent's reported context usage. During a turn it
 shows that turn's latest report; afterward it shows the last turn. It stays empty until

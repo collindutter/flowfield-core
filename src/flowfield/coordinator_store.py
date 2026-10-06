@@ -189,12 +189,6 @@ class CoordinatorStore:
                     "Choose a coordinator model and effort in settings first.",
                     409,
                 )
-            if settings.choice.mode is not None:
-                raise ApplicationError(
-                    "coordinator_read_only",
-                    "Save coordinator model and effort again; file access is fixed to read-only.",
-                    409,
-                )
             turn = CoordinatorTurn(
                 id=request.id,
                 project_id=project,

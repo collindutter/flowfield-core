@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Query
 
-from flowfield.agent_models import AgentSettingsEdit, AgentSettingsView
+from flowfield.agent_models import AgentCommand, AgentSettingsEdit, AgentSettingsView
 from flowfield.agent_settings import AgentSettings
 from flowfield.coordinator_models import (
     CoordinatorConversation,
@@ -33,6 +33,10 @@ def coordinator_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     @router.post("", status_code=201)
     def new(project_id: str) -> CoordinatorConversation:
         return supervisor().coordinator.store.new(project_id)
+
+    @router.post("/commands/discover")
+    async def commands(project_id: str, refresh: bool = False) -> list[AgentCommand]:
+        return await supervisor().coordinator.commands(project_id, refresh=refresh)
 
     @router.post("/messages", status_code=202)
     async def message(project_id: str, request: CoordinatorSend) -> CoordinatorTurn:

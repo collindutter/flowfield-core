@@ -6,6 +6,34 @@ import type { components } from "../src/api-schema";
 type Turn = components["schemas"]["CoordinatorTurn"];
 const state = process.env.FLOWFIELD_SMOKE_STATE!;
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/coordinator/commands/discover*", (route) =>
+    route.fulfill({
+      json: [
+        {
+          name: "compact",
+          description: "Compact the conversation",
+          input_hint: null,
+          unavailable_reason: null,
+        },
+        {
+          name: "status",
+          description: "Show session status",
+          input_hint: null,
+          unavailable_reason: null,
+        },
+        {
+          name: "goal",
+          description: "Manage a goal",
+          input_hint: "goal",
+          unavailable_reason:
+            "Persistent autonomous goals are not supported yet.",
+        },
+      ],
+    }),
+  );
+});
+
 test("coordinator streams, stops, retains history and drafts beside responsive work", async ({
   page,
   request,
@@ -40,6 +68,35 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   let active: Turn | null = null;
   let sends = 0;
   let recovery: string | null = null;
+  let permission: components["schemas"]["PermissionRecord"] | null = null;
+  await page.route("**/api/projects/chat-browser/permissions?*", (route) => {
+    expect(new URL(route.request().url()).searchParams.get("role")).toBe(
+      "coordinator",
+    );
+    return route.fulfill({
+      json: {
+        pending: permission?.status === "pending" ? [permission] : [],
+        items: permission ? [permission] : [],
+        next_before: null,
+      },
+    });
+  });
+  await page.route(
+    "**/api/projects/chat-browser/permissions/setup/answer",
+    (route) => {
+      expect(route.request().postDataJSON()).toEqual({
+        expected_revision: 1,
+        option_id: "yes",
+      });
+      permission = {
+        ...permission!,
+        status: "answered",
+        answer: "yes",
+        released_at: new Date().toISOString(),
+      };
+      return route.fulfill({ json: permission });
+    },
+  );
   await page.route(`**${historyPath}{,?*}`, (route) =>
     route.fulfill({
       json: {
@@ -68,7 +125,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
           harness: "codex",
           model: "test-model",
           effort: "low",
-          mode: null,
+          mode: "read-only",
         },
         source: "project",
         default_revision: 1,
@@ -133,7 +190,25 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   });
   await page.route("**/api/worker-models*", (route) =>
     route.fulfill({
-      json: [{ id: "test-model", name: "Test", efforts: ["low"], modes: [] }],
+      json: [
+        {
+          id: "test-model",
+          name: "Test",
+          efforts: ["low"],
+          modes: [
+            {
+              id: "read-only",
+              name: "Read only",
+              description: "Read project files",
+            },
+            {
+              id: "agent",
+              name: "Auto review",
+              description: "Native automatic review",
+            },
+          ],
+        },
+      ],
     }),
   );
   await page.route(
@@ -146,14 +221,14 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
             harness: "codex",
             model: "test-model",
             effort: "low",
-            mode: null,
+            mode: "read-only",
           },
           effective: {
             choice: {
               harness: "codex",
               model: "test-model",
               effort: "low",
-              mode: null,
+              mode: "read-only",
             },
             source: "project",
             default_revision: 1,
@@ -170,18 +245,33 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     page.getByRole("link", { name: /CHT-1.*Plan the chat experience/ }),
   ).toBeVisible();
   const input = page.getByRole("textbox", { name: "Message coordinator" });
+  await input.fill("/");
+  await expect(
+    page.getByRole("option", { name: /\/codex compact/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: /\/codex goal/ }),
+  ).toHaveAttribute("aria-disabled", "true");
+  await page.screenshot({
+    path: testInfo.outputPath("coordinator-commands.png"),
+  });
+  await page.getByRole("option", { name: /\/codex compact/ }).click();
+  await expect(input).toHaveValue("/codex compact ");
+  expect(sends).toBe(0);
   await input.fill("/mo");
   const commandInput = page.getByRole("combobox", {
     name: "Message coordinator",
   });
   await expect(page.getByRole("option", { name: /\/model/ })).toBeVisible();
   await commandInput.press("ArrowDown");
+  await commandInput.press("Home");
   await commandInput.press("Enter");
   await expect(input).toHaveValue("");
   await expect(
     page.getByRole("dialog", { name: "Coordinator model settings" }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
+  await input.click();
   await input.fill("/unknown");
   await page
     .getByRole("combobox", { name: "Message coordinator" })
@@ -227,6 +317,38 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   expect(sends).toBe(0);
   await input.press("Enter");
   await expect(page.getByText("Let’s plan the work.")).toBeVisible();
+  const now = new Date().toISOString();
+  permission = {
+    id: "setup",
+    project_id: "chat-browser",
+    role: "coordinator",
+    task_id: null,
+    run_id: null,
+    conversation_id: conversation.id,
+    binding: "test-binding",
+    turn_id: active!.id,
+    tool_id: "setup-tool",
+    title: "Install project dependencies",
+    details: "command: pnpm install",
+    options: [{ id: "yes", label: "Allow once", kind: "allow_once" }],
+    revision: 1,
+    status: "pending",
+    answer: null,
+    created_at: now,
+    updated_at: now,
+    expires_at: now,
+    released_at: null,
+  };
+  await expect(
+    page.getByRole("button", { name: "Allow once", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("coordinator-permission.png"),
+  });
+  await page.getByRole("button", { name: "Allow once", exact: true }).click();
+  await expect(
+    page.getByText("Tool permission history", { exact: true }),
+  ).toBeVisible();
   expect(turns[0].text).toContain(
     "[screen.png](/api/projects/chat-browser/attachments/",
   );
@@ -412,8 +534,40 @@ test("single coordinator requires a saved model, labels loading and retains unsa
     await discovery;
     await route.fulfill({
       json: [
-        { id: "first", name: "First", efforts: ["low"], modes: [] },
-        { id: "second", name: "Second", efforts: ["high"], modes: [] },
+        {
+          id: "first",
+          name: "First",
+          efforts: ["low"],
+          modes: [
+            {
+              id: "read-only",
+              name: "Read only",
+              description: "Read project files",
+            },
+            {
+              id: "agent",
+              name: "Auto review",
+              description: "Native automatic review",
+            },
+          ],
+        },
+        {
+          id: "second",
+          name: "Second",
+          efforts: ["high"],
+          modes: [
+            {
+              id: "read-only",
+              name: "Read only",
+              description: "Read project files",
+            },
+            {
+              id: "agent",
+              name: "Auto review",
+              description: "Native automatic review",
+            },
+          ],
+        },
       ],
     });
   });
@@ -424,7 +578,7 @@ test("single coordinator requires a saved model, labels loading and retains unsa
     async (route) => {
       if (route.request().method() === "PUT") {
         const change = route.request().postDataJSON();
-        expect(change.selection.mode).toBeNull();
+        expect(change.selection.mode).toBe("agent");
         settings = {
           revision: settings.revision + 1,
           selection: change.selection,
@@ -502,6 +656,9 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   await model.selectOption("second");
   await expect(effort).toBeEnabled();
   await effort.selectOption("high");
+  await page
+    .getByRole("combobox", { name: "Native access mode" })
+    .selectOption("agent");
   await expect(send).toBeDisabled();
   await page.getByRole("link", { name: "Flowfield", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();

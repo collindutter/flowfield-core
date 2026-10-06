@@ -24,7 +24,7 @@ from flowfield.adapters.acp_session import (
 )
 from flowfield.adapters.codex_cleanup import quiesce, require_cleanup
 from flowfield.adapters.codex_install import command
-from flowfield.agent_models import AgentChoice
+from flowfield.agent_models import AgentChoice, AgentCommand
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import ModelOption, NativeMode
 from flowfield.run_activity import ActivityUpdate, ContextUsage
@@ -203,7 +203,7 @@ class CodexAgent:
             raise ApplicationError("agent_stopping", "The agent is stopping.", 409)
         if not choice.mode and not read_only:
             raise ApplicationError(
-                "agent_mode_required", "Choose a native Codex mode in worker settings.", 409
+                "agent_mode_required", "Choose a native Codex access mode in agent settings.", 409
             )
         try:
             # Coordination and discussion use the harness's read-only mode.
@@ -237,6 +237,60 @@ class CodexAgent:
                 "This harness cannot receive images. Send text/code instead.",
                 409,
             )
+
+    async def command_options(self) -> list[AgentCommand]:
+        try:
+            await asyncio.wait_for(self.session.commands_received.wait(), 10)
+        except TimeoutError as error:
+            raise ApplicationError(
+                "commands_unavailable",
+                "Codex did not return its commands. Try reloading them.",
+                409,
+            ) from error
+        reasons = {
+            "plan": "Default/Plan modes are not enabled in Flowfield.",
+            "goal": "Background goals need a persistent execution lifecycle.",
+            "logout": "Sign out through Codex on the host; this affects other sessions.",
+        }
+        supported = {"compact", "status", "mcp", "skills", "rename"}
+        return [
+            item.model_copy(
+                update={
+                    "unavailable_reason": None
+                    if item.name in supported
+                    else (reasons.get(item.name, "This command's execution is not integrated yet."))
+                }
+            )
+            for item in self.session.commands
+        ]
+
+    async def command_prompt(
+        self, text: str, *, has_history: bool, attachments: list[dict[str, str]]
+    ) -> str | None:
+        words = text.strip().split(maxsplit=1)
+        if not words or words[0] != "/codex":
+            return None
+        if len(words) != 2:
+            raise ApplicationError("command_unknown", "Choose a Codex command.", 409)
+        command = words[1]
+        name, *arguments = command.split(maxsplit=1)
+        offered = next((item for item in await self.command_options() if item.name == name), None)
+        if offered is None or offered.unavailable_reason:
+            raise ApplicationError(
+                "command_unavailable",
+                (offered.unavailable_reason if offered else None)
+                or "Codex no longer advertises this command. Reload commands.",
+                409,
+            )
+        if attachments or (arguments and not offered.input_hint):
+            raise ApplicationError(
+                "command_input", "This command does not accept attachments or these arguments.", 409
+            )
+        if not has_history and name in {"compact", "rename"}:
+            raise ApplicationError(
+                "command_session", "Send a message before changing its native session.", 409
+            )
+        return "/" + command
 
     async def prompt(
         self,
@@ -316,3 +370,14 @@ async def model_options(directory: Path) -> list[ModelOption]:
                 return result
         finally:
             await agent.close()
+
+
+async def command_options(directory: Path, cwd: Path, choice: AgentChoice) -> list[AgentCommand]:
+    agent = CodexAgent(directory, cwd, os.environ)
+    try:
+        async with asyncio.timeout(60):
+            await agent.start([])
+            await agent.configure(choice)
+            return await agent.command_options()
+    finally:
+        await agent.close()

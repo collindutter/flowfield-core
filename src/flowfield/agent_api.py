@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Query
 
-from flowfield.agent_models import AgentSettingsEdit, AgentSettingsView
+from flowfield.agent_models import AgentRole, AgentSettingsEdit, AgentSettingsView
 from flowfield.agent_settings import AgentSettings
 from flowfield.permission_models import PermissionAnswer, PermissionPage, PermissionRecord
 from flowfield.supervisor import Supervisor
@@ -41,11 +41,12 @@ def agent_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     def permissions(
         project_id: str,
         task_id: str | None = None,
+        role: AgentRole | None = None,
         before: int | None = Query(None, ge=1),
         limit: int = Query(50, ge=1, le=100),
     ) -> PermissionPage:
         return supervisor().permissions.page(
-            project_id, task_id=task_id, before=before, limit=limit
+            project_id, task_id=task_id, role=role, before=before, limit=limit
         )
 
     @router.post("/permissions/{permission_id}/answer")

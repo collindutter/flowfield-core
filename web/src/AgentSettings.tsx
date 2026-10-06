@@ -175,7 +175,9 @@ function useAgentSettingsContent(
       !catalog.data ||
       catalog.data.some(
         (item) =>
-          item.id === saved?.model && item.efforts.includes(saved.effort),
+          item.id === saved?.model &&
+          item.efforts.includes(saved.effort) &&
+          !!item.modes?.some((mode) => mode.id === saved.mode),
       );
     onReady?.(!resource.error && available ? (saved ?? null) : null);
   }, [data, resource.error, catalog.data, onReady]);
@@ -187,7 +189,7 @@ function useAgentSettingsContent(
           harness: "codex",
           model,
           effort,
-          mode: coordinator ? null : mode || null,
+          mode: mode || null,
         },
       });
   }
@@ -262,11 +264,17 @@ function useAgentSettingsContent(
             model={model}
             effort={effort}
             mode={mode}
-            modesEnabled={!coordinator}
+            modesEnabled
             models={catalog.data ?? []}
             loading={catalog.loading || resource.loading}
             change={change}
           />
+          {coordinator && (
+            <p className="muted">
+              Access applies to this project directory. Requested setup changes
+              happen here directly.
+            </p>
+          )}
           <div className="actions">
             <Button
               size="sm"
@@ -274,7 +282,10 @@ function useAgentSettingsContent(
                 !draft ||
                 stale ||
                 !catalog.data?.some(
-                  (item) => item.id === model && item.efforts.includes(effort),
+                  (item) =>
+                    item.id === model &&
+                    item.efforts.includes(effort) &&
+                    !!item.modes?.some((choice) => choice.id === mode),
                 )
               }
             >
