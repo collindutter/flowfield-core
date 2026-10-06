@@ -65,7 +65,6 @@ def test_receipt_is_exact_and_bound(change, expected):
         ("", True),
         ("cleanup-uncertain", False),
         ("cleanup-wrong-session", False),
-        ("cleanup-hang", False),
     ],
 )
 def test_cleanup_receipt_controls_session_outcome(tmp_path, flag, expected):
@@ -79,9 +78,36 @@ def test_cleanup_receipt_controls_session_outcome(tmp_path, flag, expected):
         )
         require_cleanup(client.capabilities)
         await client.prompt("{}")
-        receipt = await client.close(timeout=0.2)
+        # Receipt semantics do not require the OS to reap a process in 200 ms.
+        # Use the normal bounded shutdown; exercise deadline expiry separately.
+        receipt = await client.close()
         assert receipt.owned_work_stopped is expected
         assert receipt.process_group_exited
         assert client.state == ("closed" if expected else "interrupted")
+
+    asyncio.run(exercise())
+
+
+def test_cleanup_timeout_remains_unconfirmed_and_cancels_the_request():
+    async def exercise():
+        cancelled = asyncio.Event()
+
+        async def unanswered(connection, session_id, capabilities):
+            try:
+                await asyncio.Future()
+            finally:
+                cancelled.set()
+
+        class Connection:
+            async def close(self):
+                pass
+
+        client = AcpSession(lambda event: None, cleanup=unanswered)
+        client.connection = Connection()
+        client.session_id = "owned"
+        receipt = await client.close(timeout=0.01)
+        assert cancelled.is_set()
+        assert receipt.owned_work_stopped is False
+        assert client.state == "interrupted"
 
     asyncio.run(exercise())

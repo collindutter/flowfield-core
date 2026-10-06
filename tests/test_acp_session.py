@@ -9,8 +9,20 @@ import pytest
 from acp.schema import AvailableCommandsUpdate
 
 from flowfield.adapters.acp_session import AcpSession
+from flowfield.adapters.local_process import LocalProcess
 
 FAKE = Path(__file__).with_name("fake_acp.py")
+
+
+@pytest.fixture
+def normal_process_shutdown_budget(monkeypatch):
+    """Short protocol deadlines must not also benchmark OS process reaping."""
+    close = LocalProcess.close
+
+    async def bounded_close(self, *, timeout=5):
+        return await close(self, timeout=5)
+
+    monkeypatch.setattr(LocalProcess, "close", bounded_close)
 
 
 @pytest.mark.parametrize("flags", [(), ("early-commands",)])
@@ -150,7 +162,9 @@ def test_broken_transport_never_replays_or_reuses_session(tmp_path, mode):
     asyncio.run(exercise())
 
 
-def test_unacknowledged_stop_is_uncertain_even_after_process_exit(tmp_path):
+def test_unacknowledged_stop_is_uncertain_even_after_process_exit(
+    tmp_path, normal_process_shutdown_budget
+):
     async def exercise():
         client = await start(tmp_path, [])
         prompt = asyncio.create_task(client.prompt('{"mode":"ignore_cancel"}'))
@@ -261,7 +275,9 @@ def test_negotiated_session_close_and_eof_precede_process_signals(tmp_path):
 
 
 @pytest.mark.parametrize("flag", ["close-failure", "close-hang"])
-def test_failed_native_session_close_retains_uncertainty(tmp_path, flag):
+def test_failed_native_session_close_retains_uncertainty(
+    tmp_path, flag, normal_process_shutdown_budget
+):
     async def exercise():
         client = await start(tmp_path, [], "close-session", flag)
         receipt = await client.close(timeout=0.15)

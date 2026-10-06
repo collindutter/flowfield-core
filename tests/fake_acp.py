@@ -372,22 +372,19 @@ async def main():
         elif method == "session/cancel":
             stopped.set()
         elif method == "_flowfield/quiesce":
-            if "cleanup-hang" not in sys.argv:
-                reply(
-                    request,
-                    {
-                        "version": 1,
-                        "method": "_flowfield/quiesce",
-                        "scope": "native-turns-and-terminals",
-                        "sessionId": "wrong"
-                        if "cleanup-wrong-session" in sys.argv
-                        else "test-session",
-                        "status": "uncertain" if "cleanup-uncertain" in sys.argv else "confirmed",
-                        "reason": None,
-                        "checkedThreads": 1,
-                        "stoppedTerminals": 0,
-                    },
-                )
+            reply(
+                request,
+                {
+                    "version": 1,
+                    "method": "_flowfield/quiesce",
+                    "scope": "native-turns-and-terminals",
+                    "sessionId": "wrong" if "cleanup-wrong-session" in sys.argv else "test-session",
+                    "status": "uncertain" if "cleanup-uncertain" in sys.argv else "confirmed",
+                    "reason": None,
+                    "checkedThreads": 1,
+                    "stoppedTerminals": 0,
+                },
+            )
         elif method == "session/close":
             if "close-failure" in sys.argv:
                 send({"id": request["id"], "error": {"code": -32000, "message": "Close failed"}})
