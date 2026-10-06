@@ -1,3 +1,4 @@
+import { fixtureStages } from "./support";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { expect } from "@playwright/test";
@@ -91,6 +92,7 @@ test("milestones group tasks with linked details and long project intent stays o
   await call("create_task", {
     project_id,
     task: {
+      stages: fixtureStages(),
       id: "serializer",
       title: "Serialize CSV",
       milestone_id: "M-1",
@@ -103,11 +105,21 @@ test("milestones group tasks with linked details and long project intent stays o
   });
   await call("create_task", {
     project_id,
-    task: { id: "download", title: "Download CSV", milestone_id: "M-1" },
+    task: {
+      stages: fixtureStages(),
+      id: "download",
+      title: "Download CSV",
+      milestone_id: "M-1",
+    },
   });
   await call("create_task", {
     project_id,
-    task: { id: "unrelated", title: "Independent bug", task_type: "bug" },
+    task: {
+      stages: fixtureStages(),
+      id: "unrelated",
+      title: "Independent bug",
+      task_type: "bug",
+    },
   });
   await page.goto(`/projects/${project_id}`);
   await expect(page.getByText(description, { exact: true })).toHaveCount(0);

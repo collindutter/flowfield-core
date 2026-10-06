@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+from project_fixtures import reconcile_fixture_stages
 from test_result_recovery import target_change
 from test_results import approve, current, fixture
 
@@ -122,6 +123,7 @@ def test_feedback_successor_preserves_earlier_copy_and_approval_binding(tmp_path
             note="The human refined the outcome after inspection; request a revised result.",
         ),
     )
+    reconcile_fixture_stages(service.workspace, "harbor", task.id)
     service.results.review(
         "harbor",
         first.id,

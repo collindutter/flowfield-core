@@ -73,6 +73,13 @@ export function NewTask({
           e.preventDefault();
           const content = {
             title: values.title,
+            stages: [
+              {
+                id: "work",
+                title: values.title.slice(0, 80),
+                outcome: values.title,
+              },
+            ],
             body: values.body,
             task_type: values.task_type,
             milestone_id: values.milestone_id || null,

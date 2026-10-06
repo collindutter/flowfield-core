@@ -391,6 +391,7 @@ def create_mcp(
     async def create_task(project_id: Identifier, task: TaskCreate) -> CallToolResult:
         """Capture agreed work, default feature in Backlog; first search for an existing task.
 
+        Include one to eight outcome stages in this same call, even for a draft.
         For actionable intent include preparation with completion and expected_decision_sequence
         zero for a new task. Capture and preparation commit atomically or neither is saved. Check
         code destination/check settings first; if genuinely missing, save intent without
@@ -410,8 +411,8 @@ def create_mcp(
         Include preparation for actionable upcoming work, using completion and the decision
         sequence from get_task, to save and prepare atomically. Failure leaves prior intent
         unchanged. Preserves priority/queue; active work requires reconciliation instead.
-        Reconcile existing stages to the new agreement with update_task_stages while idle;
-        scheduling waits for that explicit plan update.
+        Read get_task_stages and include stages (expected_revision, stages, reason) here
+        to reconcile the plan with the new agreement atomically while idle.
         milestone_id=null clears grouping; archived=false restores.
         """
         return await mutate(
@@ -441,7 +442,8 @@ def create_mcp(
         Prefer create_task/edit_task with preparation when also authoring intent. This legacy
         operation name means preparation, not scheduling: it neither moves the task nor enables
         the queue. Use revision and decision_sequence from get_task. Resolve consequential
-        gaps first; unfinished prerequisites may remain. Never grants code approval.
+        gaps first; unfinished prerequisites may remain. Include stages to reconcile a stale
+        plan in this same operation. Never grants code approval.
         """
         return await mutate(
             lambda: (

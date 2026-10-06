@@ -53,6 +53,7 @@ from flowfield.result_models import SCHEMA as RESULT_SCHEMA
 from flowfield.run_activity import SCHEMA as ACTIVITY_SCHEMA
 from flowfield.search import SCHEMA as SEARCH_SCHEMA
 from flowfield.stage_models import SCHEMA as STAGE_SCHEMA
+from flowfield.stage_models import Stage, StageChange, StagePlan, StageUpdate
 from flowfield.storage import acquire_lock, initialize, require_current
 
 Markdown = Annotated[str, StringConstraints(max_length=200_000)]
@@ -164,6 +165,13 @@ class TaskPreparation(Input):
 
 
 class TaskCreate(WorkCreate):
+    stages: list[Stage] = Field(min_length=1, max_length=8)
+
+    @field_validator("stages")
+    @classmethod
+    def valid_stages(cls, value: list[Stage]) -> list[Stage]:
+        return StageChange(expected_revision=0, stages=value, reason="Initial plan").stages
+
     preparation: TaskPreparation | None = None
     body: TaskDescription = ""
     task_type: TaskType = "feature"
@@ -178,6 +186,7 @@ class TaskCreate(WorkCreate):
 
 
 class TaskEdit(Edit):
+    stages: StageChange | None = None
     preparation: TaskPreparation | None = None
     title: Title | None = None
     body: TaskDescription | None = None
@@ -216,6 +225,7 @@ class TaskReconcile(Edit):
 
 
 class TaskPublish(Edit):
+    stages: StageChange | None = None
     expected_decision_sequence: int = Field(ge=0)
     completion: Literal["code", "report"]
 
@@ -945,7 +955,9 @@ class Workspace:
                 "SELECT COALESCE(MAX(number), 0) + 1 FROM tasks WHERE project_id=?", (project_id,)
             ).fetchone()[0]
             task = TaskRevision(
-                **request.model_dump(exclude={"id", "author", "dependencies", "preparation"}),
+                **request.model_dump(
+                    exclude={"id", "author", "dependencies", "preparation", "stages"}
+                ),
                 key=f"{project.task_prefix}-{number}",
                 dependencies=self._dependency_ids(db, project_id, request.dependencies),
                 id=request.id or generated_id(request.title),
@@ -978,6 +990,20 @@ class Workspace:
                     "task_blocked", "Complete prerequisites before recording work.", 409
                 )
             self._apply_task(db, task)
+            initial_plan = StagePlan(
+                project_id=project_id,
+                task_id=task.id,
+                revision=1,
+                agreement_revision=task.agreement_revision,
+                stages=request.stages,
+                reason="Initial task plan",
+                author=request.author,
+                created_at=now(),
+            )
+            db.execute(
+                "INSERT INTO stage_plans VALUES (?,?,?,?)",
+                (project_id, task.id, 1, initial_plan.model_dump_json()),
+            )
             if request.preparation:
                 return self._publish_task(
                     db,
@@ -993,8 +1019,9 @@ class Workspace:
 
     def edit_task(self, project_id: str, task_id: str, request: TaskEdit) -> Task:
         preparation = request.preparation
+        stage_change = request.stages
         request = TaskEdit.model_validate(
-            request.model_dump(exclude_unset=True, exclude={"preparation"})
+            request.model_dump(exclude_unset=True, exclude={"preparation", "stages"})
         )
         with self.connection(write=True, project_id=project_id) as db:
             current = self._task(db, project_id, task_id)
@@ -1025,6 +1052,8 @@ class Workspace:
                         "UPDATE tasks SET position=? WHERE project_id=? AND id=?",
                         (self._append_position(db, project_id), project_id, task_id),
                     )
+            if stage_change:
+                self._change_task_stages(db, task, stage_change)
             if preparation:
                 return self._publish_task(
                     db,
@@ -1067,6 +1096,18 @@ class Workspace:
             )
         return None
 
+    def _change_task_stages(
+        self, db: sqlite3.Connection, task: TaskRevision, change: StageChange
+    ) -> None:
+        from flowfield.stages import Stages
+
+        Stages(self)._update(
+            db,
+            task.project_id,
+            task.id,
+            StageUpdate(**change.model_dump(), agreement_revision=task.agreement_revision),
+        )
+
     def publish_task(self, project_id: str, task_id: str, request: TaskPublish) -> Task:
         with self.connection(write=True, project_id=project_id) as db:
             return self._publish_task(db, project_id, task_id, request)
@@ -1098,6 +1139,18 @@ class Workspace:
             raise ApplicationError(
                 "task_blocked",
                 "Apply or withdraw blocking questions before publishing the task.",
+                409,
+            )
+        if request.stages:
+            self._change_task_stages(db, current, request.stages)
+            current = self._task(db, project_id, current.id)
+        from flowfield.stages import Stages
+
+        plan = Stages(self)._get(db, current)
+        if not plan.stages or plan.agreement_revision != current.agreement_revision:
+            raise ApplicationError(
+                "stages_required",
+                "Provide current stages with this preparation; at least one stage is required.",
                 409,
             )
         target_branch = None

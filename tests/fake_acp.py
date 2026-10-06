@@ -119,6 +119,13 @@ async def main():
                         "name": "create_task",
                         "arguments": {
                             "task": {
+                                "stages": [
+                                    {
+                                        "id": "report",
+                                        "title": "Report",
+                                        "outcome": "Report the agreed findings",
+                                    }
+                                ],
                                 "id": "chat-task",
                                 "title": "Captured from Coordinator Chat",
                                 "body": "An agreed outcome",

@@ -169,6 +169,7 @@ def main() -> None:
                     "milestone_id": milestone,
                     "dependencies": dependencies,
                     "task_type": kind,
+                    "stages": [{"id": "work", "title": title[:80], "outcome": title}],
                     "body": body,
                     "status": "up_next" if identity in ("catalog", "sample", "csv") else "backlog",
                 },

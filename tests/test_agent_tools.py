@@ -90,6 +90,13 @@ def test_coordinator_captures_work_in_fixed_project(tmp_path):
                     "name": "create_task",
                     "arguments": {
                         "task": {
+                            "stages": [
+                                {
+                                    "id": "report",
+                                    "title": "Report",
+                                    "outcome": "Report the agreed findings",
+                                }
+                            ],
                             "id": "captured",
                             "title": "Captured in conversation",
                             "body": "Agreed outcome",

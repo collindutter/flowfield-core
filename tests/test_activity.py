@@ -5,13 +5,12 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from project_fixtures import adopt, existing_directory
+from project_fixtures import adopt, existing_directory, task_request
 
 from flowfield.activity import ActivityCreate
 from flowfield.api import create_app
 from flowfield.application import (
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     TaskPriority,
     TaskProgress,
@@ -23,8 +22,8 @@ from flowfield.errors import ApplicationError
 def workspace(tmp_path: Path) -> Workspace:
     service = Workspace(tmp_path / "state")
     adopt(service, ProjectSetup(path=str(tmp_path / "harbor")))
-    service.create_task("harbor", TaskCreate(id="one", title="Export CSV"))
-    service.create_task("harbor", TaskCreate(id="two", title="Download CSV"))
+    service.create_task("harbor", task_request(id="one", title="Export CSV"))
+    service.create_task("harbor", task_request(id="two", title="Download CSV"))
     return service
 
 
@@ -134,7 +133,10 @@ def test_http_activity_validates_and_preserves_scope(tmp_path: Path) -> None:
         client.post(
             "/api/projects/initialize", json={"path": existing_directory(str(tmp_path / "harbor"))}
         )
-        client.post("/api/projects/harbor/tasks", json={"title": "CSV"})
+        client.post(
+            "/api/projects/harbor/tasks",
+            json={"stages": task_request(title="Fixture").model_dump()["stages"], "title": "CSV"},
+        )
         endpoint = "/api/projects/harbor/activity"
         for entry in [
             {"body": "project note"},
@@ -163,7 +165,7 @@ def test_http_activity_validates_and_preserves_scope(tmp_path: Path) -> None:
 
 def test_edit_events_record_changes_but_not_noops(tmp_path: Path) -> None:
     service = workspace(tmp_path)
-    task = service.create_task("harbor", TaskCreate(title="Next", status="up_next"))
+    task = service.create_task("harbor", task_request(title="Next", status="up_next"))
     assert service.activity("harbor", task_id=task.id).items[0].body == "Task created in Up next."
     task = service.edit_task(
         "harbor", task.id, TaskEdit(expected_revision=1, body="Done when clear.")

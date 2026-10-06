@@ -5,11 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from project_fixtures import adopt
+from project_fixtures import adopt, fixture_stage_change, task_request
 
 from flowfield.application import (
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     TaskProgress,
     TaskPublish,
@@ -30,13 +29,14 @@ from flowfield.results import Results
 BASE, RESULT = "a" * 40, "b" * 40
 
 
-def fixture(tmp_path: Path, *, count: int = 1, cap: int = 1) -> Execution:
+def fixture(tmp_path: Path, *, count: int = 1, cap: int = 1, stages=None) -> Execution:
     workspace = Workspace(tmp_path / "state")
     adopt(workspace, ProjectSetup(path=str(tmp_path / "harbor")))
     for index in range(count):
         task = workspace.create_task(
             "harbor",
-            TaskCreate(
+            task_request(
+                **({"stages": stages} if stages is not None else {}),
                 id=f"task-{index}",
                 title=f"Task {index}",
                 body="Implement and test the assigned behavior.",
@@ -47,6 +47,7 @@ def fixture(tmp_path: Path, *, count: int = 1, cap: int = 1) -> Execution:
             "harbor",
             task.id,
             TaskPublish(
+                stages=fixture_stage_change(workspace, "harbor", task.id),
                 completion="report",
                 expected_revision=task.revision,
                 expected_decision_sequence=task.decision_sequence,
@@ -189,6 +190,7 @@ def test_review_is_bound_to_code_and_current_intent(tmp_path: Path) -> None:
         "harbor",
         task.id,
         TaskPublish(
+            stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             completion="report",
             expected_revision=upcoming.revision,
             expected_decision_sequence=upcoming.decision_sequence,
@@ -212,6 +214,7 @@ def test_report_prerequisite_does_not_require_code_availability(tmp_path: Path) 
         "harbor",
         second.id,
         TaskPublish(
+            stages=fixture_stage_change(workspace, "harbor", second.id),
             completion="report",
             expected_revision=second.revision,
             expected_decision_sequence=second.decision_sequence,
@@ -303,6 +306,7 @@ def test_followup_checks_prerequisites_in_its_own_base(tmp_path: Path) -> None:
         "harbor",
         task.id,
         TaskPublish(
+            stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             completion="report",
             expected_revision=task.revision,
             expected_decision_sequence=task.decision_sequence,

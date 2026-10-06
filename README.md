@@ -25,7 +25,8 @@ uv tool install --python 3.12 flowfield-core
 flowfield serve
 ```
 
-Open [localhost:8765](http://127.0.0.1:8765). The browser UI is included.
+The browser opens at [localhost:8765](http://127.0.0.1:8765). Use `--no-open` to keep it closed.
+The browser UI is included.
 See [Installation](https://docs.flowfield.sh/installation) for the pip alternative.
 
 Choose **Add project** in the sidebar and select an existing directory, or register it from a terminal:

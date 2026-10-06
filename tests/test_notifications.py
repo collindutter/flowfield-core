@@ -3,11 +3,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 
 from flowfield import migrations, storage
 from flowfield.api import create_app
-from flowfield.application import ProjectSetup, TaskCreate, Workspace
+from flowfield.application import ProjectSetup, Workspace
 from flowfield.notification_api import NotificationService
 from flowfield.notifications import (
     RETAINED_NOTICES,
@@ -76,7 +76,7 @@ def test_retention_bounds_content_and_delivery_rows(tmp_path):
 def test_attention_is_persistent_without_desktop_opt_in_and_resolves_from_work(tmp_path):
     workspace = Workspace(tmp_path / "state")
     adopt(workspace, ProjectSetup(path=str(tmp_path / "repo"), id="project"))
-    workspace.create_task("project", TaskCreate(id="task", title="Work"))
+    workspace.create_task("project", task_request(id="task", title="Work"))
     questions = Questions(workspace)
     q = questions.ask(
         "project",
@@ -111,7 +111,7 @@ def test_schema_30_upgrade_preserves_work_and_adds_empty_notification_state(tmp_
         old.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:1])
         workspace = Workspace(tmp_path / "state")
         adopt(workspace, ProjectSetup(path=str(tmp_path / "repo"), id="project"))
-        task = workspace.create_task("project", TaskCreate(title="Keep me"))
+        task = workspace.create_task("project", task_request(title="Keep me"))
     workspace = Workspace(workspace.directory)
     assert workspace.task("project", task.id) == task
     assert not Notifications(workspace).page().items

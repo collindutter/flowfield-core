@@ -23,9 +23,8 @@ class Stage(Record):
     status: Literal["planned", "active", "completed"] = "planned"
 
 
-class StageUpdate(Record):
+class StageChange(Record):
     expected_revision: int = Field(ge=0)
-    agreement_revision: int = Field(ge=1)
     stages: list[Stage] = Field(min_length=1, max_length=8)
     reason: str = Field(min_length=1, max_length=2000)
 
@@ -36,6 +35,10 @@ class StageUpdate(Record):
         if sum(s.status == "active" for s in self.stages) > 1:
             raise ValueError("Only one stage can be active.")
         return self
+
+
+class StageUpdate(StageChange):
+    agreement_revision: int = Field(ge=1)
 
 
 class StagePlan(Record):

@@ -4,12 +4,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from project_fixtures import adopt, existing_directory
+from project_fixtures import adopt, existing_directory, task_request
 
 from flowfield.application import (
     ProjectEdit,
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     TaskPriority,
     TaskProgress,
@@ -31,7 +30,7 @@ def test_keys_are_unique_stable_and_never_reused(tmp_path: Path) -> None:
     assert [p.task_prefix for p in service.projects()] == ["PRJ", "HAR", "HWD"]
 
     def create(number: int):
-        return service.create_task("harbor", TaskCreate(title=f"Task {number}"))
+        return service.create_task("harbor", task_request(title=f"Task {number}"))
 
     with ThreadPoolExecutor(4) as pool:
         tasks = list(pool.map(create, range(12)))
@@ -43,11 +42,11 @@ def test_keys_are_unique_stable_and_never_reused(tmp_path: Path) -> None:
         TaskEdit(expected_revision=1, title="Renamed", task_type="bug", archived=True),
     )
     service.edit_project("harbor", ProjectEdit(expected_revision=1, name="New project name"))
-    assert service.create_task("harbor", TaskCreate(title="Next")).key == "HAR-13"
+    assert service.create_task("harbor", task_request(title="Next")).key == "HAR-13"
     assert service.task("harbor", task.id).key == task.key
     assert {r.key for r in service.task("harbor", task.key).revisions} == {"HAR-1"}
     assert service.setup_project(ProjectSetup(path=str(tmp_path / "harbor"))).task_prefix == "HAR"
-    assert service.create_task("hardware", TaskCreate(title="Other")).key == "HWD-1"
+    assert service.create_task("hardware", task_request(title="Other")).key == "HWD-1"
     with pytest.raises(ApplicationError, match="not found"):
         service.task("hardware", "HAR-1")
     assert Workspace(tmp_path / "state").board("harbor") == service.board("harbor")
@@ -56,9 +55,9 @@ def test_keys_are_unique_stable_and_never_reused(tmp_path: Path) -> None:
 def test_key_aliases_share_graph_progress_and_revision_checks(tmp_path: Path) -> None:
     service = Workspace(tmp_path / "state")
     adopt(service, ProjectSetup(path=str(tmp_path / "harbor")))
-    a = service.create_task("harbor", TaskCreate(id="serializer", title="Serializer"))
+    a = service.create_task("harbor", task_request(id="serializer", title="Serializer"))
     b = service.create_task(
-        "harbor", TaskCreate(id="download", title="Download", dependencies=[a.key, a.id])
+        "harbor", task_request(id="download", title="Download", dependencies=[a.key, a.id])
     )
     assert b.dependencies == [a.id] and b.blocked_by[0].key == a.key
     assert service.task("harbor", a.key).dependents[0].key == b.key
@@ -137,7 +136,13 @@ def test_configurable_prefix_validation_and_atomic_lock(tmp_path: Path) -> None:
         )
         assert rejected.status_code == 409
         assert client.get("/api/projects/harbor").json() == renamed
-        task = client.post("/api/projects/harbor/tasks", json={"title": "First task"}).json()
+        task = client.post(
+            "/api/projects/harbor/tasks",
+            json={
+                "stages": task_request(title="Fixture").model_dump()["stages"],
+                "title": "First task",
+            },
+        ).json()
         client.put(
             f"/api/projects/harbor/tasks/{task['key']}",
             json={"expected_revision": 1, "archived": True},

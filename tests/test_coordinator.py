@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from project_fixtures import task_request
 from test_execution import BASE, fixture
 from test_managed_local import FAKE, configured
 
@@ -502,12 +503,12 @@ def test_long_unicode_reply_keeps_latest_exchange_in_bounded_context(tmp_path, m
 
 
 def test_task_focus_is_scoped_revision_bound_and_idempotent(tmp_path, monkeypatch):
-    from flowfield.application import TaskCreate, TaskEdit
+    from flowfield.application import TaskEdit
     from flowfield.coordinator_models import CoordinatorTaskSelection
 
     service, conversation = setup(tmp_path, monkeypatch)
     ws, store = service.workspace, service.coordinator.store
-    task = ws.create_task("harbor", TaskCreate(title="Focused work", body="Original"))
+    task = ws.create_task("harbor", task_request(title="Focused work", body="Original"))
     request = CoordinatorSend(
         id=uuid4().hex,
         text="Explain this task",
@@ -562,14 +563,13 @@ def test_task_focus_is_scoped_revision_bound_and_idempotent(tmp_path, monkeypatc
 def test_selected_result_is_exact_and_must_belong_to_the_task(tmp_path, monkeypatch):
     from test_execution import result
 
-    from flowfield.application import TaskCreate
     from flowfield.coordinator_models import CoordinatorTaskSelection
 
     service, conversation = setup(tmp_path, monkeypatch)
     result(service.execution, process=False)
     selected = service.results.page("harbor", "task-0").items[0]
     task = service.workspace.task("harbor", "task-0")
-    other = service.workspace.create_task("harbor", TaskCreate(title="Other task"))
+    other = service.workspace.create_task("harbor", task_request(title="Other task"))
     store = service.coordinator.store
     with pytest.raises(ApplicationError, match="does not belong"):
         store.reserve(

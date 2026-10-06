@@ -200,12 +200,22 @@ def version(json_output: Json = False) -> None:
 def serve(
     ctx: typer.Context,
     port: Annotated[int | None, typer.Option(min=1, max=65535, help="Local service port.")] = None,
+    open_browser: Annotated[
+        bool,
+        typer.Option("--open/--no-open", help="Open the browser from an interactive terminal."),
+    ] = True,
 ) -> None:
     """Serve the API and built admin panel on 127.0.0.1. Stop with Ctrl-C."""
     from flowfield.api import create_app
+    from flowfield.serve import BrowserServer
 
     client: Client = ctx.obj
-    uvicorn.run(create_app(data_dir=client.directory), host="127.0.0.1", port=port or client.port)
+    BrowserServer(
+        uvicorn.Config(
+            create_app(data_dir=client.directory), host="127.0.0.1", port=port or client.port
+        ),
+        open_browser=open_browser,
+    ).run()
 
 
 @project_app.command("init")
@@ -533,6 +543,13 @@ def text_value(text: str | None, file: Path | None) -> str | None:
     return file.read_text(encoding="utf-8") if file is not None else text
 
 
+def stages_value(file: Path) -> Any:
+    try:
+        return json.loads(file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ApplicationError("invalid_request", "Stages file must contain valid JSON.") from error
+
+
 def update(
     client: Client,
     path: str,
@@ -706,6 +723,7 @@ def task_create(
         list[str] | None,
         typer.Option("--depends-on", help="Prerequisite task ID; repeat for multiple tasks."),
     ] = None,
+    stages_file: Annotated[Path | None, typer.Option(help="JSON stages array.")] = None,
     project: ProjectOption = None,
     author: Author = "human",
     json_output: Json = False,
@@ -718,6 +736,9 @@ def task_create(
             {
                 "title": title,
                 "id": id,
+                "stages": stages_value(stages_file)
+                if stages_file
+                else [{"id": "work", "title": title[:80], "outcome": title}],
                 "body": text_value(body, body_file) or "",
                 "task_type": task_type,
                 "status": status.replace("-", "_"),
@@ -727,6 +748,16 @@ def task_create(
             },
         ),
         json_output,
+    )
+
+
+@task_app.command("stages")
+def task_stages(
+    ctx: typer.Context, task: str, project: ProjectOption = None, json_output: Json = False
+) -> None:
+    """Read the current plan and revision before editing or preparing a task."""
+    output(
+        lambda: ctx.obj.request("GET", item_path(project, "tasks", task) + "/stages"), json_output
     )
 
 
@@ -745,6 +776,9 @@ def task_edit(
         typer.Option("--depends-on", help="Replace prerequisites; repeat for multiple tasks."),
     ] = None,
     no_dependencies: Annotated[bool, typer.Option(help="Remove all prerequisites.")] = False,
+    stages_file: Annotated[
+        Path | None, typer.Option(help="JSON stages change: expected_revision, stages, reason.")
+    ] = None,
     project: ProjectOption = None,
     expected_revision: Expected = None,
     author: Author = "human",
@@ -770,6 +804,8 @@ def task_edit(
             }.items()
             if v is not None
         }
+        if stages_file is not None:
+            changes["stages"] = stages_value(stages_file)
         if no_milestone:
             changes["milestone_id"] = None
         if depends_on is not None and no_dependencies:
@@ -818,6 +854,9 @@ def task_publish(
     ctx: typer.Context,
     task: str,
     completion: Annotated[str, typer.Option(help="Completion requirement: code or report.")],
+    stages_file: Annotated[
+        Path | None, typer.Option(help="JSON stages change: expected_revision, stages, reason.")
+    ] = None,
     project: ProjectOption = None,
     expected_revision: Expected = None,
     expected_decision_sequence: Annotated[int | None, typer.Option(min=0)] = None,
@@ -836,6 +875,7 @@ def task_publish(
             ctx.obj,
             path,
             {
+                **({"stages": stages_value(stages_file)} if stages_file else {}),
                 "completion": completion,
                 "expected_decision_sequence": expected_decision_sequence
                 if expected_decision_sequence is not None

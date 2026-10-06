@@ -4,13 +4,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 
 from flowfield.application import (
     MilestoneCreate,
     MilestoneEdit,
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     Workspace,
 )
@@ -47,7 +46,7 @@ def test_milestone_keys_survive_edits_restart_and_concurrent_creation(tmp_path: 
     with pytest.raises(ValueError):
         MilestoneCreate(id="M-1", title="Cannot shadow a key")
 
-    task = workspace.create_task("one", TaskCreate(title="Member", milestone_id="M-1"))
+    task = workspace.create_task("one", task_request(title="Member", milestone_id="M-1"))
     assert task.milestone_id == original.id
     assert (
         workspace.edit_task(

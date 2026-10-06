@@ -4,11 +4,12 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
+from project_fixtures import task_request
 from test_conversation import plan
 from test_execution import BASE, RESULT, fixture, validate_report
 from test_input_continuation import answer, queue
 
-from flowfield.application import TaskCreate, TaskEdit, TaskPublish
+from flowfield.application import TaskEdit, TaskPublish
 from flowfield.browser import BrowserReads
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import RunAction, Usage, WorkerResult
@@ -19,23 +20,21 @@ from flowfield.stages import Stages
 
 
 def test_changed_stage_agreement_blocks_only_its_task_until_coordinator_reconciles(tmp_path):
-    execution = fixture(tmp_path, count=2, cap=2)
+    execution = fixture(tmp_path, count=2, cap=2, stages=plan().stages)
     workspace = execution.workspace
     stages = Stages(workspace)
-    original = stages.update("harbor", "task-0", plan())
+    original = stages.get("harbor", "task-0")
     task = workspace.task("harbor", "task-0")
     task = workspace.edit_task(
         "harbor", task.id, TaskEdit(expected_revision=task.revision, body="Refined scope")
     )
-    workspace.publish_task(
-        "harbor",
-        task.id,
-        TaskPublish(
-            completion="report",
-            expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
-        ),
+    publication = TaskPublish(
+        completion="report",
+        expected_revision=task.revision,
+        expected_decision_sequence=task.decision_sequence,
     )
+    with pytest.raises(ApplicationError, match="current stages"):
+        workspace.publish_task("harbor", task.id, publication)
     task = workspace.task("harbor", task.id)
     card = BrowserReads(workspace).task("harbor", task.id)
     brief = ContextReads(workspace).task("harbor", task.id)
@@ -50,6 +49,7 @@ def test_changed_stage_agreement_blocks_only_its_task_until_coordinator_reconcil
     assert execution.claim("harbor", BASE, {BASE: set()}) is None
     assert stages.get("harbor", task.id) == original
     stages.update("harbor", task.id, plan(1, agreement=task.agreement_revision))
+    workspace.publish_task("harbor", task.id, publication)
     assert workspace.task("harbor", task.id).readiness == "ready"
     resumed = execution.claim("harbor", BASE, {BASE: set()})
     assert resumed.task_id == task.id
@@ -102,7 +102,7 @@ def test_answer_continues_once_beside_independent_work(tmp_path, restart):
     assert questions.get("harbor", q.id).continuation_run_id == successor.id
     assert execution.get("harbor", independent.id).status == ("uncertain" if restart else "running")
     task = execution.workspace.create_task(
-        "harbor", TaskCreate(id="task-2", title="Later", status="up_next", body="Report")
+        "harbor", task_request(id="task-2", title="Later", status="up_next", body="Report")
     )
     execution.workspace.publish_task(
         "harbor",

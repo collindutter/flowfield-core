@@ -3,6 +3,7 @@
 import os
 
 import pytest
+from project_fixtures import reconcile_fixture_stages
 from pydantic import ValidationError
 from test_results import approve, current, fixture
 
@@ -185,6 +186,7 @@ def test_reconciled_blocked_scope_offers_correction_without_approving_old_code(t
             note="Human clarified the remaining outcome",
         ),
     )
+    reconcile_fixture_stages(service.workspace, "harbor", task.id)
     value = current(service)
     assert value.next_action.action == "correct"
     assert value.approved_at is None

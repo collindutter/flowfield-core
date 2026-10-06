@@ -5,14 +5,13 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from project_fixtures import adopt, existing_directory
+from project_fixtures import adopt, existing_directory, reconcile_fixture_stages, task_request
 from test_connection import running_service
 from typer.testing import CliRunner
 
 from flowfield.api import create_app
 from flowfield.application import (
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     TaskProgress,
     TaskReconcile,
@@ -45,9 +44,9 @@ def progress(service: Workspace, task: str, status: str):
 def test_graph_validation_is_atomic_and_scoped(tmp_path: Path) -> None:
     service = workspace(tmp_path)
     adopt(service, ProjectSetup(path=str(tmp_path / "other")))
-    service.create_task("other", TaskCreate(id="foreign", title="Foreign"))
-    service.create_task("harbor", TaskCreate(id="a", title="A"))
-    service.create_task("harbor", TaskCreate(id="b", title="B", dependencies=["a", "a"]))
+    service.create_task("other", task_request(id="foreign", title="Foreign"))
+    service.create_task("harbor", task_request(id="a", title="A"))
+    service.create_task("harbor", task_request(id="b", title="B", dependencies=["a", "a"]))
     assert service.task("harbor", "b").dependencies == ["a"]
     before = service.board("harbor")
     for dependencies, code in [
@@ -65,12 +64,12 @@ def test_graph_validation_is_atomic_and_scoped(tmp_path: Path) -> None:
         assert error.value.code == code
         assert service.board("harbor") == before
     with pytest.raises(ApplicationError):
-        service.create_task("harbor", TaskCreate(id="self", title="Self", dependencies=["self"]))
+        service.create_task("harbor", task_request(id="self", title="Self", dependencies=["self"]))
     for status in ["in_progress", "in_review", "done"]:
         with pytest.raises(ApplicationError, match="prerequisites|Create the task"):
             service.create_task(
                 "harbor",
-                TaskCreate(id="invalid", title="Invalid", status=status, dependencies=["a"]),
+                task_request(id="invalid", title="Invalid", status=status, dependencies=["a"]),
             )
         with pytest.raises(ApplicationError, match="Blocked by: A"):
             progress(service, "b", status)
@@ -83,7 +82,7 @@ def test_readiness_archive_and_downstream_reconciliation(tmp_path: Path) -> None
     for key, dependencies in [("a", []), ("b", ["a"]), ("c", ["b"])]:
         service.create_task(
             "harbor",
-            TaskCreate(id=key, title=key.upper(), status="up_next", dependencies=dependencies),
+            task_request(id=key, title=key.upper(), status="up_next", dependencies=dependencies),
         )
     service.edit_task("harbor", "a", TaskEdit(expected_revision=1, archived=True))
     assert service.task("harbor", "b").blocked_by[0].archived
@@ -134,7 +133,7 @@ def test_readiness_archive_and_downstream_reconciliation(tmp_path: Path) -> None
 def test_added_dependency_preserves_work_and_explicit_replanning(tmp_path: Path) -> None:
     service = workspace(tmp_path)
     for key in ["a", "b"]:
-        service.create_task("harbor", TaskCreate(id=key, title=key, status="in_progress"))
+        service.create_task("harbor", task_request(id=key, title=key, status="in_progress"))
     changed = service.edit_task("harbor", "b", TaskEdit(expected_revision=1, dependencies=["a"]))
     assert changed.revision == 2 and changed.status == "in_progress"
     assert changed.reconciliation_reason
@@ -146,13 +145,14 @@ def test_added_dependency_preserves_work_and_explicit_replanning(tmp_path: Path)
     service.edit_task(
         "harbor", "b", TaskEdit(expected_revision=replanned.revision, dependencies=["a"])
     )
+    reconcile_fixture_stages(service, "harbor", "b")
     assert service.task("harbor", "b").readiness == "blocked"
 
 
 def test_concurrent_edges_and_completion_are_serialized(tmp_path: Path) -> None:
     service = workspace(tmp_path)
     for key in ["a", "b"]:
-        service.create_task("harbor", TaskCreate(id=key, title=key))
+        service.create_task("harbor", task_request(id=key, title=key))
 
     def link(key: str):
         try:

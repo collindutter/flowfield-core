@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from project_fixtures import adopt, existing_directory
+from project_fixtures import adopt, existing_directory, task_request
 from test_connection import running_service
 from typer.testing import CliRunner
 
 from flowfield.api import create_app
-from flowfield.application import ProjectSetup, TaskCreate, TaskEdit, TaskPriority, Workspace
+from flowfield.application import ProjectSetup, TaskEdit, TaskPriority, Workspace
 from flowfield.cli import app
 from flowfield.errors import ApplicationError
 
@@ -41,6 +41,7 @@ def test_board_grouping_order_archive_and_restart(tmp_path: Path) -> None:
         milestone = client.post(base + "/milestones", json={"title": "CSV export"}).json()
         for task_id in ["serializer", "button", "rounding"]:
             payload = {
+                "stages": task_request(title=task_id).model_dump()["stages"],
                 "id": task_id,
                 "title": task_id,
                 "status": "up_next",
@@ -119,10 +120,25 @@ def test_validation_and_scoped_atomic_edits(tmp_path: Path) -> None:
         client.post("/api/projects/two/milestones", json={"id": "foreign", "title": "Other"})
         base = "/api/projects/one/tasks"
         assert (
-            client.post(base, json={"title": "Bad", "milestone_id": "foreign"}).status_code == 404
+            client.post(
+                base,
+                json={
+                    "stages": task_request(title="Fixture").model_dump()["stages"],
+                    "title": "Bad",
+                    "milestone_id": "foreign",
+                },
+            ).status_code
+            == 404
         )
         assert client.get(base).json() == []
-        task = client.post(base, json={"title": "New task", "body": "Original"}).json()
+        task = client.post(
+            base,
+            json={
+                "stages": task_request(title="Fixture").model_dump()["stages"],
+                "title": "New task",
+                "body": "Original",
+            },
+        ).json()
         path = base + "/" + task["id"]
         assert (
             client.put(
@@ -209,7 +225,7 @@ def test_validation_and_scoped_atomic_edits(tmp_path: Path) -> None:
 def test_concurrent_move_and_edit_have_one_winner(tmp_path: Path) -> None:
     workspace = Workspace(tmp_path / "state")
     adopt(workspace, ProjectSetup(path=str(tmp_path / "harbor")))
-    workspace.create_task("harbor", TaskCreate(id="export", title="Export", body="First"))
+    workspace.create_task("harbor", task_request(id="export", title="Export", body="First"))
 
     def mutate(kind: str) -> str:
         try:
@@ -312,7 +328,15 @@ def test_priority_cannot_change_progress_and_times_survive_edits(tmp_path: Path)
         )
         base = "/api/projects/harbor/tasks"
         for identity in ["a", "b"]:
-            client.post(base, json={"id": identity, "title": identity, "status": "up_next"})
+            client.post(
+                base,
+                json={
+                    "stages": task_request(title="Fixture").model_dump()["stages"],
+                    "id": identity,
+                    "title": identity,
+                    "status": "up_next",
+                },
+            )
         a = client.post(
             base + "/a/progress", json={"expected_revision": 1, "status": "in_progress"}
         ).json()

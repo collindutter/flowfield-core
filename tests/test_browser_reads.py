@@ -3,10 +3,10 @@ from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 
 from flowfield.api import create_app
-from flowfield.application import ProjectSetup, TaskCreate, TaskEdit, TaskProgress, Workspace
+from flowfield.application import ProjectSetup, TaskEdit, TaskProgress, Workspace
 from flowfield.browser import BrowserReads
 from flowfield.errors import ApplicationError
 
@@ -15,7 +15,7 @@ def test_cards_and_current_details_never_hydrate_historical_text(tmp_path: Path)
     workspace = Workspace(tmp_path / "state")
     project = adopt(workspace, ProjectSetup(path=str(tmp_path / "repo")))
     task = workspace.create_task(
-        project.id, TaskCreate(title="Large description", body="x" * 200_000)
+        project.id, task_request(title="Large description", body="x" * 200_000)
     )
     for index in range(6):
         task = workspace.edit_task(
@@ -26,7 +26,9 @@ def test_cards_and_current_details_never_hydrate_historical_text(tmp_path: Path)
                 body=str(index) * 200_000,
             ),
         )
-    blocked = workspace.create_task(project.id, TaskCreate(title="Blocked", dependencies=[task.id]))
+    blocked = workspace.create_task(
+        project.id, task_request(title="Blocked", dependencies=[task.id])
+    )
     task = workspace.edit_task(
         project.id, task.id, TaskEdit(expected_revision=task.revision, archived=True)
     )
@@ -60,7 +62,7 @@ def test_cards_and_current_details_never_hydrate_historical_text(tmp_path: Path)
 def test_state_entry_and_rearchive_metadata_match_full_records(tmp_path: Path) -> None:
     workspace = Workspace(tmp_path / "state")
     project = adopt(workspace, ProjectSetup(path=str(tmp_path / "repo")))
-    task = workspace.create_task(project.id, TaskCreate(title="Task"))
+    task = workspace.create_task(project.id, task_request(title="Task"))
     task = workspace.record_progress(
         project.id,
         task.id,
@@ -108,7 +110,7 @@ def test_archive_availability_shares_write_policy_and_rechecks_races(tmp_path: P
 
     workspace = Workspace(tmp_path / "state")
     project = adopt(workspace, ProjectSetup(path=str(tmp_path / "repo")))
-    task = workspace.create_task(project.id, TaskCreate(title="Archive safely"))
+    task = workspace.create_task(project.id, task_request(title="Archive safely"))
     reads = BrowserReads(workspace)
     assert reads.task(project.id, task.id).archive_blocker is None
     # Even a nonblocking project question affecting this task prevents archiving.
@@ -128,7 +130,7 @@ def test_archive_availability_shares_write_policy_and_rechecks_races(tmp_path: P
             project.id, task.id, TaskEdit(expected_revision=task.revision, archived=True)
         )
     assert error.value.message == blocked.archive_blocker
-    active = workspace.create_task(project.id, TaskCreate(title="Active task"))
+    active = workspace.create_task(project.id, task_request(title="Active task"))
     active = workspace.record_progress(
         project.id, active.id, TaskProgress(expected_revision=active.revision, status="in_progress")
     )

@@ -80,7 +80,7 @@ async def check_mcp(base: str, task: dict) -> None:
         stages = await session.call_tool(
             "get_task_stages", {"project_id": "harbor", "task_id": "HAR-1"}
         )
-        assert not stages.isError and stages.structuredContent["revision"] == 0
+        assert not stages.isError and stages.structuredContent["revision"] == 2
         thread = await session.call_tool(
             "get_task_conversation", {"project_id": "harbor", "task_id": "HAR-1"}
         )
@@ -245,6 +245,18 @@ def main() -> None:
                             )
                         )
                         assert created["status"] == "backlog"
+                        stage_plan = json.loads(command("task", "stages", "export", "--json"))
+                        assert stage_plan["revision"] == 1 and len(stage_plan["stages"]) == 1
+                        stage_file = Path(cwd) / "stages.json"
+                        stage_file.write_text(
+                            json.dumps(
+                                {
+                                    "expected_revision": stage_plan["revision"],
+                                    "stages": stage_plan["stages"],
+                                    "reason": "Clarified export scope",
+                                }
+                            )
+                        )
                         plan.write_text("Export filtered rows, preserving row order.\n")
                         command(
                             "task",
@@ -252,6 +264,8 @@ def main() -> None:
                             "export",
                             "--expected-revision",
                             "1",
+                            "--stages-file",
+                            str(stage_file),
                             "--title",
                             "CSV export",
                             "--body-file",

@@ -4112,6 +4112,15 @@ export interface components {
        */
       status: "planned" | "active" | "completed";
     };
+    /** StageChange */
+    StageChange: {
+      /** Expected Revision */
+      expected_revision: number;
+      /** Stages */
+      stages: components["schemas"]["Stage-Input"][];
+      /** Reason */
+      reason: string;
+    };
     /** StagePlan */
     StagePlan: {
       /** Project Id */
@@ -4146,12 +4155,12 @@ export interface components {
     StageUpdate: {
       /** Expected Revision */
       expected_revision: number;
-      /** Agreement Revision */
-      agreement_revision: number;
       /** Stages */
       stages: components["schemas"]["Stage-Input"][];
       /** Reason */
       reason: string;
+      /** Agreement Revision */
+      agreement_revision: number;
     };
     /** Task */
     Task: {
@@ -4324,6 +4333,8 @@ export interface components {
        * @default human
        */
       author: string;
+      /** Stages */
+      stages: components["schemas"]["Stage-Input"][];
       preparation?: components["schemas"]["TaskPreparation"] | null;
       /**
        * Task Type
@@ -4439,6 +4450,7 @@ export interface components {
        * @default human
        */
       author: string;
+      stages?: components["schemas"]["StageChange"] | null;
       preparation?: components["schemas"]["TaskPreparation"] | null;
       /** Title */
       title?: string | null;
@@ -4516,6 +4528,7 @@ export interface components {
        * @default human
        */
       author: string;
+      stages?: components["schemas"]["StageChange"] | null;
       /** Expected Decision Sequence */
       expected_decision_sequence: number;
       /**

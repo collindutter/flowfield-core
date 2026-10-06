@@ -6,7 +6,16 @@ import { rmSync } from "node:fs";
 // performs cleanup only after the service exits. Forced termination retains state.
 const service = spawn(
   "uv",
-  ["run", "--project", "..", "flowfield", "serve", "--port", "8766"],
+  [
+    "run",
+    "--project",
+    "..",
+    "flowfield",
+    "serve",
+    "--no-open",
+    "--port",
+    "8766",
+  ],
   {
     stdio: "inherit",
   },

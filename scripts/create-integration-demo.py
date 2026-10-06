@@ -14,6 +14,8 @@ from flowfield.execution_models import QueueEdit, SettingsEdit, WorkerResult
 from flowfield.integration import Integrations
 from flowfield.integration_models import IntegrationConfig
 from flowfield.results import Results
+from flowfield.stage_models import StageUpdate
+from flowfield.stages import Stages
 
 
 def main() -> None:
@@ -71,6 +73,7 @@ def main() -> None:
         task = workspace.create_task(
             project.id,
             TaskCreate(
+                stages=[{"id": "work", "title": title[:80], "outcome": title}],
                 id=identity,
                 title=title,
                 milestone_id=milestone,
@@ -143,6 +146,18 @@ def main() -> None:
     reports = run_checks(env, ["python -m unittest -v"])
     assert all(check.exit_code == 0 for check in reports)
     commit, _ = env.snapshot(head)
+    progress = Stages(workspace).get(project.id, run.task_id)
+    Stages(workspace).update(
+        project.id,
+        run.task_id,
+        StageUpdate(
+            expected_revision=progress.revision,
+            agreement_revision=progress.agreement_revision,
+            stages=[stage.model_copy(update={"status": "completed"}) for stage in progress.stages],
+            reason="Demo implementation and checks completed",
+        ),
+        run_id=run.id,
+    )
     run = execution.finish(
         project.id,
         run.id,

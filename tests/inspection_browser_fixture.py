@@ -5,11 +5,11 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 
 from flowfield.adapters.git_workspace import git
 from flowfield.adapters.local_execution import LocalHost
-from flowfield.application import ProjectSetup, TaskCreate, TaskPreparation, Workspace
+from flowfield.application import ProjectSetup, TaskPreparation, Workspace
 from flowfield.execution_models import SettingsEdit, WorkerResult
 from flowfield.inspection import Inspections
 from flowfield.inspection_models import InspectionConfig
@@ -54,7 +54,7 @@ if sys.argv[2] == "create":
     )
     workspace.create_task(
         project,
-        TaskCreate(
+        task_request(
             id="try",
             title="Try the candidate",
             body="Make a useful greeting",

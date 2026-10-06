@@ -1,3 +1,4 @@
+import { fixtureStages } from "./support";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
@@ -17,7 +18,7 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
   ).toBe(true);
   const task = await (
     await request.post("/api/projects/agent-settings/tasks", {
-      data: { title: "Check project behavior" },
+      data: { stages: fixtureStages(), title: "Check project behavior" },
     })
   ).json();
   const first = {
@@ -208,7 +209,7 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
   await picker.getByLabel("Reasoning effort").selectOption("high");
   settings = { ...settings, revision: settings.revision + 1 };
   await request.post("/api/projects/agent-settings/tasks", {
-    data: { title: "Cause settings refresh" },
+    data: { stages: fixtureStages(), title: "Cause settings refresh" },
   });
   await expect(
     picker.getByText(

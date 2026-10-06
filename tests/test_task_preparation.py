@@ -3,12 +3,11 @@
 from pathlib import Path
 
 import pytest
-from project_fixtures import adopt
+from project_fixtures import adopt, fixture_stage_change, task_request
 
 from flowfield.activity import ActivityCreate
 from flowfield.application import (
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     TaskPreparation,
     TaskPriority,
@@ -42,7 +41,7 @@ def test_capture_refinement_and_queue_are_separate(tmp_path: Path):
     w.on_change = lambda _: snapshots.append(w.tasks("project"))
     task = w.create_task(
         "project",
-        TaskCreate(
+        task_request(
             title="Find the cause",
             body="Report evidence and recommendation.",
             preparation=preparation(),
@@ -60,6 +59,7 @@ def test_capture_refinement_and_queue_are_separate(tmp_path: Path):
         TaskEdit(
             expected_revision=task.revision,
             body="Report evidence, uncertainty and recommendation.",
+            stages=fixture_stage_change(w, "project", task.id),
             preparation=preparation(),
         ),
     )
@@ -98,7 +98,7 @@ def test_failed_preparation_rolls_back_creation_edits_history_and_notifications(
     with pytest.raises(ApplicationError, match="delivery target"):
         w.create_task(
             "project",
-            TaskCreate(
+            task_request(
                 title="Code",
                 body="Implement the change.",
                 preparation=preparation(completion="code"),
@@ -106,7 +106,8 @@ def test_failed_preparation_rolls_back_creation_edits_history_and_notifications(
         )
     assert not w.tasks("project") and not notifications
     task = w.create_task(
-        "project", TaskCreate(title="Report", body="Original agreement", preparation=preparation())
+        "project",
+        task_request(title="Report", body="Original agreement", preparation=preparation()),
     )
     assert task.key.endswith("-1")
     w.add_activity(
@@ -163,11 +164,11 @@ def test_failed_preparation_rolls_back_creation_edits_history_and_notifications(
 def test_preparation_keeps_dependency_gates_and_manual_edits_show_next_owner(tmp_path: Path):
     w = setup(tmp_path)
     first = w.create_task(
-        "project", TaskCreate(title="Findings", body="Report findings", preparation=preparation())
+        "project", task_request(title="Findings", body="Report findings", preparation=preparation())
     )
     second = w.create_task(
         "project",
-        TaskCreate(
+        task_request(
             title="Recommendation",
             body="Use the findings",
             dependencies=[first.key],
@@ -180,7 +181,7 @@ def test_preparation_keeps_dependency_gates_and_manual_edits_show_next_owner(tmp
         "project", second.id, TaskEdit(expected_revision=second.revision, body="Use new findings")
     )
     assert changed.publication_status == "draft"
-    assert "Requirements changed" in changed.preparation_issue
+    assert "stages" in changed.preparation_issue.lower()
     browser = BrowserReads(w).board("project")
     assert (
         next(t for t in browser.tasks if t.id == second.id).preparation_issue
@@ -190,7 +191,7 @@ def test_preparation_keeps_dependency_gates_and_manual_edits_show_next_owner(tmp
         ContextReads(w).task("project", second.key)["preparation_issue"]
         == changed.preparation_issue
     )
-    empty = w.create_task("project", TaskCreate(title="Unfinished idea"))
+    empty = w.create_task("project", task_request(title="Unfinished idea"))
     assert (
         "Describe the requested outcome"
         in BrowserReads(w).task("project", empty.id).preparation_issue

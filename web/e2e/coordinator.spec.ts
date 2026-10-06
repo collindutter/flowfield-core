@@ -1,3 +1,4 @@
+import { fixtureStages } from "./support";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
@@ -48,7 +49,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   expect(
     (
       await request.post("/api/projects/chat-browser/tasks", {
-        data: { title: "Plan the chat experience" },
+        data: { stages: fixtureStages(), title: "Plan the chat experience" },
       })
     ).ok(),
   ).toBeTruthy();
@@ -401,10 +402,12 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     "color",
     await timeline.nth(0).evaluate((el) => getComputedStyle(el).color),
   );
-  await page.getByRole("button", { name: "Collapse projects" }).click();
+  await expect(
+    page.getByRole("button", { name: "Collapse projects" }),
+  ).toHaveCount(0);
   const rail = page.locator('[data-sidebar="sidebar"]').first();
   for (const control of [
-    page.getByRole("button", { name: "Expand projects" }),
+    page.getByRole("link", { name: "Flowfield", exact: true }),
     page.getByRole("button", { name: /^Appearance:/ }),
     page.getByRole("button", { name: /^Notifications/ }),
     page.getByRole("button", { name: "Add project", exact: true }),
@@ -416,7 +419,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
         async () => {
           const bounds = await rail.boundingBox();
           const icon = await control
-            .locator("svg, .project-badge, .live-dot")
+            .locator("svg, img, .project-badge, .live-dot")
             .first()
             .boundingBox();
           return Math.abs(
@@ -443,7 +446,9 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
       }),
     )
     .toBeLessThan(1);
-  await page.getByRole("button", { name: "Expand projects" }).click();
+  await expect(
+    page.getByRole("button", { name: "Expand projects" }),
+  ).toHaveCount(0);
   await expect(
     page.locator(".coordinator-message").last().locator(":scope > :last-child"),
   ).toHaveText("Coordinator · stopped");
@@ -868,7 +873,7 @@ test("long project chat preserves loaded history while live pages advance", asyn
   await expect(messages).toHaveCount(40);
   count = 41;
   await request.post("/api/projects/long-chat-project/tasks", {
-    data: { title: "Refresh project state" },
+    data: { stages: fixtureStages(), title: "Refresh project state" },
   });
   await expect(
     page.getByText("Planning exchange 41", { exact: true }),
@@ -882,7 +887,7 @@ test("long project chat preserves loaded history while live pages advance", asyn
   ).toHaveCount(0);
   count = 100; // More than a page arrived while this browser was disconnected.
   await request.post("/api/projects/long-chat-project/tasks", {
-    data: { title: "Reconnect with newer work" },
+    data: { stages: fixtureStages(), title: "Reconnect with newer work" },
   });
   await expect(messages).toHaveCount(100);
   await expect(
@@ -904,7 +909,11 @@ test("task focus preserves one coordinator, records context at send and restores
     tasks.push(
       await (
         await request.post(`/api/projects/${project}/tasks`, {
-          data: { title, body: "Keep the interaction simple." },
+          data: {
+            stages: fixtureStages(),
+            title,
+            body: "Keep the interaction simple.",
+          },
         })
       ).json(),
     );

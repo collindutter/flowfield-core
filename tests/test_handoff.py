@@ -4,11 +4,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 from pydantic import ValidationError
 
 from flowfield.activity import ActivityCreate
-from flowfield.application import ProjectSetup, TaskCreate, TaskEdit, Workspace
+from flowfield.application import ProjectSetup, TaskEdit, Workspace
 from flowfield.errors import ApplicationError
 from flowfield.reads import PAGE_BYTES, ContextReads, size
 
@@ -16,7 +16,7 @@ from flowfield.reads import PAGE_BYTES, ContextReads, size
 def test_handoff_selection_conflicts_retry_and_restart(tmp_path: Path) -> None:
     service = Workspace(tmp_path / "state")
     adopt(service, ProjectSetup(path=str(tmp_path / "harbor")))
-    service.create_task("harbor", TaskCreate(id="one", title="Catalog"))
+    service.create_task("harbor", task_request(id="one", title="Catalog"))
     first = ActivityCreate(
         id="first",
         task_id="HAR-1",
@@ -83,7 +83,7 @@ def test_briefing_prioritizes_answers_and_exposes_omissions(tmp_path: Path) -> N
     (root / "AGENTS.md").write_text("Use unittest.")
     for number in range(5):
         service.create_task(
-            "harbor", TaskCreate(id=f"t{number}", title=f"Task {number}", status="up_next")
+            "harbor", task_request(id=f"t{number}", title=f"Task {number}", status="up_next")
         )
     service.prioritize_task(
         "harbor", "t4", TaskPriority(expected_revision=1, status="up_next", before_id="t0")

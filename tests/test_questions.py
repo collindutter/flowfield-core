@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from project_fixtures import adopt
+from project_fixtures import adopt, reconcile_fixture_stages, task_request
 
 from flowfield.api import create_app
-from flowfield.application import ProjectSetup, TaskCreate, TaskEdit, TaskProgress, Workspace
+from flowfield.application import ProjectSetup, TaskEdit, TaskProgress, Workspace
 from flowfield.errors import ApplicationError
 from flowfield.questions import (
     QuestionAnswer,
@@ -25,11 +25,11 @@ def setup(tmp_path: Path):
     workspace = Workspace(tmp_path / "state")
     adopt(workspace, ProjectSetup(path=str(tmp_path / "harbor")))
     workspace.create_task(
-        "harbor", TaskCreate(id="serializer", title="Serialize CSV", status="up_next")
+        "harbor", task_request(id="serializer", title="Serialize CSV", status="up_next")
     )
     workspace.create_task(
         "harbor",
-        TaskCreate(
+        task_request(
             id="download",
             title="Download",
             body="Export CSV",
@@ -106,6 +106,7 @@ def test_answer_is_not_application_and_other_gates_survive(tmp_path: Path) -> No
         "format",
         QuestionWithdraw(expected_revision=1, reason="Covered by the existing CSV standard."),
     )
+    reconcile_fixture_stages(workspace, "harbor", "HAR-2")
     assert workspace.task("harbor", "HAR-2").readiness == "blocked"  # dependency still applies
     workspace.record_progress(
         "harbor", "HAR-1", TaskProgress(expected_revision=1, status="done", completion="report")
@@ -373,7 +374,7 @@ def test_project_input_targets_and_atomic_stale_protection(tmp_path: Path) -> No
 
     workspace, questions = setup(tmp_path)
     workspace.create_task(
-        "harbor", TaskCreate(id="independent", title="Independent", status="up_next")
+        "harbor", task_request(id="independent", title="Independent", status="up_next")
     )
     question = project_question(questions, ["HAR-1", "serializer", "HAR-2"])
     assert len(question.affected_task_ids) == 2
@@ -414,6 +415,8 @@ def test_project_input_targets_and_atomic_stale_protection(tmp_path: Path) -> No
     request.expected_project_revision = 1
     applied = questions.apply("harbor", question.id, request)
     assert applied.applied_task_revisions == {"serializer": 2, "download": 3}
+    reconcile_fixture_stages(workspace, "harbor", "HAR-1")
+    reconcile_fixture_stages(workspace, "harbor", "HAR-2")
     assert workspace.task("harbor", "HAR-1").readiness == "draft"
     assert workspace.task("harbor", "HAR-2").readiness == "blocked"
     assert not workspace.task("harbor", "HAR-2").blocking_questions

@@ -5,7 +5,9 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
-from flowfield.application import ProjectSetup, TaskCreate, TaskPublish, Workspace
+from project_fixtures import task_request
+
+from flowfield.application import ProjectSetup, TaskPublish, Workspace
 from flowfield.conversation import Conversation
 from flowfield.execution import Execution
 from flowfield.execution_models import QueueEdit, SettingsEdit, Usage, WorkerResult
@@ -20,7 +22,7 @@ if sys.argv[2] == "create":
     ws.setup_project(ProjectSetup(path=str(path), task_prefix="STR"))
     task = ws.create_task(
         "stream-project",
-        TaskCreate(
+        task_request(
             id="stream",
             title="Observe live output",
             body="Verify the public activity feed.",

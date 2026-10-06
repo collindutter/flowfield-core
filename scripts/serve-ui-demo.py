@@ -53,40 +53,44 @@ let i=document.querySelector('input');plants.push(i.value);i.value='';render()};
 render();</script></html>"""
 
 
+def demo_stages(task_type, active=-1):
+    investigation = task_type == "investigation"
+    return [
+        Stage(
+            id=name,
+            title=title,
+            outcome=outcome,
+            status="completed" if i < active else "active" if i == active else "planned",
+        )
+        for i, (name, title, outcome) in enumerate(
+            [
+                (
+                    "understand",
+                    "Understand",
+                    "Confirm the requested experience and constraints.",
+                ),
+                (
+                    "build",
+                    "Explore" if investigation else "Build",
+                    "Gather evidence and alternatives."
+                    if investigation
+                    else "Implement the agreed small outcome.",
+                ),
+                ("check", "Check", "Verify behavior and report remaining limitations."),
+            ]
+        )
+    ]
+
+
 def plan(workspace, task, active=0):
     current = Stages(workspace).get(task.project_id, task.id)
-    investigation = task.task_type == "investigation"
     return Stages(workspace).update(
         task.project_id,
         task.id,
         StageUpdate(
             expected_revision=current.revision,
             agreement_revision=task.agreement_revision,
-            stages=[
-                Stage(
-                    id=name,
-                    title=title,
-                    outcome=outcome,
-                    status="completed" if i < active else "active" if i == active else "planned",
-                )
-                for i, (name, title, outcome) in enumerate(
-                    [
-                        (
-                            "understand",
-                            "Understand",
-                            "Confirm the requested experience and constraints.",
-                        ),
-                        (
-                            "build",
-                            "Explore" if investigation else "Build",
-                            "Gather evidence and alternatives."
-                            if investigation
-                            else "Implement the agreed small outcome.",
-                        ),
-                        ("check", "Check", "Verify behavior and report remaining limitations."),
-                    ]
-                )
-            ],
+            stages=demo_stages(task.task_type, active),
             reason="Demo progress plan; the agreed outcome still governs completion.",
         ),
     )
@@ -174,6 +178,7 @@ def seed(root):
         item = ws.create_task(
             project.id,
             TaskCreate(
+                stages=demo_stages(kwargs.get("task_type", "feature")),
                 id=identity,
                 title=title,
                 body=body,

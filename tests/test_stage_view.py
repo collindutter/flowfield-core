@@ -12,9 +12,9 @@ from flowfield.thread_view import ThreadView
 
 
 def test_stage_history_stays_exact_after_progress_and_repeated_saves(tmp_path):
-    workspace = fixture(tmp_path).workspace
+    workspace = fixture(tmp_path, stages=plan().stages).workspace
     stages = Stages(workspace)
-    first = stages.update("harbor", "task-0", plan())
+    first = stages.get("harbor", "task-0")
     thread = ThreadView(workspace)
     original = thread.item_view("harbor", "task-0", "plan:1")
     assert original.title == "Stages defined"

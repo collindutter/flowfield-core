@@ -36,9 +36,11 @@ flowfield serve
 
 ## Start and stop
 
-Open [localhost:8765](http://127.0.0.1:8765). The service runs in the foreground;
-Ctrl-C stops it. Choose another port with `flowfield serve --port 8770` and give
-clients the same port using `flowfield --port 8770 ...`.
+The service runs in the foreground at [localhost:8765](http://127.0.0.1:8765).
+An interactive `flowfield serve` opens your browser once the service is ready.
+Use `flowfield serve --no-open` to keep it closed; scripts and noninteractive sessions
+only print the link. Ctrl-C stops it. Choose another port with `flowfield serve --port 8770`
+and give clients the same port using `flowfield --port 8770 ...`.
 
 Flowfield runs locally on macOS and Linux and binds to loopback. Managed work needs Git
 and an installed, signed-in [Codex CLI](https://developers.openai.com/codex/cli/).

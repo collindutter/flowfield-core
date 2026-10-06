@@ -3,9 +3,9 @@ import json
 from pathlib import Path
 
 import pytest
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 
-from flowfield.application import ProjectSetup, TaskCreate, TaskEdit, Workspace
+from flowfield.application import ProjectSetup, TaskEdit, Workspace
 from flowfield.changes import Changes
 from flowfield.errors import ApplicationError
 
@@ -40,7 +40,7 @@ def test_only_committed_writes_publish_project(tmp_path: Path) -> None:
     project = adopt(workspace, ProjectSetup(path=str(tmp_path / "repo")))
     assert published == [None]
     published.clear()
-    task = workspace.create_task(project.id, TaskCreate(title="Task"))
+    task = workspace.create_task(project.id, task_request(title="Task"))
     assert published == [project.id]
     published.clear()
     with pytest.raises(ApplicationError):

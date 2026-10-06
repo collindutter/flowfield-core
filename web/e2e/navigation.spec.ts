@@ -1,3 +1,4 @@
+import { fixtureStages } from "./support";
 import { join } from "node:path";
 
 import { expect } from "@playwright/test";
@@ -33,11 +34,16 @@ test("task keys link to persistent selections with native tabs, history and draf
   const call = await connectMcp(request);
   const one = await call("create_task", {
     project_id: "navigation",
-    task: { title: "Prepare the export", status: "up_next" },
+    task: {
+      stages: fixtureStages(),
+      title: "Prepare the export",
+      status: "up_next",
+    },
   });
   const two = await call("create_task", {
     project_id: "navigation",
     task: {
+      stages: fixtureStages(),
       title: "Download the export",
       status: "up_next",
       dependencies: [one.key],
@@ -45,7 +51,7 @@ test("task keys link to persistent selections with native tabs, history and draf
   });
   const old = await call("create_task", {
     project_id: "navigation",
-    task: { title: "Earlier experiment" },
+    task: { stages: fixtureStages(), title: "Earlier experiment" },
   });
   await call("edit_task", {
     project_id: "navigation",
@@ -215,7 +221,7 @@ test("collections open and close entity details through the same routes", async 
   });
   await call("create_task", {
     project_id,
-    task: { id: "retired", title: "Retired work" },
+    task: { stages: fixtureStages(), id: "retired", title: "Retired work" },
   });
   await call("edit_task", {
     project_id,
@@ -256,6 +262,7 @@ test("task metadata and internal Markdown links stay inside the router", async (
   expect(milestone.ok()).toBe(true);
   await request.post(`/api/projects/${project_id}/tasks`, {
     data: {
+      stages: fixtureStages(),
       id: "export",
       title: "Export books",
       milestone_id: "questions",
@@ -297,7 +304,12 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
     data: { id: "group", title: "First delivery" },
   });
   await request.post(`/api/projects/${id}/tasks`, {
-    data: { id: "one", title: "A focused task", milestone_id: "group" },
+    data: {
+      stages: fixtureStages(),
+      id: "one",
+      title: "A focused task",
+      milestone_id: "group",
+    },
   });
   await page.goto(`/projects/${id}`);
   const boot = await page.evaluate(() => performance.timeOrigin);
@@ -420,7 +432,7 @@ test("closing entity overlays returns through history without duplicate collecti
     data: { path: existingDirectory(join(state, id)), task_prefix: "HIS" },
   });
   await request.post(`/api/projects/${id}/tasks`, {
-    data: { id: "one", title: "History task" },
+    data: { stages: fixtureStages(), id: "one", title: "History task" },
   });
   const call = await connectMcp(request);
   await call("ask_question", {
@@ -492,7 +504,12 @@ test("entity identity and drafts persist across task and project tabs", async ({
     data: { id: "first", title: "First milestone" },
   });
   await request.post(`/api/projects/${project}/tasks`, {
-    data: { id: "first", title: "First task", milestone_id: "first" },
+    data: {
+      stages: fixtureStages(),
+      id: "first",
+      title: "First task",
+      milestone_id: "first",
+    },
   });
   await page.goto("/");
   const sidebar = page.locator('[data-slot="sidebar"]');
@@ -603,12 +620,16 @@ test.describe("relative timestamps", () => {
       timeStyle: "long",
       timeZone: "America/Denver",
     }).format(new Date(created));
+    // Initial feed layout follows its last entry; settle its animation frames before hover.
+    await expect(page.locator('[data-message-id="plan:1"]')).toBeVisible();
+    await page.clock.runFor(1000);
     await time.hover();
     await page.clock.runFor(100);
     await expect(page.getByRole("tooltip")).toHaveText(exact);
     await page.mouse.move(0, 0);
     await page.clock.runFor(100);
     await time.focus();
+    await page.clock.runFor(100);
     await expect(page.getByRole("tooltip")).toHaveText(exact);
     // Time advances without a data refresh; the date behind the label stays fixed.
     await page.clock.fastForward(290000);
@@ -643,6 +664,7 @@ test("sidebar rail names remain accessible and idle input opens deliberately", a
   const path = "/api/projects/sidebar-names";
   await request.post(path + "/tasks", {
     data: {
+      stages: fixtureStages(),
       id: "idle",
       title: "Read the current agreement",
       body: "Useful intent",
@@ -726,7 +748,7 @@ test("workspace navigation, mobile board and appearance work beside the coordina
     },
   });
   await request.post("/api/projects/workspace-frame/tasks", {
-    data: { title: "Review the workspace layout" },
+    data: { stages: fixtureStages(), title: "Review the workspace layout" },
   });
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/projects/workspace-frame");
@@ -889,6 +911,7 @@ test("long task tooltips never expand the workspace scroll owners", async ({
   });
   await request.post("/api/projects/tooltip-overflow/tasks", {
     data: {
+      stages: fixtureStages(),
       title: "Long definition",
       body: Array.from(
         { length: 70 },

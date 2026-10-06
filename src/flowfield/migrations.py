@@ -233,6 +233,35 @@ def retire_project_decisions(db: sqlite3.Connection) -> None:
             )
 
 
+def initial_task_stages(db: sqlite3.Connection) -> None:
+    for project_id, task_id, raw in db.execute(
+        "SELECT project_id,id,data FROM tasks t WHERE NOT EXISTS "
+        "(SELECT 1 FROM stage_plans p WHERE p.project_id=t.project_id AND p.task_id=t.id)"
+    ).fetchall():
+        task = json.loads(raw)
+        plan = {
+            "project_id": project_id,
+            "task_id": task_id,
+            "revision": 1,
+            "agreement_revision": task["agreement_revision"],
+            "stages": [
+                {
+                    "id": "work",
+                    "title": task["title"][:80],
+                    "outcome": task["title"],
+                    "status": "completed" if task["status"] == "done" else "planned",
+                }
+            ],
+            "reason": "Initial stage from the existing task outcome.",
+            "author": "Flowfield",
+            "created_at": task["updated_at"],
+            "run_id": None,
+        }
+        db.execute(
+            "INSERT INTO stage_plans VALUES (?,?,?,?)", (project_id, task_id, 1, json.dumps(plan))
+        )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
@@ -247,6 +276,7 @@ MIGRATIONS = (
     Migration(40, task_specific_speed),
     Migration(41, retire_worker_discussions),
     Migration(42, retire_project_decisions),
+    Migration(43, initial_task_stages),
 )
 
 

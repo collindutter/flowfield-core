@@ -3,11 +3,11 @@
 import json
 
 from fastapi.testclient import TestClient
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 
 from flowfield import migrations
 from flowfield.api import create_app
-from flowfield.application import ProjectSetup, TaskCreate, TaskPreparation, Workspace
+from flowfield.application import ProjectSetup, TaskPreparation, Workspace
 from flowfield.reads import ContextReads
 
 
@@ -21,7 +21,7 @@ def test_project_decisions_are_read_only_history_after_upgrade(tmp_path, monkeyp
         adopt(workspace, ProjectSetup(path=str(tmp_path / "project")))
         task = workspace.create_task(
             "project",
-            TaskCreate(
+            task_request(
                 title="Inspect exports",
                 body="Report findings.",
                 preparation=TaskPreparation(expected_decision_sequence=0, completion="report"),

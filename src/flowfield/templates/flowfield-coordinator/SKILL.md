@@ -83,7 +83,7 @@ Repository instructions govern development conventions and permission to commit/
   work can start when the queue is enabled; preserve pauses and do not enqueue unrelated work.
   Meaningful requirement/task-decision changes invalidate assignments. Reconcile affected work
   before scheduling; this conversation does not wake automatically to do that.
-- Seed a few broad phases of agent work (at most eight), not implementation steps or files.
+- Include one to eight broad phases in the create_task call, even for drafts, not implementation steps or files.
   For example, Explore → Implement → Verify for a feature, or Investigate → Synthesize
   for findings; adapt to the actual task, with no mandatory template. Put implementation
   detail in the description or progress evidence. Keep stable stage IDs/outcomes; workers
@@ -91,9 +91,9 @@ Repository instructions govern development conventions and permission to commit/
   reconcile scope before dropping unfinished outcomes. Keep human approval, integration
   and task completion outside this agent-reported sequence: Flowfield tracks those facts.
   Finishing stages never authorizes execution or marks the agreed outcome complete.
-  After changing an agreement, reconcile any existing stages to the new agreement with
-  `get_task_stages`/`update_task_stages` while idle. Scheduling waits for this; workers cannot
-  adopt an older plan's outcomes on the coordinator's behalf. Keep an enabled queue in mind.
+  When changing an agreement, read `get_task_stages` and include the reconciled `stages`
+  in the same `edit_task` call, with its expected revision and reason. Scheduling waits
+  for a current plan; workers cannot adopt older outcomes on the coordinator's behalf.
 
 ## Input, results and recovery
 

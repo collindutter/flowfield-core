@@ -4,12 +4,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from project_fixtures import adopt
+from project_fixtures import adopt, fixture_stage_change, task_request
 
 from flowfield.activity import ActivityCreate, DecisionWithdraw
 from flowfield.application import (
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     TaskPriority,
     TaskProgress,
@@ -29,7 +28,7 @@ def setup(tmp_path: Path) -> Workspace:
     for identity in ("catalog", "export"):
         workspace.create_task(
             "harbor",
-            TaskCreate(
+            task_request(
                 id=identity,
                 title=identity,
                 status="up_next",
@@ -49,6 +48,7 @@ def publish(workspace: Workspace, identity: str = "export"):
             expected_revision=current.revision,
             expected_decision_sequence=current.decision_sequence,
             author="coordinator",
+            stages=fixture_stage_change(workspace, "harbor", identity),
         ),
     )
 
@@ -159,6 +159,7 @@ def test_questions_must_be_applied_and_edits_race_with_publication(tmp_path: Pat
                     "export",
                     TaskPublish(
                         completion="report",
+                        stages=fixture_stage_change(workspace, "harbor", "export"),
                         expected_revision=current.revision,
                         expected_decision_sequence=current.decision_sequence,
                     ),

@@ -1,3 +1,4 @@
+import { fixtureStages } from "./support";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { expect } from "@playwright/test";
@@ -95,7 +96,7 @@ test("browser notifications are opt-in, deduplicate across tabs and link to a ta
     },
   });
   await request.post("/api/projects/notify-project/tasks", {
-    data: { id: "notice", title: "Needs a choice" },
+    data: { stages: fixtureStages(), id: "notice", title: "Needs a choice" },
   });
   await page.goto("/projects/notify-project");
   await page.getByRole("button", { name: /Notifications/ }).click();

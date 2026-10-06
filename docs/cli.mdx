@@ -16,6 +16,9 @@ flowfield version --json
 flowfield --help
 ```
 
+`serve` opens the browser after startup in an interactive terminal. Use `serve --no-open`
+to keep it closed. The service always prints its URL; browser-launch failure is nonfatal.
+
 Global `--port` selects the service. `--data-dir` or `FLOWFIELD_DATA_DIR` selects storage;
 `FLOWFIELD_PORT` sets the default port for the service and CLI. A command-line port
 overrides it. For example:
@@ -84,6 +87,17 @@ flowfield milestone --help
 Use stable task keys or IDs. The coordinator prepares task definitions through MCP;
 CLI task operations expose the same workspace rules. Task dependencies and readiness
 are checked by the service.
+
+Every task starts with at least one outcome stage. `task create --title "…"` seeds a
+single planned stage from the title. Use `--stages-file stages.json` to supply an array
+of one to eight stages, each with an `id`, `title` and `outcome`.
+
+`task edit` and `task publish` also accept `--stages-file`, containing
+`{"expected_revision": 1, "stages": [...], "reason": "Scope clarified"}`. Read the
+current plan with `task stages APP-1 --json` or MCP `get_task_stages` first.
+The plan and task change save together;
+a stale revision rejects the whole change. Coordinator MCP calls can create or edit the
+definition, stages and assignment preparation in one operation.
 
 ## Questions, execution and results
 

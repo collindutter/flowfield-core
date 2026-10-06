@@ -15,7 +15,7 @@ import httpx
 from fastapi.testclient import TestClient
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
-from project_fixtures import existing_directory
+from project_fixtures import existing_directory, task_request
 
 from flowfield.api import create_app
 
@@ -35,6 +35,7 @@ def running_service(state: Path) -> Iterator[str]:
                 "--data-dir",
                 str(state),
                 "serve",
+                "--no-open",
                 "--port",
                 str(port),
             ],
@@ -177,6 +178,7 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                         {
                             "project_id": "harbor",
                             "task": {
+                                "stages": task_request(title="Fixture").model_dump()["stages"],
                                 "id": "export",
                                 "title": "Export",
                                 "body": "Keep filters",
@@ -231,7 +233,7 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                         {
                             **identity,
                             "request": {
-                                "expected_revision": 0,
+                                "expected_revision": 1,
                                 "agreement_revision": task["agreement_revision"],
                                 "stages": [
                                     {
@@ -246,13 +248,13 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                     )
                 stage = await call("get_task_stages", identity)
                 assert stage == (await api.get("/api/projects/harbor/tasks/export/stages")).json()
-                assert stage["revision"] == 1
+                assert stage["revision"] == 2
                 conversation = await call("get_task_conversation", identity)
                 assert (
                     conversation
                     == (await api.get("/api/projects/harbor/tasks/export/conversation")).json()
                 )
-                source = await call("get_conversation_source", {**identity, "item_id": "plan:1"})
+                source = await call("get_conversation_source", {**identity, "item_id": "plan:2"})
                 assert json.loads(source["text"])["reason"] == "Plan the agreed outcome"
                 assert (
                     await api.get("/api/projects/harbor/tasks/export/input-eligibility")
@@ -316,7 +318,12 @@ def test_sse_mutations_and_reconnection(tmp_path: Path) -> None:
                             "create_task",
                             {
                                 "project_id": "harbor",
-                                "task": {"id": "export", "title": "Export", "body": "Plan"},
+                                "task": {
+                                    "stages": task_request(title="Fixture").model_dump()["stages"],
+                                    "id": "export",
+                                    "title": "Export",
+                                    "body": "Plan",
+                                },
                             },
                         )
                         assert not result.isError

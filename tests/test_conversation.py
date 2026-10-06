@@ -39,9 +39,9 @@ def plan(revision=0, agreement=1, status="planned"):
 
 
 def test_stages_have_one_owner_and_cannot_complete_or_remove_scope(tmp_path):
-    execution = fixture(tmp_path)
+    execution = fixture(tmp_path, stages=plan().stages)
     stages = Stages(execution.workspace)
-    initial = stages.update("harbor", "task-0", plan())
+    initial = stages.get("harbor", "task-0")
     run = execution.claim("harbor", BASE, {BASE: set()})
     assert (
         json.loads(execution.assignment("harbor", run.id)["stages"])["revision"] == initial.revision
@@ -87,13 +87,13 @@ def test_stages_have_one_owner_and_cannot_complete_or_remove_scope(tmp_path):
 
 
 def test_plan_writes_and_claims_serialize_and_scope_changes_do_not_rebind(tmp_path):
-    execution = fixture(tmp_path)
+    execution = fixture(tmp_path, stages=plan().stages)
     stages = Stages(execution.workspace)
     with ThreadPoolExecutor(2) as pool:
 
         def update(_):
             try:
-                return stages.update("harbor", "task-0", plan())
+                return stages.update("harbor", "task-0", plan(1, status="active"))
             except ApplicationError:
                 return None
 
@@ -110,9 +110,9 @@ def test_plan_writes_and_claims_serialize_and_scope_changes_do_not_rebind(tmp_pa
 
 @pytest.mark.parametrize("outcome", ["complete", "partial"])
 def test_submission_reconciles_progress_without_closing_rejected_worker(tmp_path, outcome):
-    execution = fixture(tmp_path)
+    execution = fixture(tmp_path, stages=plan().stages)
     stages = Stages(execution.workspace)
-    initial = stages.update("harbor", "task-0", plan())
+    initial = stages.get("harbor", "task-0")
     run = execution.claim("harbor", BASE, {BASE: set()})
     execution.started("harbor", run.id)
     bridge = WorkerBridge(execution, run, SimpleNamespace())
@@ -268,7 +268,7 @@ def test_brief_includes_complete_small_essentials_and_pages_large_constraints():
 
 
 def test_worker_reads_only_frozen_report_sources_and_stage_updates_are_scoped(tmp_path):
-    execution = fixture(tmp_path)
+    execution = fixture(tmp_path, stages=plan().stages)
     old = execution.claim("harbor", BASE, {BASE: set()})
     execution.started("harbor", old.id)
     execution.finish(
@@ -298,7 +298,9 @@ def test_worker_reads_only_frozen_report_sources_and_stage_updates_are_scoped(tm
     )
     with pytest.raises(ApplicationError, match="not in the frozen context"):
         asyncio.run(bridge.call("read_context", {"section": f"attempt:{run.id}"}))
-    updated = json.loads(asyncio.run(bridge.call("update_stages", plan().model_dump())))
+    updated = json.loads(
+        asyncio.run(bridge.call("update_stages", plan(1, status="active").model_dump()))
+    )
     assert updated["run_id"] == run.id
     with execution.workspace.connection(write=True) as db:
         db.execute(

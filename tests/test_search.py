@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 from test_execution import BASE
 from test_execution import fixture as execution_fixture
 from test_results import approve, current, fixture
@@ -12,7 +12,6 @@ from test_results import approve, current, fixture
 from flowfield.activity import ActivityCreate, DecisionWithdraw
 from flowfield.application import (
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     TaskProgress,
     TaskPublish,
@@ -28,7 +27,7 @@ def test_current_decision_wins_over_similar_old_text_and_filters_scope(tmp_path)
     workspace = Workspace(tmp_path / "state")
     for project in ("harbor", "other"):
         adopt(workspace, ProjectSetup(path=str(tmp_path / project)))
-        workspace.create_task(project, TaskCreate(id="export", title="Export"))
+        workspace.create_task(project, task_request(id="export", title="Export"))
     old = workspace.add_activity(
         "harbor",
         ActivityCreate(
@@ -73,7 +72,7 @@ def test_task_revision_search_pages_are_bounded_and_sources_exact(tmp_path):
     workspace = Workspace(tmp_path / "state")
     adopt(workspace, ProjectSetup(path=str(tmp_path / "harbor")))
     task = workspace.create_task(
-        "harbor", TaskCreate(title="Needle task", body="old needle requirement")
+        "harbor", task_request(title="Needle task", body="old needle requirement")
     )
     workspace.edit_task(
         "harbor", task.id, TaskEdit(expected_revision=1, body="new needle requirement")
@@ -137,7 +136,7 @@ def test_worker_search_cannot_escape_snapshot_and_manual_report_is_usable(tmp_pa
     execution = execution_fixture(tmp_path, count=0)
     workspace = execution.workspace
     report = workspace.create_task(
-        "harbor", TaskCreate(id="report", title="Inspect catalog", body="Report scope")
+        "harbor", task_request(id="report", title="Inspect catalog", body="Report scope")
     )
     workspace.add_activity(
         "harbor",
@@ -161,7 +160,7 @@ def test_worker_search_cannot_escape_snapshot_and_manual_report_is_usable(tmp_pa
     assert accepted.report_completion_revision == accepted.revision
     child = workspace.create_task(
         "harbor",
-        TaskCreate(
+        task_request(
             title="Use report",
             status="up_next",
             body="Use the measured finding",

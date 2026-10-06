@@ -147,3 +147,14 @@ export function resultMessage(v: {
     run_id: null,
   };
 }
+
+export function fixtureStages() {
+  return [
+    {
+      id: "fixture",
+      title: "Fixture setup",
+      outcome: "Prepare the isolated fixture",
+      status: "completed",
+    },
+  ];
+}

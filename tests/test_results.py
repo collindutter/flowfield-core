@@ -5,12 +5,12 @@ import os
 from pathlib import Path
 
 import pytest
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 
 from flowfield.adapters import git_integration as gitops
 from flowfield.adapters.git_workspace import baseline, git
 from flowfield.adapters.local_execution import LocalHost
-from flowfield.application import ProjectSetup, TaskCreate, TaskProgress, TaskPublish, Workspace
+from flowfield.application import ProjectSetup, TaskProgress, TaskPublish, Workspace
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import QueueEdit, ReviewAction, SettingsEdit, WorkerResult
 from flowfield.integration_models import IntegrationApply, IntegrationConfig
@@ -56,7 +56,7 @@ def fixture(
     )
     git(repo, "switch", "integration")
     task = workspace.create_task(
-        "harbor", TaskCreate(id="work", title="Work", body="Deliver the result", status="up_next")
+        "harbor", task_request(id="work", title="Work", body="Deliver the result", status="up_next")
     )
     workspace.publish_task(
         "harbor",
@@ -119,7 +119,7 @@ def test_task_history_pages_one_chronology_and_nests_service_evidence(tmp_path):
             task_id="work", kind="decision", body="Current choice", supersedes=decision.id
         ),
     )
-    workspace.create_task("harbor", TaskCreate(id="other", title="Unrelated"))
+    workspace.create_task("harbor", task_request(id="other", title="Unrelated"))
     foreign = workspace.add_activity("harbor", ActivityCreate(task_id="other", body="Other task"))
     history = ExecutionHistory(workspace)
     full = history.timeline("harbor", "work", limit=50).items
@@ -303,8 +303,8 @@ def test_manual_completion_requires_explicit_report(tmp_path):
     workspace = Workspace(tmp_path / "state")
     adopt(workspace, ProjectSetup(path=str(tmp_path / "harbor")))
     with pytest.raises(ApplicationError, match="Create the task"):
-        workspace.create_task("harbor", TaskCreate(title="Bypass", status="done"))
-    task = workspace.create_task("harbor", TaskCreate(title="Report"))
+        workspace.create_task("harbor", task_request(title="Bypass", status="done"))
+    task = workspace.create_task("harbor", task_request(title="Report"))
     with pytest.raises(ApplicationError, match="explicitly accepted reports"):
         workspace.record_progress(
             "harbor", task.id, TaskProgress(expected_revision=1, status="done")

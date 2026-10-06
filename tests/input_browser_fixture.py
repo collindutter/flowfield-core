@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-from project_fixtures import adopt
+from project_fixtures import adopt, task_request
 
-from flowfield.application import ProjectSetup, TaskCreate, TaskPreparation, Workspace
+from flowfield.application import ProjectSetup, TaskPreparation, Workspace
 from flowfield.execution import Execution
 from flowfield.execution_models import SettingsEdit
 from flowfield.questions import QuestionCreate
@@ -20,7 +20,7 @@ if sys.argv[2] == "create":
     adopt(workspace, ProjectSetup(path=str(workspace.directory / project), task_prefix="INP"))
     workspace.create_task(
         project,
-        TaskCreate(
+        task_request(
             id="export",
             title="Export records",
             body="Implement the agreed export.",

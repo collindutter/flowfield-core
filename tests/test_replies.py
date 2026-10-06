@@ -4,12 +4,13 @@ import asyncio
 import json
 
 import pytest
+from project_fixtures import task_request
 from test_execution import BASE, fixture, result
 from test_input_continuation import question
 from test_results import approve, current
 from test_results import fixture as result_fixture
 
-from flowfield.application import TaskCreate, TaskEdit, TaskPublish, Workspace
+from flowfield.application import TaskEdit, TaskPublish, Workspace
 from flowfield.conversation import Conversation
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import QueueEdit, SettingsEdit
@@ -105,7 +106,7 @@ def test_human_testing_records_exact_result_without_work_and_reaches_successor(t
             ),
         )
         task = service.workspace.create_task(
-            "harbor", TaskCreate(title="Independent", status="up_next", body="Investigate")
+            "harbor", task_request(title="Independent", status="up_next", body="Investigate")
         )
         service.workspace.publish_task(
             "harbor",

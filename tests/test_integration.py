@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
+from project_fixtures import fixture_stage_change
 from test_execution import fixture
 
 from flowfield.adapters import git_integration as gitops
@@ -54,6 +55,7 @@ def seed(tmp_path: Path, checks: list[str] | None = None):
             "harbor",
             task.id,
             TaskPublish(
+                stages=fixture_stage_change(execution.workspace, "harbor", task.id),
                 completion="code",
                 expected_revision=task.revision,
                 expected_decision_sequence=task.decision_sequence,
@@ -147,6 +149,7 @@ def test_accept_validate_apply_releases_dependent_without_touching_human_files(t
         "harbor",
         task.id,
         TaskPublish(
+            stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             completion="code",
             expected_revision=task.revision,
             expected_decision_sequence=task.decision_sequence,
@@ -394,6 +397,7 @@ def test_enabled_scheduler_picks_up_dependent_after_explicit_integration(tmp_pat
         "harbor",
         task.id,
         TaskPublish(
+            stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             completion="code",
             expected_revision=task.revision,
             expected_decision_sequence=task.decision_sequence,

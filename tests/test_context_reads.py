@@ -4,14 +4,13 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from project_fixtures import adopt, existing_directory
+from project_fixtures import adopt, existing_directory, reconcile_fixture_stages, task_request
 
 from flowfield.activity import ActivityCreate
 from flowfield.api import create_app
 from flowfield.application import (
     ProjectEdit,
     ProjectSetup,
-    TaskCreate,
     TaskEdit,
     TaskProgress,
     Workspace,
@@ -30,7 +29,7 @@ def test_context_growth_pagination_and_full_text(
     for i in range(16):
         service.create_task(
             "harbor",
-            TaskCreate(
+            task_request(
                 id=f"t{i}",
                 title=f"Task {i}",
                 body=text,
@@ -44,6 +43,7 @@ def test_context_growth_pagination_and_full_text(
         service.add_activity(
             "harbor", ActivityCreate(task_id="t15", kind="decision", body='🦉\\"' * 50000)
         )
+    reconcile_fixture_stages(service, "harbor", "t15")
     reads = ContextReads(service)
     # Context reads must not silently route through the old full-board/task loaders.
     monkeypatch.setattr(service, "_task", lambda *a, **kw: pytest.fail("hydrated full task"))
@@ -108,15 +108,15 @@ def test_context_growth_pagination_and_full_text(
 def test_context_readiness_matches_domain_and_invalid_input(tmp_path: Path) -> None:
     service = Workspace(tmp_path / "state")
     adopt(service, ProjectSetup(path=str(tmp_path / "harbor")))
-    service.create_task("harbor", TaskCreate(id="one", title="One"))
+    service.create_task("harbor", task_request(id="one", title="One"))
     service.record_progress(
         "harbor", "one", TaskProgress(expected_revision=1, status="done", completion="report")
     )
-    service.create_task("harbor", TaskCreate(id="two", title="Two", dependencies=["one"]))
+    service.create_task("harbor", task_request(id="two", title="Two", dependencies=["one"]))
     service.record_progress(
         "harbor", "two", TaskProgress(expected_revision=1, status="done", completion="report")
     )
-    service.create_task("harbor", TaskCreate(id="three", title="Three", dependencies=["two"]))
+    service.create_task("harbor", task_request(id="three", title="Three", dependencies=["two"]))
     reads = ContextReads(service)
     for status in ["backlog", "done"]:
         service.record_progress(
@@ -148,7 +148,14 @@ def test_http_context_is_scoped_and_bounded(tmp_path: Path) -> None:
         client.post(
             "/api/projects/initialize", json={"path": existing_directory(str(tmp_path / "harbor"))}
         )
-        client.post("/api/projects/harbor/tasks", json={"title": "Export", "body": "x" * 200000})
+        client.post(
+            "/api/projects/harbor/tasks",
+            json={
+                "stages": task_request(title="Fixture").model_dump()["stages"],
+                "title": "Export",
+                "body": "x" * 200000,
+            },
+        )
         base = "/api/context/projects/harbor"
         assert "revisions" not in client.get(base + "/tasks/HAR-1").json()
         assert len(client.get(base + "/tasks/HAR-1").content) < PAGE_BYTES
@@ -179,7 +186,7 @@ def test_http_context_is_scoped_and_bounded(tmp_path: Path) -> None:
 def test_browser_links_and_question_pagination(tmp_path: Path) -> None:
     service = Workspace(tmp_path / "state")
     adopt(service, ProjectSetup(path=str(tmp_path / "harbor")))
-    service.create_task("harbor", TaskCreate(id="catalog", title="Catalog", status="up_next"))
+    service.create_task("harbor", task_request(id="catalog", title="Catalog", status="up_next"))
     for i in range(20):
         Questions(service).ask(
             "harbor",
