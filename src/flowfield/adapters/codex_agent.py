@@ -22,7 +22,7 @@ from flowfield.adapters.acp_session import (
     bounded_details,
     permission_details,
 )
-from flowfield.adapters.codex_cleanup import quiesce, require_cleanup
+from flowfield.adapters.codex_cleanup import CODEX_SHUTDOWN_TIMEOUTS, quiesce, require_cleanup
 from flowfield.adapters.codex_install import command
 from flowfield.agent_models import AgentChoice, AgentCommand
 from flowfield.errors import ApplicationError
@@ -86,6 +86,7 @@ class CodexAgent:
         self.session = AcpSession(
             self._event,
             cleanup=quiesce,
+            shutdown_timeouts=CODEX_SHUTDOWN_TIMEOUTS,
             turn_timeout=900,
             permission_projection=codex_permission_details,
             activity_projection=codex_activity_details,

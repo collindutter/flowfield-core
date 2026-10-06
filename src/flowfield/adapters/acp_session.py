@@ -6,6 +6,7 @@ canonical Flowfield state before explicitly creating/loading another session.
 
 import asyncio
 import contextlib
+import math
 from collections.abc import Callable, Coroutine, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -61,6 +62,21 @@ PermissionHandler = Callable[[PermissionRequest], Coroutine[Any, Any, str | None
 CleanupHandler = Callable[[ClientSideConnection, str, dict[str, Any]], Coroutine[Any, Any, bool]]
 
 
+@dataclass(frozen=True)
+class ShutdownTimeouts:
+    cancellation: float = 5
+    native_cleanup: float = 5
+    session: float = 5
+    process_exit: float = 5
+
+    def __post_init__(self) -> None:
+        if any(
+            not math.isfinite(value) or value <= 0
+            for value in (self.cancellation, self.native_cleanup, self.session, self.process_exit)
+        ):
+            raise ValueError("Shutdown deadlines must be positive and finite")
+
+
 class AcpSession:
     def __init__(
         self,
@@ -72,11 +88,13 @@ class AcpSession:
         activity_projection: Callable[[BaseModel], str] | None = None,
         request_timeout: float = 30,
         turn_timeout: float = 3600,
+        shutdown_timeouts: ShutdownTimeouts | None = None,
     ):
         self.on_event, self.on_permission = on_event, on_permission
         self.activity_projection = activity_projection or activity_locations
         self._tool_activity: dict[str, dict[str, Any]] = {}
         self.cleanup = cleanup
+        self.shutdown_timeouts = shutdown_timeouts or ShutdownTimeouts()
         self.permission_projection = permission_projection or permission_details
         self._tool_details: dict[str, str] = {}
         self.request_timeout, self.turn_timeout = request_timeout, turn_timeout
@@ -403,21 +421,23 @@ class AcpSession:
         finally:
             self._permission = None
 
-    async def close(self, *, timeout: float = 5) -> StopReceipt:
+    async def close(self, *, timeouts: ShutdownTimeouts | None = None) -> StopReceipt:
         if self._close_task is None:
             self.state = "stopping"
-            self._close_task = asyncio.create_task(self._shutdown(timeout))
+            self._close_task = asyncio.create_task(
+                self._shutdown(timeouts or self.shutdown_timeouts)
+            )
         # Cancelling an HTTP caller must not abandon an owned agent process.
         return await asyncio.shield(self._close_task)
 
-    async def _shutdown(self, timeout: float) -> StopReceipt:
+    async def _shutdown(self, timeouts: ShutdownTimeouts) -> StopReceipt:
         self.state = "stopping"
         async with self._spawn_lock:
             pass  # A concurrently starting process must acquire its owner first.
         turn_finished = self._turn is None
         if self._turn is not None and self.connection is not None:
             try:
-                async with asyncio.timeout(timeout):
+                async with asyncio.timeout(timeouts.cancellation):
                     if not self._turn.done() and self.session_id:
                         await self.connection.cancel(session_id=self.session_id)
                     await self._cancel_permission()
@@ -431,7 +451,7 @@ class AcpSession:
             owned_work_stopped = False
             if self.connection is not None and self.session_id is not None:
                 with contextlib.suppress(Exception, asyncio.CancelledError):
-                    async with asyncio.timeout(timeout):
+                    async with asyncio.timeout(timeouts.native_cleanup):
                         owned_work_stopped = await self.cleanup(
                             self.connection, self.session_id, self.capabilities
                         )
@@ -443,14 +463,14 @@ class AcpSession:
         ):
             session_closed = False
             try:
-                async with asyncio.timeout(timeout):
+                async with asyncio.timeout(timeouts.session):
                     await self.connection.close_session(self.session_id)
                 session_closed = True
             except (Exception, asyncio.CancelledError):
                 pass
         if self.connection:
             with contextlib.suppress(Exception):
-                async with asyncio.timeout(timeout):
+                async with asyncio.timeout(timeouts.session):
                     await self.connection.close()
         # EOF gives the bridge its native shutdown path before escalating to
         # process-group signals. In particular, Codex bridges forward EOF to the
@@ -458,11 +478,11 @@ class AcpSession:
         graceful_exit = False
         if self.process is not None:
             with contextlib.suppress(TimeoutError):
-                async with asyncio.timeout(timeout):
+                async with asyncio.timeout(timeouts.process_exit):
                     graceful_exit = await self.process.wait() == 0
         exited = True
         if self._local_process is not None:
-            exited = await self._local_process.close(timeout=timeout)
+            exited = await self._local_process.close(timeout=timeouts.process_exit)
         if self._turn:
             self._turn.cancel()
             with contextlib.suppress(Exception, asyncio.CancelledError):

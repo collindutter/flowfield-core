@@ -9,7 +9,11 @@ from typing import Any, Literal
 from acp.client import ClientSideConnection
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from flowfield.adapters.acp_session import ShutdownTimeouts
 from flowfield.errors import ApplicationError
+
+# The bridge bounds quiescence at 10 seconds. Leave 5 seconds for transport.
+CODEX_SHUTDOWN_TIMEOUTS = ShutdownTimeouts(native_cleanup=15)
 
 CAPABILITY = {
     "version": 1,

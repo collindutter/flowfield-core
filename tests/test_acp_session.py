@@ -8,21 +8,9 @@ from pathlib import Path
 import pytest
 from acp.schema import AvailableCommandsUpdate
 
-from flowfield.adapters.acp_session import AcpSession
-from flowfield.adapters.local_process import LocalProcess
+from flowfield.adapters.acp_session import AcpSession, ShutdownTimeouts
 
 FAKE = Path(__file__).with_name("fake_acp.py")
-
-
-@pytest.fixture
-def normal_process_shutdown_budget(monkeypatch):
-    """Short protocol deadlines must not also benchmark OS process reaping."""
-    close = LocalProcess.close
-
-    async def bounded_close(self, *, timeout=5):
-        return await close(self, timeout=5)
-
-    monkeypatch.setattr(LocalProcess, "close", bounded_close)
 
 
 @pytest.mark.parametrize("flags", [(), ("early-commands",)])
@@ -162,14 +150,14 @@ def test_broken_transport_never_replays_or_reuses_session(tmp_path, mode):
     asyncio.run(exercise())
 
 
-def test_unacknowledged_stop_is_uncertain_even_after_process_exit(
-    tmp_path, normal_process_shutdown_budget
-):
+def test_unacknowledged_stop_is_uncertain_even_after_process_exit(tmp_path):
     async def exercise():
         client = await start(tmp_path, [])
         prompt = asyncio.create_task(client.prompt('{"mode":"ignore_cancel"}'))
         await asyncio.sleep(0.1)
-        receipt = await client.close(timeout=0.15)
+        receipt = await client.close(
+            timeouts=ShutdownTimeouts(cancellation=0.15, session=0.15, process_exit=5)
+        )
         assert not receipt.turn_finished
         assert receipt.process_group_exited
         assert client.state == "interrupted"
@@ -265,7 +253,7 @@ def test_negotiated_session_close_and_eof_precede_process_signals(tmp_path):
     async def exercise():
         client = await start(tmp_path, [], "close-session", "slow-exit")
         await client.prompt("{}")
-        receipt = await client.close(timeout=1)
+        receipt = await client.close()
         assert receipt.session_closed is True
         assert receipt.process_exited_gracefully
         assert receipt.process_group_exited and receipt.turn_finished
@@ -275,12 +263,12 @@ def test_negotiated_session_close_and_eof_precede_process_signals(tmp_path):
 
 
 @pytest.mark.parametrize("flag", ["close-failure", "close-hang"])
-def test_failed_native_session_close_retains_uncertainty(
-    tmp_path, flag, normal_process_shutdown_budget
-):
+def test_failed_native_session_close_retains_uncertainty(tmp_path, flag):
     async def exercise():
         client = await start(tmp_path, [], "close-session", flag)
-        receipt = await client.close(timeout=0.15)
+        receipt = await client.close(
+            timeouts=ShutdownTimeouts(cancellation=0.15, session=0.15, process_exit=5)
+        )
         assert receipt.session_closed is False
         assert receipt.process_group_exited
         assert client.state == "interrupted"
@@ -299,14 +287,14 @@ def test_closing_one_session_does_not_interrupt_another(tmp_path):
             async with asyncio.timeout(3):
                 while not first_events or not second_events:
                     await asyncio.sleep(0.01)
-            receipt = await first.close(timeout=1)
+            receipt = await first.close()
             assert receipt.session_closed and receipt.process_group_exited
             assert await first_turn == "cancelled"
             assert not second_turn.done()
             assert second.state == "running" and second.process.returncode is None
         finally:
-            await first.close(timeout=1)
-            await second.close(timeout=1)
+            await first.close()
+            await second.close()
             await asyncio.gather(first_turn, second_turn, return_exceptions=True)
 
     asyncio.run(exercise())

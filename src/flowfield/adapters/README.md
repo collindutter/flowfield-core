@@ -42,9 +42,10 @@ bindings. Saved input, reservation and execution remain distinct facts. Worker c
 uses preserved workspaces and deliberate context; it does not promise a persistent harness
 session. The browser reads application activity, never provider messages directly.
 
-The embedded coordinator uses the same ACP adapter in read-only native mode with scoped
-planning tools. Each turn owns a fresh native session and temporary directory. Application
-history supplies a bounded handoff; native sessions are not implicitly resumed or replayed.
+The embedded coordinator uses the same ACP adapter with scoped planning tools and its saved
+Access mode. It runs in the registered project directory and resumes the native session across
+turns and service restarts. Application history remains durable; explicit recovery from a missing
+session uses a bounded handoff instead of claiming to replay the complete native history.
 Mid-run steering and additional production harnesses remain future work. Deterministic adapters test application behavior without model calls.
 The installed service requires no Node runtime.
 
@@ -62,3 +63,11 @@ unsupported input/output totals remain unknown. Catalog discovery is shared by c
 callers, cached for five minutes (with explicit refresh), bounded to 64 model selections and
 120 seconds, and starts no model turn. Public tool activity merges partial updates in a
 100-entry cache bounded to 4,000 characters per field; caches clear when the turn ends.
+
+Shutdown budgets are separate for turn cancellation, native cleanup, session/transport
+closure and process exit. Codex allows 15 seconds for its bridge's 10-second native
+cleanup operation. Other phases default to five seconds; process escalation can spend
+that budget on each of TERM, KILL and reaping. After acquiring a started process owner,
+the sequential phase budgets total at most 50 seconds for Codex (excluding event-loop
+starvation or callbacks that ignore cancellation). A cancelled caller does not cancel
+shared shutdown, and a late or missing receipt never becomes confirmed termination.

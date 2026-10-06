@@ -19,7 +19,7 @@ from pathlib import Path
 
 from acp.schema import HttpMcpServer
 
-from flowfield.adapters.acp_session import AcpSession
+from flowfield.adapters.acp_session import AcpSession, ShutdownTimeouts
 from flowfield.adapters.codex_cleanup import quiesce, require_cleanup
 from flowfield.adapters.codex_install import install
 from flowfield.adapters.git_workspace import baseline, git
@@ -113,10 +113,10 @@ async def probe(
         prompt = asyncio.create_task(client.prompt("Offline conformance probe"))
         if scenario == "cancel":
             await asyncio.wait_for(started.wait(), 10)
-            await client.close(timeout=15)
+            await client.close(timeouts=ShutdownTimeouts(native_cleanup=15))
         result = await prompt
     finally:
-        stopped = await client.close(timeout=15)
+        stopped = await client.close(timeouts=ShutdownTimeouts(native_cleanup=15))
     if cleanup and stopped.owned_work_stopped is not (scenario != "cleanup-refused"):
         raise AssertionError("Unexpected managed cleanup receipt")
     if scenario == "resume":
@@ -149,7 +149,7 @@ async def probe(
             for command in ("/status", "/skills", "/mcp", "/rename Probe", "/compact"):
                 assert await client.prompt(command) == "end_turn"
         finally:
-            stopped = await client.close(timeout=15)
+            stopped = await client.close(timeouts=ShutdownTimeouts(native_cleanup=15))
         assert stopped.owned_work_stopped is True and stopped.process_group_exited
     if unexpected_logs.exists():
         raise AssertionError("The runtime loaded project dotenv settings")
