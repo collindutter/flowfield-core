@@ -5,6 +5,11 @@ import { request } from "./workspace";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Popover } from "radix-ui";
 import { ChevronDown, Zap } from "lucide-react";
@@ -22,6 +27,7 @@ export function AgentModelFields({
   models,
   loading,
   change,
+  compact = false,
 }: {
   model: string;
   effort: string;
@@ -30,6 +36,7 @@ export function AgentModelFields({
   models: Model[];
   loading: boolean;
   change: (model: string, effort: string, mode: string, fast: boolean) => void;
+  compact?: boolean;
 }) {
   const selected = models.find((item) => item.id === model);
   return (
@@ -37,6 +44,7 @@ export function AgentModelFields({
       <Label className="field block">
         Model
         <NativeSelect
+          size={compact ? "sm" : "default"}
           aria-label="Model"
           value={loading ? "" : model}
           required
@@ -63,6 +71,7 @@ export function AgentModelFields({
       <Label className="field block">
         Reasoning effort
         <NativeSelect
+          size={compact ? "sm" : "default"}
           aria-label="Reasoning effort"
           value={loading ? "" : effort}
           required
@@ -92,6 +101,7 @@ export function AgentModelFields({
         <Label className="field block">
           Access mode
           <NativeSelect
+            size={compact ? "sm" : "default"}
             aria-label="Access mode"
             value={loading ? "" : mode}
             required
@@ -119,7 +129,7 @@ export function AgentModelFields({
           </span>
         </Label>
       )}
-      {(selected?.fast || fast) && (
+      {!compact && (selected?.fast || fast) && (
         <div>
           <Button
             type="button"
@@ -156,6 +166,7 @@ type AgentSettingsProps = {
   onSaved?: () => void;
   onSaveError?: () => void;
   compact?: boolean;
+  open?: boolean;
 };
 
 function useAgentSettingsContent({
@@ -167,6 +178,7 @@ function useAgentSettingsContent({
   onSaved,
   onSaveError,
   compact = false,
+  open = true,
 }: AgentSettingsProps) {
   const resource = useResource<Settings>(path, refresh);
   const [retry, setRetry] = useState(0);
@@ -182,6 +194,15 @@ function useAgentSettingsContent({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) {
+      setDraft(null);
+      setError("");
+      setNotice("");
+    }
+  }
   const data = resource.data;
   const selection = draft ? draft.selection : data?.selection;
   const choice = selection ?? data?.effective?.choice;
@@ -296,6 +317,7 @@ function useAgentSettingsContent({
             models={catalog.data ?? []}
             loading={catalog.loading || resource.loading}
             change={change}
+            compact={compact}
           />
           {coordinator && (
             <p className="muted">
@@ -382,27 +404,31 @@ function useAgentSettingsContent({
   const selected = catalog.data?.find((item) => item.id === saved?.model);
   const fastControl =
     selected?.fast && saved ? (
-      <Button
-        type="button"
-        size="icon-sm"
-        variant={saved.fast ? "secondary" : "ghost"}
-        aria-label="Fast mode"
-        aria-pressed={saved.fast ?? false}
-        title={
-          selected.fast_description ||
-          "Fast mode: faster responses, increased usage"
-        }
-        disabled={
-          !!draft ||
-          busy ||
-          catalog.loading ||
-          resource.loading ||
-          !!resource.error
-        }
-        onClick={() => void save(false, { ...saved, fast: !saved.fast })}
-      >
-        <Zap size={14} />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant={saved.fast ? "secondary" : "ghost"}
+            aria-label="Fast mode"
+            aria-pressed={saved.fast ?? false}
+            disabled={
+              !!draft ||
+              busy ||
+              catalog.loading ||
+              resource.loading ||
+              !!resource.error
+            }
+            onClick={() => void save(false, { ...saved, fast: !saved.fast })}
+          >
+            <Zap size={14} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          Fast mode {saved.fast ? "on" : "off"}.{" "}
+          {selected.fast_description || "Faster responses, increased usage."}
+        </TooltipContent>
+      </Tooltip>
     ) : null;
   return { fields, fastControl };
 }
@@ -422,6 +448,7 @@ export function AgentSettingsControl({
   const { fields, fastControl } = useAgentSettingsContent({
     ...props,
     compact: true,
+    open,
     onSaved: () => onOpenChange(false),
     onSaveError: () => onOpenChange(true),
   });

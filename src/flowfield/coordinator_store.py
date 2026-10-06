@@ -14,7 +14,7 @@ from flowfield.coordinator_models import (
     CoordinatorTurn,
 )
 from flowfield.errors import ApplicationError
-from flowfield.run_activity import ActivityUpdate, update_activity
+from flowfield.run_activity import ActivityUpdate, ContextUsage, update_activity
 
 
 class CoordinatorStore:
@@ -143,7 +143,20 @@ class CoordinatorStore:
                 for entry in turn.activity.items:
                     entry.preview = preview(entry.text, entry.kind)
                     entry.abridged = entry.preview != entry.text
+            # Commands and failed/starting turns may not emit usage. Read the last
+            # report independently of the visible history window, across restarts,
+            # but never carry it across an explicitly started replacement session.
+            context = db.execute(
+                "SELECT json_extract(data,'$.activity.context') FROM coordinator_turns "
+                "WHERE project_id=? AND (json_type(data,'$.activity.context')='object' "
+                "OR json_extract(data,'$.session')='new') "
+                "ORDER BY number DESC LIMIT 1",
+                (project,),
+            ).fetchone()
             return CoordinatorPage(
+                context=ContextUsage.model_validate_json(context[0])
+                if context and context[0]
+                else None,
                 conversation=owner,
                 items=items if after is not None else list(reversed(items)),
                 next_before=items[-1].number if len(rows) > 20 else None,

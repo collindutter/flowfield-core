@@ -2391,6 +2391,7 @@ export interface components {
     };
     /** CoordinatorPage */
     CoordinatorPage: {
+      context: components["schemas"]["ContextUsage"] | null;
       conversation: components["schemas"]["CoordinatorConversation"] | null;
       /** Items */
       items: components["schemas"]["CoordinatorTurn"][];

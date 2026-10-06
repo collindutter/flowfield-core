@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Flowfield",
+  "name": "Flowfield Docs",
   "colors": { "primary": "#2563eb" },
   "navigation": {
     "groups": [

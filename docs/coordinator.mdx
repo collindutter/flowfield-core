@@ -27,6 +27,7 @@ questions and approve exact code results in their task feeds.
 
 Use the model button beside the input to change model, effort or access. Changes apply to the next
 message; a running turn keeps its saved choice. Standalone coding-agent settings are separate.
+Save to apply your choices; closing the popup cancels unsaved changes.
 
 Access modes come from Codex, including Read only, workspace access and Auto review.
 Existing chats retain read-only access until you change it. Auto review uses Codex's native
@@ -53,6 +54,8 @@ Each project has 128 MiB of attachment storage. Unsent uploads expire after 24 h
 Type `/` to see the available coordinator commands. Use arrow keys and Enter to select,
 then send the command. Escape returns to ordinary writing. The list contains only commands
 supported by both Flowfield and the connected Codex session; discovery starts no model turn.
+Flowfield loads the list when the composer is ready and briefly caches it. Opening commands
+immediately may still show a loading state while Codex starts.
 
 | Command | Effect |
 | --- | --- |
@@ -67,14 +70,15 @@ session commands.
 
 **Fast mode** appears as a lightning button beside model settings when the selected model
 supports it. Select it to save Fast on or off for subsequent messages. It provides faster
-responses with increased usage; the settings show the harness's description. You can also
-change Fast alongside model, effort and Access mode in the settings popup before saving.
+responses with increased usage; hover or focus the button for its description and current state.
 Changing models starts at normal speed. Running turns keep their captured settings.
 Worker defaults and task overrides offer the same Fast control, applied to subsequent attempts.
 
 Hover or focus the context ring for the agent's reported context usage. During a turn it
-shows that turn's latest report; afterward it shows the last turn. It stays empty until
-the agent reports usage. Context occupancy is separate from billable token usage.
+shows that turn's latest report when available; otherwise it shows **Last reported** usage.
+This saved report survives reloads and restarts, even if later commands do not report usage.
+Starting a replacement session clears the previous session's report. The ring stays empty
+until the agent reports usage. Context occupancy is separate from billable token usage.
 
 ## Follow and stop
 

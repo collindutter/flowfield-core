@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
 
-test("task settings preserve drafts, reject stale saves and reset; tool answers survive reload", async ({
+test("task settings cancel dismissed edits, reject stale saves and reset; tool answers survive reload", async ({
   page,
   request,
 }) => {
@@ -162,7 +162,13 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await expect(picker.getByLabel("Reasoning effort")).toHaveValue("");
   await picker.getByLabel("Reasoning effort").selectOption("medium");
   await picker.getByLabel("Access mode").selectOption("read-only");
-  await picker.getByRole("button", { name: "Fast mode", exact: true }).click();
+  await expect(
+    picker.getByRole("button", { name: "Fast mode", exact: true }),
+  ).toHaveCount(0);
+  await expect(picker.getByLabel("Model", { exact: true })).toHaveCSS(
+    "height",
+    "32px",
+  );
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     const tops = await Promise.all(
@@ -180,12 +186,19 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await page.getByRole("button", { name: "Ask worker", exact: true }).click();
   await page.getByRole("button", { name: "first · low", exact: true }).click();
   await expect(picker.getByLabel("Model", { exact: true })).toHaveValue(
-    "second",
+    "first",
   );
-  await expect(picker.getByLabel("Reasoning effort")).toHaveValue("medium");
+  await expect(picker.getByLabel("Reasoning effort")).toHaveValue("low");
+  await picker.getByLabel("Model", { exact: true }).selectOption("second");
+  await picker.getByLabel("Reasoning effort").selectOption("medium");
+  await picker.getByLabel("Access mode").selectOption("read-only");
   await picker.getByLabel("Access mode").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/tmp/flowfield-slice3-native-modes.png" });
   await picker.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Fast mode", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Fast mode", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page
     .getByRole("button", { name: "second · medium", exact: true })
     .click();
@@ -194,7 +207,7 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   expect(settings.selection?.fast).toBe(true);
   await picker.getByLabel("Model", { exact: true }).selectOption("first");
   await picker.getByLabel("Reasoning effort").selectOption("high");
-  settings = { ...settings, revision: 3 };
+  settings = { ...settings, revision: settings.revision + 1 };
   await request.post("/api/projects/agent-settings/tasks", {
     data: { title: "Cause settings refresh" },
   });

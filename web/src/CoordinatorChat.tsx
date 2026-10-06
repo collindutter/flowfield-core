@@ -62,6 +62,7 @@ export function CoordinatorChat({
   const [commandsLoading, setCommandsLoading] = useState(false);
   const [commandsError, setCommandsError] = useState("");
   const commandsPending = useRef(false);
+  const commandsFresh = useRef({ key: "", until: 0 });
   const commandsGeneration = useRef({ value: 0 });
   const commandChoice = JSON.stringify(choice);
   useEffect(() => {
@@ -74,13 +75,22 @@ export function CoordinatorChat({
   const loadCommands = useCallback(
     async (reload = false) => {
       if (commandsPending.current) return;
+      const key = base + commandChoice;
+      if (
+        !reload &&
+        commandsFresh.current.key === key &&
+        commandsFresh.current.until > Date.now()
+      )
+        return;
       if (commandChoice === "null") {
+        commandsFresh.current = { key: "", until: 0 };
         setCommands([]);
         setCommandsLoading(false);
         setCommandsError("Choose model, effort and access mode first.");
         return;
       }
       commandsPending.current = true;
+      commandsFresh.current = { key: "", until: 0 };
       const generation = commandsGeneration.current.value;
       setCommands([]);
       setCommandsLoading(true);
@@ -95,8 +105,10 @@ export function CoordinatorChat({
           undefined,
           90000,
         );
-        if (generation === commandsGeneration.current.value)
+        if (generation === commandsGeneration.current.value) {
+          commandsFresh.current = { key, until: Date.now() + 300000 };
           setCommands(discovered);
+        }
       } catch (e) {
         if (generation === commandsGeneration.current.value)
           setCommandsError((e as Error).message);
@@ -109,6 +121,12 @@ export function CoordinatorChat({
     },
     [base, commandChoice],
   );
+  useEffect(() => {
+    if (!controlsActive || commandChoice === "null") return;
+    // Warm discovery while the composer is ready, without starting a model turn.
+    const timer = window.setTimeout(() => void loadCommands(), 0);
+    return () => window.clearTimeout(timer);
+  }, [controlsActive, commandChoice, loadCommands]);
   const dirty = useCallback(
     (value: boolean) => {
       setSettingsDirty(value);
@@ -376,8 +394,8 @@ export function CoordinatorChat({
                 }
               />
               <ContextRing
-                context={(active ?? turns.at(-1))?.activity.context}
-                active={running}
+                context={active?.activity.context ?? page?.context}
+                active={running && !!active?.activity.context}
               />
             </>
           }

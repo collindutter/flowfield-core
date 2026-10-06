@@ -52,7 +52,7 @@ export function ContextRing({
       <TooltipContent>
         {context ? (
           <>
-            {active ? "Current turn" : "Last turn"}:{" "}
+            {active ? "Current turn" : "Last reported"}:{" "}
             {context.used.toLocaleString()} / {context.size.toLocaleString()}{" "}
             tokens ({percent}%).
           </>

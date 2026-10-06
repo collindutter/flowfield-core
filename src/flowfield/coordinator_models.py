@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import Field
 
 from flowfield.agent_models import AgentRecord, EffectiveAgent
-from flowfield.run_activity import RunActivityPage
+from flowfield.run_activity import ContextUsage, RunActivityPage
 
 
 class CoordinatorConversation(AgentRecord):
@@ -45,6 +45,7 @@ class CoordinatorTurn(AgentRecord):
 
 
 class CoordinatorPage(AgentRecord):
+    context: ContextUsage | None = None
     conversation: CoordinatorConversation | None = None
     items: list[CoordinatorTurn]
     next_before: int | None = None

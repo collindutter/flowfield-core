@@ -18,7 +18,7 @@ from flowfield.application import Workspace
 from flowfield.coordinator_models import CoordinatorSend
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
-from flowfield.run_activity import MAX_TOTAL, ActivityUpdate
+from flowfield.run_activity import MAX_TOTAL, ActivityUpdate, ContextUsage
 from flowfield.supervisor import Supervisor
 
 
@@ -52,6 +52,41 @@ def setup(tmp_path, monkeypatch, scenario="normal", flags=()):
 
 def message(text="Capture the agreed task"):
     return CoordinatorSend(id=uuid4().hex, text=text)
+
+
+def test_context_report_survives_restart_and_reportless_turns_outside_page(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch)
+    store = service.coordinator.store
+    usage = ContextUsage(used=12000, size=100000)
+    first, _ = store.reserve("harbor", conversation.id, message())
+    store.write(
+        "harbor", first.id, [ActivityUpdate(key="usage", kind="status", text="", context=usage)]
+    )
+    with service.workspace.connection(write=True) as db:
+        first = store._get(db, "harbor", first.id)
+        first.status = "completed"
+        first.session = "new"
+        store._save(db, first)
+    for _ in range(22):
+        turn, _ = store.reserve("harbor", conversation.id, message("/status"))
+        with service.workspace.connection(write=True) as db:
+            turn.status = "completed"
+            turn.session = "resumed"
+            store._save(db, turn)
+    restored = CoordinatorStore(Workspace(service.workspace.directory))
+    page = restored.page("harbor")
+    assert len(page.items) == 20 and all(item.activity.context is None for item in page.items)
+    assert page.context == usage
+    assert restored.page("harbor", after=turn.number).context == usage
+    active, _ = restored.reserve("harbor", conversation.id, message())
+    assert restored.page("harbor").context == usage
+    restored.restart()
+    assert restored.page("harbor").context == usage
+    with service.workspace.connection(write=True) as db:
+        active = restored._get(db, "harbor", active.id)
+        active.session = "new"
+        restored._save(db, active)
+    assert restored.page("harbor").context is None
 
 
 async def settled(service, turn):

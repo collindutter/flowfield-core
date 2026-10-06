@@ -96,6 +96,9 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
         active,
         next_before: null,
         session_recovery_turn_id: recovery,
+        context:
+          [...turns].reverse().find((turn) => turn.activity.context)?.activity
+            .context ?? null,
       },
     }),
   );
@@ -228,6 +231,27 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
         },
       }),
   );
+  let discoveries = 0;
+  await page.route(
+    "**/api/projects/chat-browser/coordinator/commands/discover*",
+    async (route) => {
+      discoveries++;
+      await route.fulfill({
+        json: [
+          {
+            name: "compact",
+            description: "Compact the conversation",
+            input_hint: null,
+          },
+          {
+            name: "status",
+            description: "Show session status",
+            input_hint: null,
+          },
+        ],
+      });
+    },
+  );
   await page.goto("/projects/chat-browser");
   await expect(
     page.getByRole("heading", { name: "Coordinator Chat" }),
@@ -236,6 +260,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     page.getByRole("link", { name: /CHT-1.*Plan the chat experience/ }),
   ).toBeVisible();
   const input = page.getByRole("textbox", { name: "Message coordinator" });
+  await expect.poll(() => discoveries).toBe(1);
   await input.fill("/");
   await expect(page.getByRole("option", { name: /\/compact/ })).toBeVisible();
   await expect(page.locator("[cmdk-item]")).toHaveCount(2);
@@ -246,7 +271,10 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   await page.getByRole("option", { name: /\/compact/ }).click();
   await expect(input).toHaveValue("/compact");
   expect(sends).toBe(0);
-  await input.fill("");
+  await input.fill("/");
+  await expect(page.getByRole("option", { name: /\/compact/ })).toBeVisible();
+  expect(discoveries).toBe(1);
+  await page.getByRole("combobox", { name: "Message coordinator" }).fill("");
   await page
     .getByRole("button", { name: "test-model · low", exact: true })
     .click();
@@ -452,8 +480,20 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     animations: "disabled",
     path: testInfo.outputPath("coordinator-mobile.png"),
   });
+  turns.push({
+    ...turns[0],
+    id: "command-without-usage",
+    number: 2,
+    text: "/status",
+    activity: { ...turns[0].activity, items: [], context: null },
+  });
   await page.reload();
   await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(page.getByLabel("12% context used")).toBeVisible();
+  await page.getByLabel("12% context used").hover();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Last reported: 12,000",
+  );
   await expect(
     page.getByText("Let’s plan the work.", { exact: false }),
   ).toBeVisible();
@@ -499,7 +539,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   expect(sends).toBe(1);
 });
 
-test("single coordinator requires a saved model, labels loading and retains unsaved edits", async ({
+test("single coordinator requires a saved model, labels loading and cancels dismissed settings", async ({
   page,
   request,
 }, testInfo) => {
@@ -645,13 +685,24 @@ test("single coordinator requires a saved model, labels loading and retains unsa
     .getByRole("combobox", { name: "Access mode" })
     .selectOption("agent");
   await expect(send).toBeDisabled();
-  await page.getByRole("link", { name: "Flowfield", exact: true }).click();
-  await expect(page.getByRole("alertdialog")).toBeVisible();
-  await page.getByRole("button", { name: "Keep editing", exact: true }).click();
+  await input.click();
+  await expect(model).not.toBeVisible();
+  await expect(input).toBeEditable();
   await page
     .getByRole("button", { name: "Model settings", exact: true })
     .click();
-  await expect(model).toHaveValue("second");
+  await expect(model).toHaveValue("");
+  await model.selectOption("second");
+  await effort.selectOption("high");
+  await page
+    .getByRole("combobox", { name: "Access mode" })
+    .selectOption("agent");
+  await expect(model).toHaveCSS("height", "32px");
+  await expect(
+    page
+      .getByRole("dialog", { name: "Coordinator model settings" })
+      .getByRole("button", { name: "Fast mode" }),
+  ).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath("coordinator-model-settings.png"),
   });
@@ -662,12 +713,26 @@ test("single coordinator requires a saved model, labels loading and retains unsa
     .locator(".composer-toolbar")
     .getByRole("button", { name: "Fast mode", exact: true });
   await expect(fastButton).toHaveAttribute("aria-pressed", "false");
+  await fastButton.hover();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Fast mode off. Faster responses, increased usage",
+  );
   await fastButton.click();
   await expect(fastButton).toHaveAttribute("aria-pressed", "true");
   expect(settings.effective?.choice.fast).toBe(true);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
   await expect(fastButton).toBeVisible();
+  await page
+    .getByRole("button", { name: "second · high", exact: true })
+    .click();
+  await model.selectOption("first");
+  await page.getByRole("tab", { name: "Work", exact: true }).click();
+  await expect(model).not.toBeVisible();
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(model).toHaveValue("second");
+  await page.keyboard.press("Escape");
+  await expect(send).toBeEnabled();
   const fastBounds = await fastButton.boundingBox();
   expect(fastBounds!.x + fastBounds!.width).toBeLessThanOrEqual(390);
   await page.screenshot({
@@ -681,6 +746,17 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   await expect(page.getByRole("button", { name: "Use defaults" })).toHaveCount(
     0,
   );
+  await model.selectOption("first");
+  await page.keyboard.press("Escape");
+  await expect(send).toBeEnabled();
+  await expect(fastButton).toBeEnabled();
+  await expect(input).toBeEditable();
+  await page
+    .getByRole("button", { name: "second · high", exact: true })
+    .click();
+  await expect(model).toHaveValue("second");
+  await expect(effort).toHaveValue("high");
+  await input.click();
   await send.click();
   await expect(page.getByRole("alert")).toContainText("Model is unavailable");
   await expect(page.getByRole("button", { name: "Refresh chat" })).toHaveCount(
