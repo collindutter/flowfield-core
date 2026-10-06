@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "flowfield-core"
 version = "0.1.0"
-description = "Shared task feeds and parallel workers for agent software development"
+description = "A workspace for you and your coding agents"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
