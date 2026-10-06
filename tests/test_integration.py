@@ -58,7 +58,6 @@ def seed(tmp_path: Path, checks: list[str] | None = None):
                 stages=fixture_stage_change(execution.workspace, "harbor", task.id),
                 completion="code",
                 expected_revision=task.revision,
-                expected_decision_sequence=task.decision_sequence,
             ),
         )
     base = baseline(repo)
@@ -152,7 +151,6 @@ def test_accept_validate_apply_releases_dependent_without_touching_human_files(t
             stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             completion="code",
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
         ),
     )
     original = baseline(repo)
@@ -400,7 +398,6 @@ def test_enabled_scheduler_picks_up_dependent_after_explicit_integration(tmp_pat
             stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             completion="code",
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
         ),
     )
 

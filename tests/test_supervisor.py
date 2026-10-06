@@ -127,7 +127,6 @@ def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
         TaskPublish(
             completion="code",
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
         ),
     )
 
@@ -283,7 +282,6 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
             TaskPublish(
                 completion="code",
                 expected_revision=task.revision,
-                expected_decision_sequence=task.decision_sequence,
             ),
         )
 

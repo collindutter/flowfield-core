@@ -31,7 +31,7 @@ def test_stages_required_and_atomic_preparation_rollback(tmp_path):
     adopt(workspace, ProjectSetup(path=str(tmp_path / "project")))
     notices = []
     workspace.on_change = notices.append
-    preparation = TaskPreparation(expected_decision_sequence=0, completion="report")
+    preparation = TaskPreparation(completion="report")
     task = workspace.create_task("project", request(preparation=preparation))
     stages = Stages(workspace)
     initial = stages.get("project", task.id)

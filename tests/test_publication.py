@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from project_fixtures import adopt, fixture_stage_change, task_request
 
-from flowfield.activity import ActivityCreate, DecisionWithdraw
+from flowfield.activity import ActivityCreate
 from flowfield.application import (
     ProjectSetup,
     TaskEdit,
@@ -46,7 +46,6 @@ def publish(workspace: Workspace, identity: str = "export"):
         TaskPublish(
             completion="report",
             expected_revision=current.revision,
-            expected_decision_sequence=current.decision_sequence,
             author="coordinator",
             stages=fixture_stage_change(workspace, "harbor", identity),
         ),
@@ -86,39 +85,6 @@ def test_publication_is_separate_from_dependencies_priority_and_notes(tmp_path: 
     assert restored.publication == refreshed.publication
     assert ContextReads(workspace).task("harbor", "HAR-2")["publication_status"] == "published"
     assert BrowserReads(workspace).task("harbor", "HAR-2").publication_status == "published"
-
-
-def test_decision_changes_and_stale_checks_are_visible(tmp_path: Path) -> None:
-    workspace = setup(tmp_path)
-    first = publish(workspace)
-    publish(workspace, "catalog")
-    decision = workspace.add_activity(
-        "harbor", ActivityCreate(kind="decision", task_id="export", body="Use UTF-8.")
-    )
-    assert workspace.task("harbor", "export").publication_status == "draft"
-    assert workspace.task("harbor", "catalog").publication_status == "published"
-    with pytest.raises(ApplicationError, match="Decisions changed"):
-        workspace.publish_task(
-            "harbor",
-            "export",
-            TaskPublish(
-                completion="report",
-                expected_revision=first.revision,
-                expected_decision_sequence=first.decision_sequence,
-            ),
-        )
-    publish(workspace)
-    workspace.withdraw_decision(
-        "harbor", decision.id, DecisionWithdraw(reason="Reconsider encoding.")
-    )
-    assert workspace.task("harbor", "export").readiness == "draft"
-    publish(workspace)
-    workspace.add_activity(
-        "harbor",
-        ActivityCreate(task_id="export", kind="decision", body="Exports must stay offline."),
-    )
-    assert workspace.task("harbor", "export").publication_status == "draft"
-    assert ContextReads(workspace).overview("harbor")["recommendation"]["action"] == "publish"
 
 
 def test_questions_must_be_applied_and_edits_race_with_publication(tmp_path: Path) -> None:
@@ -161,7 +127,6 @@ def test_questions_must_be_applied_and_edits_race_with_publication(tmp_path: Pat
                         completion="report",
                         stages=fixture_stage_change(workspace, "harbor", "export"),
                         expected_revision=current.revision,
-                        expected_decision_sequence=current.decision_sequence,
                     ),
                 )
             return workspace.edit_task(
@@ -204,25 +169,10 @@ def test_active_work_requires_reconciliation_without_moving_its_card(tmp_path: P
         "export",
         TaskReconcile(
             expected_revision=changed.revision,
-            expected_decision_sequence=changed.decision_sequence,
             note="Reviewed the changed assignment and remaining work.",
         ),
     )
     assert reconciled.status == "in_progress" and reconciled.publication_status == "published"
-    workspace.add_activity(
-        "harbor", ActivityCreate(kind="decision", task_id="export", body="No network calls.")
-    )
-    assert workspace.task("harbor", "export").readiness == "needs_reconciliation"
-    with pytest.raises(ApplicationError, match="current decisions"):
-        workspace.reconcile_task(
-            "harbor",
-            "export",
-            TaskReconcile(
-                expected_revision=workspace.task("harbor", "export").revision,
-                expected_decision_sequence=reconciled.decision_sequence,
-                note="Stale check.",
-            ),
-        )
 
 
 def test_project_answer_updates_a_completed_dependency_chain_atomically(tmp_path: Path) -> None:
@@ -273,34 +223,6 @@ def test_project_answer_updates_a_completed_dependency_chain_atomically(tmp_path
         assert current.revision == before[identity].revision + 1
         assert applied.applied_task_revisions[identity] == current.revision
         assert current.readiness == "needs_reconciliation" and current.status == "done"
-
-
-def test_decision_reconciliation_does_not_silently_revalidate_dependents(tmp_path: Path) -> None:
-    workspace = setup(tmp_path)
-    workspace.edit_task("harbor", "export", TaskEdit(expected_revision=1, dependencies=["catalog"]))
-    for identity in ("catalog", "export"):
-        task = publish(workspace, identity)
-        workspace.record_progress(
-            "harbor",
-            identity,
-            TaskProgress(expected_revision=task.revision, status="done", completion="report"),
-        )
-    workspace.add_activity(
-        "harbor",
-        ActivityCreate(task_id="catalog", kind="decision", body="Reject malformed extra fields."),
-    )
-    task = workspace.task("harbor", "catalog")
-    workspace.reconcile_task(
-        "harbor",
-        "catalog",
-        TaskReconcile(
-            expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
-            note="Reviewed the catalog result.",
-        ),
-    )
-    dependent = workspace.task("harbor", "export")
-    assert dependent.status == "done" and dependent.readiness == "needs_reconciliation"
 
 
 def test_changed_selected_assignment_requires_republication_before_progress(tmp_path: Path) -> None:

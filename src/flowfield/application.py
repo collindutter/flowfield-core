@@ -27,7 +27,6 @@ from flowfield.activity import (
     ActivityCreate,
     ActivityEntry,
     ActivityPage,
-    DecisionWithdraw,
     EntryKind,
 )
 from flowfield.errors import ApplicationError
@@ -41,7 +40,6 @@ from flowfield.publication import (
     Publication,
     PublicationStatus,
     Readiness,
-    decision_sequence,
     preparation_issue,
     publication_status,
     readiness,
@@ -160,7 +158,6 @@ class Milestone(WorkRecord):
 
 
 class TaskPreparation(Input):
-    expected_decision_sequence: int = Field(ge=0)
     completion: Literal["code", "report"]
 
 
@@ -220,13 +217,11 @@ class TaskProgress(Edit):
 
 class TaskReconcile(Edit):
     completion: Literal["code", "report"] | None = None
-    expected_decision_sequence: int | None = Field(default=None, ge=0)
     note: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200_000)]
 
 
 class TaskPublish(Edit):
     stages: StageChange | None = None
-    expected_decision_sequence: int = Field(ge=0)
     completion: Literal["code", "report"]
 
 
@@ -259,7 +254,6 @@ class Task(TaskRevision):
     position: int
     revisions: list[TaskRevision]
     publication_status: PublicationStatus
-    decision_sequence: int
     readiness: Readiness
     blocked_by: list[TaskReference]
     blocking_questions: list[QuestionReference]
@@ -334,10 +328,9 @@ CREATE TABLE activity (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL UNIQUE,
     project_id TEXT NOT NULL REFERENCES projects(id), task_id TEXT,
-    kind TEXT NOT NULL CHECK(kind IN ('note', 'decision', 'handoff', 'event')),
+    kind TEXT NOT NULL CHECK(kind IN ('note', 'handoff', 'event')),
     body TEXT NOT NULL, author TEXT NOT NULL, created_at TEXT NOT NULL,
     supersedes TEXT UNIQUE REFERENCES activity(id), task_revision INTEGER, question_id TEXT,
-    withdraws TEXT UNIQUE REFERENCES activity(id),
     FOREIGN KEY (project_id, task_id) REFERENCES tasks(project_id, id)
 );
 CREATE INDEX activity_scope ON activity(project_id, task_id, sequence);
@@ -715,8 +708,7 @@ class Workspace:
             if (
                 task.status == "done"
                 and not task.reconciliation_reason
-                and publication_status(task, decision_sequence(db, task.project_id, task.id))
-                != "needs_reconciliation"
+                and publication_status(task) != "needs_reconciliation"
                 and all(prerequisite in completed for prerequisite in task.dependencies)
             ):
                 completed.add(key)
@@ -766,8 +758,7 @@ class Workspace:
                 item.status == "done"
                 and not blocked
                 and not item.reconciliation_reason
-                and publication_status(item, decision_sequence(db, item.project_id, item.id))
-                != "needs_reconciliation"
+                and publication_status(item) != "needs_reconciliation"
             ):
                 completed.add(key)
         for key in changed:
@@ -801,16 +792,14 @@ class Workspace:
         completed = completed if completed is not None else self._completed(records, db)
         blocked = [records[p] for p in current.dependencies if p not in completed]
         questions = blocking_questions(db, project_id, task_id)
-        decisions = decision_sequence(db, project_id, task_id)
-        publication = publication_status(current, decisions)
+        publication = publication_status(current)
         return Task(
             **current.model_dump(),
             position=row["position"],
             latest_update=self._latest_update(db, project_id, task_id),
             revisions=revisions,
             publication_status=publication,
-            preparation_issue=preparation_issue(db, current, decisions),
-            decision_sequence=decisions,
+            preparation_issue=preparation_issue(db, current),
             readiness=readiness(
                 current,
                 publication,
@@ -1117,12 +1106,6 @@ class Workspace:
     ) -> Task:
         current = self._task(db, project_id, task_id)
         self._current(current.revision, request.expected_revision)
-        if current.decision_sequence != request.expected_decision_sequence:
-            raise ApplicationError(
-                "publication_conflict",
-                "Decisions changed. Read current decisions before publishing the task.",
-                409,
-            )
         if current.archived or current.status not in PLANNING:
             raise ApplicationError(
                 "inactive_task",
@@ -1185,7 +1168,6 @@ class Workspace:
             completion=request.completion,
             target_branch=target_branch,
             agreement_revision=current.agreement_revision,
-            decision_sequence=current.decision_sequence,
             task_revision=current.revision,
             author=request.author,
             created_at=task.updated_at,
@@ -1342,14 +1324,6 @@ class Workspace:
         with self.connection(write=True, project_id=project_id) as db:
             current = self._task(db, project_id, task_id)
             self._current(current.revision, request.expected_revision)
-            if (
-                current.publication or request.completion
-            ) and request.expected_decision_sequence != current.decision_sequence:
-                raise ApplicationError(
-                    "publication_conflict",
-                    "Read current decisions before reconciling published work.",
-                    409,
-                )
             if current.archived:
                 raise ApplicationError(
                     "archived_task", "Restore the task before reconciling it.", 409
@@ -1392,7 +1366,6 @@ class Workspace:
                         completion=completion,
                         target_branch=target_branch,
                         agreement_revision=current.agreement_revision,
-                        decision_sequence=current.decision_sequence,
                         task_revision=current.revision,
                         author=request.author,
                         created_at=now(),
@@ -1423,12 +1396,11 @@ class Workspace:
         supersedes: str | None = None,
         task_revision: int | None = None,
         question_id: str | None = None,
-        withdraws: str | None = None,
     ) -> ActivityEntry:
         db.execute(
             "INSERT INTO activity (id, project_id, task_id, kind, body, author, created_at, "
-            "supersedes, task_revision, question_id, withdraws) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "supersedes, task_revision, question_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 entry_id,
                 project_id,
@@ -1440,31 +1412,8 @@ class Workspace:
                 supersedes,
                 task_revision,
                 question_id,
-                withdraws,
             ),
         )
-        if kind == "decision" or withdraws is not None:
-            affected = []
-            for task in self._records(db, project_id).values():
-                if (
-                    task.status not in PLANNING
-                    and not task.reconciliation_reason
-                    and publication_status(task, decision_sequence(db, project_id, task.id))
-                    == "needs_reconciliation"
-                ):
-                    reason = "Decisions changed. Review recorded work with the coordinator."
-                    affected.append(
-                        task.model_copy(
-                            update={
-                                "revision": task.revision + 1,
-                                "updated_at": created_at,
-                                "updated_by": author,
-                                "reconciliation_reason": reason,
-                                "change_note": reason,
-                            }
-                        )
-                    )
-            self._apply_tasks(db, affected)
         return self._activity_entry(db, entry_id)
 
     def _latest_update(
@@ -1519,10 +1468,7 @@ class Workspace:
                 sql += " AND a.kind=?"
                 args.append(kind)
             if current_only:
-                sql += (
-                    " AND a.task_id IS NOT NULL AND a.kind='decision' "
-                    "AND replacement.id IS NULL AND withdrawal.id IS NULL"
-                )
+                sql += " AND a.kind != 'event' AND replacement.id IS NULL"
             if before is not None:
                 sql += " AND a.sequence<?"
                 args.append(before)
@@ -1589,22 +1535,6 @@ class Workspace:
                         "Read the task before recording a handoff.",
                         409,
                     )
-            elif request.supersedes is not None:
-                previous = self._activity_entry(db, request.supersedes)
-                if (
-                    previous.project_id != project_id
-                    or previous.task_id != task_id
-                    or previous.kind != "decision"
-                ):
-                    raise ApplicationError(
-                        "invalid_decision", "Replace a decision in the same scope."
-                    )
-                if previous.superseded_by is not None or previous.withdrawn_by is not None:
-                    raise ApplicationError(
-                        "decision_conflict",
-                        "This decision was already replaced or withdrawn. Read its history first.",
-                        409,
-                    )
             return self._insert_activity(
                 db,
                 project_id,
@@ -1616,44 +1546,6 @@ class Workspace:
                 now(),
                 request.supersedes,
                 task_revision=request.expected_task_revision,
-            )
-
-    def withdraw_decision(
-        self, project_id: str, identity: str, request: DecisionWithdraw
-    ) -> ActivityEntry:
-        with self.connection(write=True, project_id=project_id) as db:
-            original = self._activity_entry(db, identity)
-            if (
-                original.project_id != project_id
-                or original.kind != "decision"
-                or original.task_id is None
-            ):
-                raise ApplicationError("not_found", "Task decision not found in this project.", 404)
-            body = "Decision withdrawn: " + request.reason
-            if db.execute("SELECT 1 FROM activity WHERE id=?", (request.id,)).fetchone():
-                existing = self._activity_entry(db, request.id)
-                if (existing.project_id, existing.withdraws, existing.body, existing.author) == (
-                    project_id,
-                    identity,
-                    body,
-                    request.author,
-                ):
-                    return existing
-                raise ApplicationError("activity_conflict", "This entry ID was already used.", 409)
-            if original.superseded_by or original.withdrawn_by:
-                raise ApplicationError(
-                    "decision_conflict", "This decision was already replaced or withdrawn.", 409
-                )
-            return self._insert_activity(
-                db,
-                project_id,
-                original.task_id,
-                request.id,
-                "event",
-                body,
-                request.author,
-                now(),
-                withdraws=identity,
             )
 
     def _current(self, revision: int, expected: int) -> None:

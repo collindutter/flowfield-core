@@ -198,7 +198,6 @@ class Execution:
                 task.archived
                 or task.reconciliation_reason
                 or task.agreement_revision != run.agreement_revision
-                or task.decision_sequence != run.decision_sequence
             ):
                 raise ApplicationError("assignment_changed", "The conversation scope changed.", 409)
             return
@@ -206,7 +205,6 @@ class Execution:
             task.archived
             or task.readiness != "ready"
             or task.agreement_revision != run.agreement_revision
-            or task.decision_sequence != run.decision_sequence
             or not task.publication
             or task.publication.completion != run.completion
             or task.publication.target_branch != run.target_branch
@@ -267,7 +265,6 @@ class Execution:
                     and pending_input.origin_run_id == predecessor.id
                     and task.status in ("in_progress", "up_next")
                     and task.agreement_revision == predecessor.agreement_revision
-                    and task.decision_sequence == predecessor.decision_sequence
                     and not task.reconciliation_reason
                     and not task.blocked_by
                     and all(q.id == pending_input.id for q in task.blocking_questions)
@@ -310,7 +307,6 @@ class Execution:
                     and predecessor.input_question_id
                     and predecessor.status in ("failed", "stopped")
                     and task.agreement_revision == predecessor.agreement_revision
-                    and task.decision_sequence == predecessor.decision_sequence
                     and task.publication
                     and task.publication.completion == predecessor.completion
                     and task.publication.target_branch == predecessor.target_branch
@@ -448,25 +444,12 @@ class Execution:
                     effort=effective.choice.effort,
                     agent_settings=effective,
                     agreement_revision=task.agreement_revision,
-                    decision_sequence=task.decision_sequence,
                     base_commit=chosen_base,
                     completion=task.publication.completion,
                     target_branch=task.publication.target_branch,
                     feedback=predecessor.feedback if predecessor else "",
                     created_at=now(),
                 )
-                decisions = [
-                    dict(row)
-                    for row in db.execute(
-                        (
-                            "SELECT id, body FROM activity a WHERE project_id=? AND "
-                            "kind='decision' AND task_id=? AND NOT EXISTS"
-                            " (SELECT 1 FROM activity newer WHERE newer.supersedes=a.id OR "
-                            "newer.withdraws=a.id) ORDER BY sequence"
-                        ),
-                        (project_id, task.id),
-                    )
-                ]
                 milestone = (
                     self.workspace._milestone(db, project_id, task.milestone_id)
                     if task.milestone_id
@@ -479,7 +462,6 @@ class Execution:
                             "task": task.key,
                             "task_revision": task.revision,
                             "agreement_revision": task.agreement_revision,
-                            "decision_sequence": task.decision_sequence,
                             "completion": task.publication.completion,
                             "target_branch": task.publication.target_branch,
                             "base_commit": chosen_base,
@@ -489,7 +471,6 @@ class Execution:
                     "description": task.body,
                     "project": project.description,
                     "milestone": milestone.body if milestone else "",
-                    "decisions": json.dumps(decisions),
                     "prerequisites": json.dumps(prerequisites),
                     "feedback": run.feedback,
                     "predecessor": predecessor.result.model_dump_json()

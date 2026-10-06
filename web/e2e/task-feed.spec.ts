@@ -906,14 +906,6 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
       body: "Export filtered rows as JSON, capped at 500. Test Unicode, empty output and overflow.",
     },
   });
-  await call("add_activity", {
-    project_id: "publication",
-    entry: {
-      kind: "decision",
-      task_id: "PRE-1",
-      body: "Keep exports offline.",
-    },
-  });
   await expect(draft).toBeVisible();
   const fromCli = cli([
     "task",
@@ -926,12 +918,21 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
   ]);
   expect(fromCli.publication_status).toBe("published");
   await expect(draft).toHaveCount(0);
-  await call("add_activity", {
+  const plan = await call("get_task_stages", {
     project_id: "publication",
-    entry: {
-      task_id: "PRE-1",
-      kind: "decision",
-      body: "Use UTF-8 for all exports.",
+    task_id: "PRE-1",
+  });
+  await call("edit_task", {
+    project_id: "publication",
+    task_id: "PRE-1",
+    changes: {
+      expected_revision: fromCli.revision,
+      body: "Export filtered rows as JSON, capped at 500. Test Unicode, empty output and overflow. Use UTF-8.",
+      stages: {
+        expected_revision: plan.revision,
+        stages: fixtureStages(),
+        reason: "Cover the updated encoding requirement",
+      },
     },
   });
   await expect(draft).toBeVisible();
@@ -945,7 +946,6 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
     publication: {
       completion: "report",
       expected_revision: current.revision,
-      expected_decision_sequence: current.decision_sequence,
     },
   });
   await page.reload();
@@ -992,7 +992,6 @@ test("conversation capture prepares atomically while task defaults show only use
       task_type: "investigation",
       preparation: {
         completion: "report",
-        expected_decision_sequence: 0,
       },
     },
   });
@@ -1096,7 +1095,6 @@ test("conversation capture prepares atomically while task defaults show only use
       body: "Compare formats, include uncertainty and recommend one; report only with no file changes.",
       preparation: {
         completion: "report",
-        expected_decision_sequence: current.decision_sequence,
       },
     },
   });
@@ -1114,7 +1112,6 @@ test("conversation capture prepares atomically while task defaults show only use
         body: "Stale replacement",
         preparation: {
           completion: "report",
-          expected_decision_sequence: current.decision_sequence,
         },
       },
     },

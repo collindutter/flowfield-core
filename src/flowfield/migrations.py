@@ -183,54 +183,80 @@ def retire_worker_discussions(db: sqlite3.Connection) -> None:
     )
 
 
-def retire_project_decisions(db: sqlite3.Connection) -> None:
-    # Retain original activity and frozen attempts. Retired project constraints must
-    # not silently disappear from prepared work; reconcile them into its real sources.
-    active_projects = {
-        row[0]
-        for row in db.execute(
-            "SELECT DISTINCT a.project_id FROM activity a WHERE a.task_id IS NULL "
-            "AND a.kind='decision' AND NOT EXISTS (SELECT 1 FROM activity newer "
-            "WHERE newer.supersedes=a.id OR newer.withdraws=a.id)"
+def remove_decisions(db: sqlite3.Connection) -> None:
+    # Decisions have no replacement store or historical reader.
+    db.execute(
+        "DELETE FROM search_docs WHERE entity='activity' AND identity IN "
+        "(SELECT id FROM activity WHERE kind='decision')"
+    )
+    columns = {row[1] for row in db.execute("PRAGMA table_info(activity)")}
+    if "withdraws" in columns:
+        db.execute(
+            "DELETE FROM search_docs WHERE entity='activity' AND identity IN "
+            "(SELECT id FROM activity WHERE withdraws IS NOT NULL)"
         )
-    }
-    for row in db.execute("SELECT project_id,id,data FROM tasks").fetchall():
-        project_id, task_id, raw = row
-        task = json.loads(raw)
-        publication = task.get("publication")
-        sequence = db.execute(
-            "SELECT coalesce(max(sequence),0) FROM activity WHERE project_id=? "
-            "AND task_id=? AND (kind='decision' OR withdraws IS NOT NULL)",
-            (project_id, task_id),
-        ).fetchone()[0]
-        changed = bool(publication and publication["decision_sequence"] != sequence)
-        if publication:
-            publication["decision_sequence"] = sequence
-        if (
-            project_id in active_projects
-            and publication
-            and not task.get("archived")
-            and task["status"] != "done"
-        ):
-            reason = (
-                "Project decisions were retired. Review retained project history and move "
-                "applicable constraints into the task definition or repository guidance, "
-                "then reconcile this task."
+        db.execute("DROP INDEX activity_scope")
+        db.execute("ALTER TABLE activity RENAME TO removed_activity")
+        db.execute(
+            "CREATE TABLE activity (sequence INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "id TEXT NOT NULL UNIQUE, project_id TEXT NOT NULL REFERENCES projects(id), "
+            "task_id TEXT, kind TEXT NOT NULL CHECK(kind IN ('note','handoff','event')), "
+            "body TEXT NOT NULL, author TEXT NOT NULL, created_at TEXT NOT NULL, "
+            "supersedes TEXT UNIQUE REFERENCES activity(id), task_revision INTEGER, "
+            "question_id TEXT, FOREIGN KEY(project_id,task_id) REFERENCES tasks(project_id,id))"
+        )
+        db.execute(
+            "INSERT INTO activity SELECT sequence,id,project_id,task_id,kind,body,author,"
+            "created_at,supersedes,task_revision,question_id FROM removed_activity "
+            "WHERE kind!='decision' AND withdraws IS NULL"
+        )
+        db.execute("DROP TABLE removed_activity")
+        db.execute("CREATE INDEX activity_scope ON activity(project_id,task_id,sequence)")
+        from flowfield.search import _index
+
+        db.execute(
+            _index(
+                "activity",
+                "activity",
+                "new.id,new.sequence,new.kind,new.task_id,new.created_at,new.kind,new.body",
             )
-            task["reconciliation_reason"] = "\n\n".join(
-                filter(None, [task.get("reconciliation_reason"), reason])
-            )
-            changed = True
-        if changed:
-            task["revision"] += 1
-            data = json.dumps(task)
-            db.execute(
-                "UPDATE tasks SET data=? WHERE project_id=? AND id=?", (data, project_id, task_id)
-            )
-            db.execute(
-                "INSERT INTO task_revisions VALUES (?,?,?,?)",
-                (project_id, task_id, task["revision"], data),
-            )
+        )
+    for table in ("tasks", "task_revisions", "runs"):
+        db.execute(
+            f"UPDATE {table} SET data=json_remove(data,'$.decision_sequence',"
+            "'$.publication.decision_sequence')"
+        )
+    for row in db.execute("SELECT id,assignment FROM runs").fetchall():
+        assignment = json.loads(row[1])
+        assignment.pop("decisions", None)
+        if assignment.get("agreement"):
+            agreement = json.loads(assignment["agreement"])
+            agreement.pop("decision_sequence", None)
+            assignment["agreement"] = json.dumps(agreement)
+        db.execute("UPDATE runs SET assignment=? WHERE id=?", (json.dumps(assignment), row[0]))
+    for table in ("tasks", "task_revisions"):
+        for row in db.execute(f"SELECT rowid,data FROM {table}").fetchall():
+            task = json.loads(row[1])
+            changed = False
+            for field in ("reconciliation_reason", "change_note"):
+                text = task.get(field)
+                if not text:
+                    continue
+                parts = text.split("\n\n")
+                kept = [
+                    part
+                    for part in parts
+                    if not part.startswith(
+                        ("Project decisions were retired.", "Decisions changed.")
+                    )
+                ]
+                if kept != parts:
+                    task[field] = "\n\n".join(kept) or (
+                        None if field == "reconciliation_reason" else ""
+                    )
+                    changed = True
+            if changed:
+                db.execute(f"UPDATE {table} SET data=? WHERE rowid=?", (json.dumps(task), row[0]))
 
 
 def initial_task_stages(db: sqlite3.Connection) -> None:
@@ -275,8 +301,9 @@ MIGRATIONS = (
     Migration(39, explicit_fast_mode),
     Migration(40, task_specific_speed),
     Migration(41, retire_worker_discussions),
-    Migration(42, retire_project_decisions),
+    Migration(42, remove_decisions),
     Migration(43, initial_task_stages),
+    Migration(44, remove_decisions),
 )
 
 

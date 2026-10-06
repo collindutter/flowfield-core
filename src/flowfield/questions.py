@@ -571,7 +571,7 @@ class Questions:
                 project_id,
                 task.id,
                 uuid4().hex,
-                "decision",
+                "note",
                 request.decision,
                 request.author,
                 question.updated_at,

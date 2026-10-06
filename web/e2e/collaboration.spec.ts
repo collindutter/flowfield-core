@@ -253,7 +253,7 @@ test("three-letter prefix setup, coordinator dependencies and immediate accessib
   expect(reinitialized.task_prefix).toBe("CLX");
 });
 
-test("task activity, Markdown and independently retrievable decisions preserve the current agreement", async ({
+test("task activity, Markdown and independently retrievable handoffs preserve the current agreement", async ({
   page,
   request,
 }) => {
@@ -303,7 +303,9 @@ test("task activity, Markdown and independently retrievable decisions preserve t
     ...identity,
     entry: {
       task_id: task.key,
-      kind: "decision",
+      kind: "handoff",
+      expected_task_revision: 1,
+      supersedes: null,
       body: "Visible columns only",
     },
   });
@@ -311,9 +313,10 @@ test("task activity, Markdown and independently retrievable decisions preserve t
     ...identity,
     entry: {
       task_id: task.key,
-      kind: "decision",
-      body: "Include hidden columns but exclude secrets.",
+      kind: "handoff",
+      expected_task_revision: 1,
       supersedes: old.id,
+      body: "Include hidden columns but exclude secrets.",
     },
   });
   await expect(
@@ -347,7 +350,7 @@ test("task activity, Markdown and independently retrievable decisions preserve t
   );
 });
 
-test("conversation pages exact revisions without hiding notes or superseded decisions", async ({
+test("conversation pages exact revisions without hiding notes or superseded handoffs", async ({
   page,
   request,
 }) => {
@@ -384,20 +387,27 @@ test("conversation pages exact revisions without hiding notes or superseded deci
   });
   const old = await (
     await request.post(`${path}/activity`, {
-      data: { task_id: "one", kind: "decision", body: "Old choice" },
+      data: {
+        task_id: "one",
+        kind: "handoff",
+        expected_task_revision: 34,
+        supersedes: null,
+        body: "Old handoff",
+      },
     })
   ).json();
   await request.post(`${path}/activity`, {
     data: {
       task_id: "one",
-      kind: "decision",
-      body: "Current choice",
+      kind: "handoff",
+      expected_task_revision: 34,
       supersedes: old.id,
+      body: "Current handoff",
     },
   });
   await page.goto("/projects/edit-feed/tasks/EDF-1/activity");
   const activity = page.getByRole("list", { name: "Task feed" });
-  await expect(activity).toContainText("Current choice");
+  await expect(activity).toContainText("Current handoff");
   await expect(
     activity.getByRole("img", { name: "Superseded", exact: true }),
   ).toBeVisible();
@@ -1034,7 +1044,7 @@ test("project questions link affected tasks and reconcile through CLI and MCP", 
   });
   await closeOverlay(page);
   expect(
-    cli(["project", "history", "--project", project_id]).items.some(
+    (await call("list_activity", { project_id })).items.some(
       (item: { body: string }) => item.body === "Target personal use.",
     ),
   ).toBe(true);

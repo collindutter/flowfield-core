@@ -1061,7 +1061,6 @@ test("outcomes finish reports, preserve partial work and offer one contextual re
       await request.post(taskPath + "/reconcile", {
         data: {
           expected_revision: revisedTask.revision,
-          expected_decision_sequence: revisedTask.decision_sequence,
           completion: "code",
           note: "Human clarified the remaining outcome",
         },

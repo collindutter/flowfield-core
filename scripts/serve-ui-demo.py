@@ -193,7 +193,6 @@ def seed(root):
                 item.id,
                 TaskPublish(
                     expected_revision=item.revision,
-                    expected_decision_sequence=item.decision_sequence,
                     completion=completion,
                 ),
             )

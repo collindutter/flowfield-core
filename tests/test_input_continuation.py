@@ -353,7 +353,6 @@ def test_explicit_retry_after_scope_revision_cannot_relabel_old_answer_as_new_as
         TaskPublish(
             stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
             completion="report",
         ),
     )

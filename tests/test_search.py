@@ -9,7 +9,7 @@ from test_execution import BASE
 from test_execution import fixture as execution_fixture
 from test_results import approve, current, fixture
 
-from flowfield.activity import ActivityCreate, DecisionWithdraw
+from flowfield.activity import ActivityCreate
 from flowfield.application import (
     ProjectSetup,
     TaskEdit,
@@ -23,7 +23,7 @@ from flowfield.search import Search, assignment_search
 from flowfield.supervisor import WorkerBridge
 
 
-def test_current_decision_wins_over_similar_old_text_and_filters_scope(tmp_path):
+def test_current_handoff_wins_over_similar_old_text_and_filters_scope(tmp_path):
     workspace = Workspace(tmp_path / "state")
     for project in ("harbor", "other"):
         adopt(workspace, ProjectSetup(path=str(tmp_path / project)))
@@ -32,7 +32,9 @@ def test_current_decision_wins_over_similar_old_text_and_filters_scope(tmp_path)
         "harbor",
         ActivityCreate(
             task_id="export",
-            kind="decision",
+            kind="handoff",
+            expected_task_revision=1,
+            supersedes=None,
             body="CSV export preserves insertion ordering. This is obsolete.",
         ),
     )
@@ -40,17 +42,24 @@ def test_current_decision_wins_over_similar_old_text_and_filters_scope(tmp_path)
         "harbor",
         ActivityCreate(
             task_id="export",
-            kind="decision",
+            kind="handoff",
+            expected_task_revision=1,
             supersedes=old.id,
             body="CSV export uses stable alphabetical ordering.",
         ),
     )
     workspace.add_activity(
         "other",
-        ActivityCreate(task_id="export", kind="decision", body="CSV export private choice."),
+        ActivityCreate(
+            task_id="export",
+            kind="handoff",
+            expected_task_revision=1,
+            supersedes=None,
+            body="CSV export private choice.",
+        ),
     )
     search = Search(workspace, "http://localhost:1234")
-    current_hits = search.page("harbor", "CSV export", kind="decision")
+    current_hits = search.page("harbor", "CSV export", kind="handoff")
     assert [hit["identity"] for hit in current_hits["items"]] == [latest.id]
     assert current_hits["items"][0]["current"]
     assert current_hits["items"][0]["url"].endswith("/tasks/HAR-1")
@@ -60,8 +69,6 @@ def test_current_decision_wins_over_similar_old_text_and_filters_scope(tmp_path)
     assert not old_hits["items"][0]["current"]
     assert "[CSV]" in old_hits["items"][0]["snippet"]
     assert search.page("harbor", "CSV export", since="2099-01-01")["items"] == []
-    workspace.withdraw_decision("harbor", latest.id, DecisionWithdraw(reason="Scope cancelled"))
-    assert search.page("harbor", "alphabetical", kind="decision")["items"] == []
     with pytest.raises(ApplicationError, match="YYYY-MM-DD"):
         search.page("harbor", "CSV", since="yesterday")
     with pytest.raises(ApplicationError, match="1–20"):
@@ -172,7 +179,6 @@ def test_worker_search_cannot_escape_snapshot_and_manual_report_is_usable(tmp_pa
         child.id,
         TaskPublish(
             expected_revision=child.revision,
-            expected_decision_sequence=child.decision_sequence,
             completion="report",
         ),
     )

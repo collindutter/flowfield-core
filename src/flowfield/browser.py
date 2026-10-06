@@ -24,7 +24,6 @@ from flowfield.publication import (
     Publication,
     PublicationStatus,
     Readiness,
-    decision_sequence,
     preparation_issue,
     publication_status,
     readiness,
@@ -53,7 +52,6 @@ class TaskCard(TaskReference):
     readiness: Readiness
     publication_status: PublicationStatus
     agreement_revision: int
-    decision_sequence: int
     publication: Publication | None
     blocked_by: list[TaskReference]
     blocking_questions: list[QuestionReference]
@@ -116,8 +114,7 @@ class BrowserReads:
     ) -> TaskCard:
         blocked = [records[key] for key in task.dependencies if key not in completed]
         questions = blocking_questions(db, task.project_id, task.id)
-        decisions = decision_sequence(db, task.project_id, task.id)
-        publication = publication_status(task, decisions)
+        publication = publication_status(task)
         state = task_state(self.workspace, db, task.project_id, task.id)
         return TaskCard(
             **task.model_dump(exclude={"body", "change_note"}),
@@ -125,9 +122,8 @@ class BrowserReads:
             status_changed_at=timeline["entered"],
             archived_at=timeline["archived_at"] if task.archived else None,
             archived_by=timeline["archived_by"] if task.archived else None,
-            decision_sequence=decisions,
             publication_status=publication,
-            preparation_issue=preparation_issue(db, task, decisions, include_draft_hint=False),
+            preparation_issue=preparation_issue(db, task, include_draft_hint=False),
             readiness=readiness(
                 task,
                 publication,

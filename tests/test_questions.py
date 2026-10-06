@@ -95,10 +95,9 @@ def test_answer_is_not_application_and_other_gates_survive(tmp_path: Path) -> No
     assert task.body.endswith("10,000.") and task.status == "up_next"
     assert [q.id for q in task.blocking_questions] == ["format"]
     assert [t.key for t in task.blocked_by] == ["HAR-1"]
-    assert (
-        task.latest_update
-        and task.latest_update.kind == "decision"
-        and task.latest_update.question_id == "scope"
+    assert any(
+        entry.question_id == "scope"
+        for entry in workspace.activity("harbor", task_id=task.id).items
     )
     assert questions.list("harbor")["needs_you_count"] == 1
     questions.withdraw(
@@ -366,7 +365,6 @@ def test_project_input_applies_once_without_placeholder_task(tmp_path: Path) -> 
     ]
     assert len(history) == 1 and history[0].task_id is None
     assert history[0].question_id == question.id
-    assert not workspace.activity("harbor", kind="decision").items
 
 
 def test_project_input_targets_and_atomic_stale_protection(tmp_path: Path) -> None:
@@ -420,7 +418,6 @@ def test_project_input_targets_and_atomic_stale_protection(tmp_path: Path) -> No
     assert workspace.task("harbor", "HAR-1").readiness == "draft"
     assert workspace.task("harbor", "HAR-2").readiness == "blocked"
     assert not workspace.task("harbor", "HAR-2").blocking_questions
-    assert not workspace.activity("harbor", kind="decision").items
     assert (
         sum(
             e.body == "All outputs use UTF-8."
@@ -428,7 +425,6 @@ def test_project_input_targets_and_atomic_stale_protection(tmp_path: Path) -> No
         )
         == 1
     )
-    assert not workspace.activity("harbor", task_id="HAR-1", kind="decision").items
 
 
 def test_project_question_rejects_ambiguous_scope_and_incomplete_application(

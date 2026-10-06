@@ -69,7 +69,6 @@ def configured(tmp_path, monkeypatch, *, count=1, scenario="normal", flags=()):
             TaskPublish(
                 completion="code",
                 expected_revision=task.revision,
-                expected_decision_sequence=task.decision_sequence,
             ),
         )
     return service, repo, settings

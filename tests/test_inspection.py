@@ -119,7 +119,6 @@ def test_feedback_successor_preserves_earlier_copy_and_approval_binding(tmp_path
         task.id,
         TaskReconcile(
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
             note="The human refined the outcome after inspection; request a revised result.",
         ),
     )

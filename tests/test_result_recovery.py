@@ -262,7 +262,6 @@ def test_changed_target_requires_explicit_reconciliation_before_correction(tmp_p
         task.id,
         TaskReconcile(
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
             completion="code",
             note="Deliver to new-target",
         ),

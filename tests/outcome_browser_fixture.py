@@ -61,9 +61,7 @@ for kind in ("report", "partial", "checks", "setup"):
             title=f"{kind.title()} outcome",
             body="Deliver both requested behaviors",
             status="up_next",
-            preparation=TaskPreparation(
-                completion="report" if kind == "report" else "code", expected_decision_sequence=0
-            ),
+            preparation=TaskPreparation(completion="report" if kind == "report" else "code"),
         ),
     )
     settings = service.execution.settings(project).model_copy(update={"enabled": True})

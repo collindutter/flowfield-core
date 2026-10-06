@@ -121,15 +121,13 @@ class ExecutionHistory:
         task_id: str,
         offset: int = 0,
         limit: int = 30,
-        mode: Literal["all", "notes", "decisions", "attempts"] = "all",
-        include_superseded: bool = False,
+        mode: Literal["all", "notes", "attempts"] = "all",
     ) -> TaskHistoryPage:
         """Page one chronology before hydrating entries; checks nest under attempts."""
         with self.workspace.connection() as db:
             args = {
                 **self._args(db, project_id, task_id),
                 "mode": mode,
-                "superseded": include_superseded,
                 "limit": limit + 1,
                 "offset": offset,
             }
@@ -141,10 +139,7 @@ class ExecutionHistory:
                     UNION ALL
                     SELECT a.id, 'activity', a.created_at, a.sequence FROM activity a
                     WHERE a.project_id=:project AND a.task_id=:task AND (
-                        :mode='all' OR (:mode='notes' AND a.kind IN ('note','decision','handoff'))
-                        OR (:mode='decisions' AND a.kind='decision' AND
-                            (:superseded OR NOT EXISTS (SELECT 1 FROM activity b
-                                WHERE b.supersedes=a.id OR b.withdraws=a.id))))
+                        :mode='all' OR (:mode='notes' AND a.kind IN ('note','handoff')))
                 ) SELECT * FROM timeline ORDER BY created_at DESC,sequence DESC,id
                 LIMIT :limit OFFSET :offset""",
                 args,

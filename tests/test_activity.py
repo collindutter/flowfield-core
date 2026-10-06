@@ -1,6 +1,5 @@
 """Activity is durable evidence, separate from current task agreement and progress."""
 
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -65,49 +64,6 @@ def test_activity_does_not_change_agreement_and_important_events_are_atomic(tmp_
     )
 
 
-def test_decision_scope_replacement_conflicts_and_current_reads(tmp_path: Path) -> None:
-    service = workspace(tmp_path)
-    old = service.add_activity(
-        "harbor", ActivityCreate(task_id="HAR-1", kind="decision", body="Visible columns only.")
-    )
-    for scope in ["two"]:
-        with pytest.raises(ApplicationError, match="same scope"):
-            service.add_activity(
-                "harbor",
-                ActivityCreate(
-                    task_id=scope, kind="decision", body="Invalid replacement", supersedes=old.id
-                ),
-            )
-
-    def replace(body: str):
-        try:
-            return service.add_activity(
-                "harbor",
-                ActivityCreate(task_id="one", kind="decision", body=body, supersedes=old.id),
-            )
-        except ApplicationError as error:
-            assert error.code == "decision_conflict"
-            return None
-
-    with ThreadPoolExecutor(2) as pool:
-        results = list(
-            pool.map(replace, ["All columns, for fidelity.", "Selected columns, for privacy."])
-        )
-    winners = [result for result in results if result]
-    assert len(winners) == 1
-    current = winners[0]
-    assert service.activity("harbor", task_id="HAR-1", current_only=True).items == [current]
-    decisions = service.activity("harbor", task_id="one", kind="decision").items
-    assert len(decisions) == 2 and decisions[1].superseded_by == current.id
-    assert not service.activity("harbor", current_only=True).items
-    assert service.task("harbor", "one").body == ""  # Recording is not applying.
-    adopt(service, ProjectSetup(path=str(tmp_path / "other")))
-    with pytest.raises(ApplicationError, match="not found"):
-        service.activity_entry("other", old.id)
-    with pytest.raises(ApplicationError, match="not found"):
-        service.activity("other", task_id="HAR-1")
-
-
 def test_activity_pagination_is_stable_across_new_entries(tmp_path: Path) -> None:
     service = workspace(tmp_path)
     for number in range(5):
@@ -149,7 +105,7 @@ def test_http_activity_validates_and_preserves_scope(tmp_path: Path) -> None:
             endpoint,
             json={
                 "task_id": "HAR-1",
-                "kind": "decision",
+                "kind": "note",
                 "body": "# Export\n\nInclude **all columns**.",
             },
         )
@@ -182,52 +138,3 @@ def test_edit_events_record_changes_but_not_noops(tmp_path: Path) -> None:
         service.activity("harbor", task_id=task.id).items[0].body
         == "Title updated.\n\nType updated."
     )
-
-
-def test_withdrawal_preserves_decision_and_serializes_against_replacement(tmp_path: Path) -> None:
-    from concurrent.futures import ThreadPoolExecutor
-
-    from flowfield.activity import DecisionWithdraw
-
-    service = workspace(tmp_path)
-    old = service.add_activity(
-        "harbor", ActivityCreate(task_id="one", kind="decision", body="Offline only")
-    )
-    request = DecisionWithdraw(id="withdraw-offline", reason="No longer a requirement")
-    withdrawn = service.withdraw_decision("harbor", old.id, request)
-    assert service.withdraw_decision("harbor", old.id, request) == withdrawn
-    original = service.activity_entry("harbor", old.id)
-    assert original.body == "Offline only" and original.withdrawn_by == withdrawn.id
-    assert original.superseded_by is None and withdrawn.withdraws == old.id
-    assert not service.activity("harbor", current_only=True).items
-    assert service.task("harbor", "HAR-1").revision == 1
-    with pytest.raises(ApplicationError):
-        service.add_activity(
-            "harbor",
-            ActivityCreate(task_id="one", kind="decision", body="Online", supersedes=old.id),
-        )
-    with pytest.raises(ApplicationError):
-        service.withdraw_decision("elsewhere", old.id, DecisionWithdraw(reason="Wrong project"))
-    raced = service.add_activity(
-        "harbor", ActivityCreate(task_id="one", kind="decision", body="Limit exports")
-    )
-
-    def change(withdraw: bool):
-        try:
-            if withdraw:
-                service.withdraw_decision("harbor", raced.id, DecisionWithdraw(reason="No limit"))
-            else:
-                service.add_activity(
-                    "harbor",
-                    ActivityCreate(
-                        task_id="one", kind="decision", body="Higher limit", supersedes=raced.id
-                    ),
-                )
-            return True
-        except ApplicationError:
-            return False
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        assert sum(pool.map(change, [True, False])) == 1
-    restored = Workspace(tmp_path / "state").activity_entry("harbor", old.id)
-    assert restored.withdrawn_by == withdrawn.id

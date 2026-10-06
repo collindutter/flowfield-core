@@ -101,14 +101,6 @@ class ThreadView(Conversation):
         elif kind == "activity":
             title = data["kind"].capitalize()
             body = data["body"]
-            if data["kind"] == "decision":
-                data["status"] = (
-                    "withdrawn"
-                    if data.get("withdrawn_by")
-                    else "superseded"
-                    if data.get("superseded_by")
-                    else "current"
-                )
             if data["kind"] == "handoff":
                 task = self.workspace._task(db, project_id, task_id)
                 data["status"] = (

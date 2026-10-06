@@ -251,7 +251,7 @@ def test_brief_includes_complete_small_essentials_and_pages_large_constraints():
         "description": "Current agreement",
         "feedback": "Current feedback",
         "input": '{"answer":"Keep offline use"}',
-        "decisions": "Constraint " * 1500,
+        "milestone": "Constraint " * 1500,
         "stages": '{"revision":3}',
         "questions": "[]",
         "project": "",
@@ -261,8 +261,8 @@ def test_brief_includes_complete_small_essentials_and_pages_large_constraints():
     brief = brief_context(sections)
     assert brief["context"]["input"] == sections["input"]
     assert brief["context"]["stages"] == sections["stages"]
-    assert "decisions" not in brief["context"] and "questions" not in brief["context"]
-    assert brief["sections"]["decisions"] == len(sections["decisions"])
+    assert "milestone" not in brief["context"] and "questions" not in brief["context"]
+    assert brief["sections"]["milestone"] == len(sections["milestone"])
     assert len(json.dumps(brief["context"])) <= 10000
     assert sections == before  # Full omitted constraints remain in the frozen source.
 
@@ -309,45 +309,6 @@ def test_worker_reads_only_frozen_report_sources_and_stage_updates_are_scoped(tm
         )
     with pytest.raises(ApplicationError, match="not in the frozen context"):
         asyncio.run(bridge.call("read_context", {"section": f"attempt:{old.id}"}))
-
-
-def test_current_decisions_are_frozen_and_partial_concerns_remain_visible(tmp_path):
-    from flowfield.application import TaskPublish
-
-    execution = fixture(tmp_path)
-    workspace = execution.workspace
-    old = workspace.add_activity(
-        "harbor", ActivityCreate(task_id="task-0", kind="decision", body="Old speculative behavior")
-    )
-    current = workspace.add_activity(
-        "harbor",
-        ActivityCreate(
-            task_id="task-0",
-            kind="decision",
-            supersedes=old.id,
-            body="Keep Unicode paths and offline support",
-        ),
-    )
-    task = workspace.task("harbor", "task-0")
-    workspace.publish_task(
-        "harbor",
-        task.id,
-        TaskPublish(
-            expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
-            completion="report",
-        ),
-    )
-    run = execution.claim("harbor", BASE, {BASE: set()})
-    original = execution.assignment("harbor", run.id)
-    assert json.loads(original["decisions"]) == [{"id": current.id, "body": current.body}]
-    workspace.add_activity(
-        "harbor",
-        ActivityCreate(
-            task_id="task-0", kind="decision", supersedes=current.id, body="Later choice"
-        ),
-    )
-    assert execution.assignment("harbor", run.id) == original
 
 
 def test_approval_and_delivery_have_distinct_linked_items(tmp_path):

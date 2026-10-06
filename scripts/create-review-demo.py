@@ -89,7 +89,6 @@ def main() -> None:
             TaskPublish(
                 completion="code",
                 expected_revision=task.revision,
-                expected_decision_sequence=task.decision_sequence,
             ),
         )
         tasks.append(task)

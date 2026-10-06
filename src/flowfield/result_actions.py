@@ -107,7 +107,7 @@ def result_action(
                 action="coordinator",
                 label="Reconcile task",
                 reason=(
-                    "Requirements, decisions or prerequisites changed. Resume the "
+                    "Requirements or prerequisites changed. Resume the "
                     "coordinator with this task link before requesting revised work."
                 ),
             )

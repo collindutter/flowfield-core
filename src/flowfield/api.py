@@ -16,7 +16,6 @@ from flowfield.activity import (
     ActivityCreate,
     ActivityEntry,
     ActivityPage,
-    DecisionWithdraw,
     EntryKind,
 )
 from flowfield.adapters.directory_picker import DirectorySelection, select_directory
@@ -185,12 +184,6 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
     @router.get("/{project_id}/activity/{entry_id}")
     def activity_entry(project_id: str, entry_id: str, service: Service) -> ActivityEntry:
         return service.activity_entry(project_id, entry_id)
-
-    @router.post("/{project_id}/activity/{entry_id}/withdraw")
-    def withdraw_decision(
-        project_id: str, entry_id: str, request: DecisionWithdraw, service: Service
-    ) -> ActivityEntry:
-        return service.withdraw_decision(project_id, entry_id, request)
 
     @router.get("/{project_id}/board")
     def board(project_id: str, service: Service) -> Board:

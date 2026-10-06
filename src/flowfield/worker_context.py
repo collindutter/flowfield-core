@@ -153,7 +153,6 @@ def brief_context(sections: dict[str, str]) -> dict[str, object]:
         "input",
         "earlier_answers",
         "correction",
-        "decisions",
         "project",
         "milestone",
         "stages",

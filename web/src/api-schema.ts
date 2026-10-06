@@ -160,23 +160,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/projects/{project_id}/activity/{entry_id}/withdraw": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Withdraw Decision */
-    post: operations["withdraw_decision_api_projects__project_id__activity__entry_id__withdraw_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/projects/{project_id}/board": {
     parameters: {
       query?: never;
@@ -2045,7 +2028,7 @@ export interface components {
        * @default note
        * @enum {string}
        */
-      kind: "note" | "decision" | "handoff";
+      kind: "note" | "handoff";
       /** Body */
       body: string;
       /**
@@ -2072,7 +2055,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: "note" | "decision" | "handoff" | "event";
+      kind: "note" | "handoff" | "event";
       /** Body */
       body: string;
       /** Author */
@@ -2083,10 +2066,6 @@ export interface components {
       supersedes: string | null;
       /** Superseded By */
       superseded_by: string | null;
-      /** Withdraws */
-      withdraws: string | null;
-      /** Withdrawn By */
-      withdrawn_by: string | null;
       /** Task Revision */
       task_revision: number | null;
       /** Question Id */
@@ -2510,18 +2489,6 @@ export interface components {
       details: string;
       /** Number */
       number: number;
-    };
-    /** DecisionWithdraw */
-    DecisionWithdraw: {
-      /** Id */
-      id?: string;
-      /** Reason */
-      reason: string;
-      /**
-       * Author
-       * @default human
-       */
-      author: string;
     };
     /** DirectorySelection */
     DirectorySelection: {
@@ -3347,8 +3314,6 @@ export interface components {
     Publication: {
       /** Agreement Revision */
       agreement_revision: number;
-      /** Decision Sequence */
-      decision_sequence: number;
       /** Task Revision */
       task_revision: number;
       /** Author */
@@ -3877,8 +3842,6 @@ export interface components {
       effort: string;
       /** Agreement Revision */
       agreement_revision: number;
-      /** Decision Sequence */
-      decision_sequence: number;
       /** Base Commit */
       base_commit: string;
       /**
@@ -4228,8 +4191,6 @@ export interface components {
        * @enum {string}
        */
       publication_status: "draft" | "published" | "needs_reconciliation";
-      /** Decision Sequence */
-      decision_sequence: number;
       /**
        * Readiness
        * @enum {string}
@@ -4309,8 +4270,6 @@ export interface components {
       publication_status: "draft" | "published" | "needs_reconciliation";
       /** Agreement Revision */
       agreement_revision: number;
-      /** Decision Sequence */
-      decision_sequence: number;
       publication: components["schemas"]["Publication"] | null;
       /** Blocked By */
       blocked_by: components["schemas"]["TaskReference"][];
@@ -4418,8 +4377,6 @@ export interface components {
        * @default 1
        */
       agreement_revision: number;
-      /** Decision Sequence */
-      decision_sequence: number;
       publication: components["schemas"]["Publication"] | null;
       /** Blocked By */
       blocked_by: components["schemas"]["TaskReference"][];
@@ -4477,8 +4434,6 @@ export interface components {
     };
     /** TaskPreparation */
     TaskPreparation: {
-      /** Expected Decision Sequence */
-      expected_decision_sequence: number;
       /**
        * Completion
        * @enum {string}
@@ -4529,8 +4484,6 @@ export interface components {
        */
       author: string;
       stages?: components["schemas"]["StageChange"] | null;
-      /** Expected Decision Sequence */
-      expected_decision_sequence: number;
       /**
        * Completion
        * @enum {string}
@@ -4548,8 +4501,6 @@ export interface components {
       author: string;
       /** Completion */
       completion?: ("code" | "report") | null;
-      /** Expected Decision Sequence */
-      expected_decision_sequence?: number | null;
       /** Note */
       note: string;
     };
@@ -5115,7 +5066,7 @@ export interface operations {
     parameters: {
       query?: {
         task_id?: string | null;
-        kind?: ("note" | "decision" | "handoff" | "event") | null;
+        kind?: ("note" | "handoff" | "event") | null;
         current_only?: boolean;
         before?: number | null;
         limit?: number;
@@ -5194,42 +5145,6 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ActivityEntry"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  withdraw_decision_api_projects__project_id__activity__entry_id__withdraw_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        project_id: string;
-        entry_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["DecisionWithdraw"];
-      };
-    };
     responses: {
       /** @description Successful Response */
       200: {
@@ -6241,7 +6156,7 @@ export interface operations {
     parameters: {
       query?: {
         task_id?: string | null;
-        kind?: ("note" | "decision" | "handoff" | "event") | null;
+        kind?: ("note" | "handoff" | "event") | null;
         current_only?: boolean;
         before?: number | null;
         limit?: number;
@@ -8693,8 +8608,7 @@ export interface operations {
       query?: {
         offset?: number;
         limit?: number;
-        mode?: "all" | "notes" | "decisions" | "attempts";
-        include_superseded?: boolean;
+        mode?: "all" | "notes" | "attempts";
       };
       header?: never;
       path: {

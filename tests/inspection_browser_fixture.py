@@ -59,7 +59,7 @@ if sys.argv[2] == "create":
             title="Try the candidate",
             body="Make a useful greeting",
             status="up_next",
-            preparation=TaskPreparation(completion="code", expected_decision_sequence=0),
+            preparation=TaskPreparation(completion="code"),
         ),
     )
 settings = service.execution.settings(project).model_copy(update={"enabled": True})

@@ -25,7 +25,7 @@ if sys.argv[2] == "create":
             title="Export records",
             body="Implement the agreed export.",
             status="up_next",
-            preparation=TaskPreparation(completion="report", expected_decision_sequence=0),
+            preparation=TaskPreparation(completion="report"),
         ),
     )
     execution.configure(project, SettingsEdit(expected_revision=1, model="fake", effort="low"))

@@ -24,10 +24,9 @@ CREATE TABLE activity (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL UNIQUE,
     project_id TEXT NOT NULL REFERENCES projects(id), task_id TEXT,
-    kind TEXT NOT NULL CHECK(kind IN ('note', 'decision', 'handoff', 'event')),
+    kind TEXT NOT NULL CHECK(kind IN ('note', 'handoff', 'event')),
     body TEXT NOT NULL, author TEXT NOT NULL, created_at TEXT NOT NULL,
     supersedes TEXT UNIQUE REFERENCES activity(id), task_revision INTEGER, question_id TEXT,
-    withdraws TEXT UNIQUE REFERENCES activity(id),
     FOREIGN KEY (project_id, task_id) REFERENCES tasks(project_id, id)
 );
 CREATE INDEX activity_scope ON activity(project_id, task_id, sequence);

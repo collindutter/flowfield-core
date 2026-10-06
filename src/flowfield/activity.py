@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 from flowfield.project_config import Identifier, Title
 
-EntryKind = Literal["note", "decision", "handoff", "event"]
+EntryKind = Literal["note", "handoff", "event"]
 TaskKey = Annotated[
     str, StringConstraints(pattern=r"^(?:[a-z0-9][a-z0-9_-]{0,63}|[A-Z]{3}-[1-9][0-9]*)$")
 ]
@@ -17,7 +17,7 @@ class ActivityCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: Identifier = Field(default_factory=lambda: uuid4().hex)
     task_id: TaskKey
-    kind: Literal["note", "decision", "handoff"] = "note"
+    kind: Literal["note", "handoff"] = "note"
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200_000)]
     author: Title = "human"
     supersedes: Identifier | None = None
@@ -37,13 +37,6 @@ class ActivityCreate(BaseModel):
         return self
 
 
-class DecisionWithdraw(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    id: Identifier = Field(default_factory=lambda: uuid4().hex)
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)]
-    author: Title = "human"
-
-
 class ActivityEntry(BaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
     sequence: int
@@ -56,8 +49,6 @@ class ActivityEntry(BaseModel):
     created_at: str
     supersedes: str | None = None
     superseded_by: str | None = None
-    withdraws: str | None = None
-    withdrawn_by: str | None = None
     task_revision: int | None = None
     question_id: str | None = None
 
@@ -70,7 +61,6 @@ class ActivityPage(BaseModel):
 
 # superseded_by is derived so there is only one authoritative replacement link.
 ACTIVITY_SELECT = """
-SELECT a.*, replacement.id AS superseded_by, withdrawal.id AS withdrawn_by FROM activity a
+SELECT a.*, replacement.id AS superseded_by FROM activity a
 LEFT JOIN activity replacement ON replacement.supersedes = a.id
-LEFT JOIN activity withdrawal ON withdrawal.withdraws = a.id
 """

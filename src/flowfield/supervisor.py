@@ -332,7 +332,6 @@ class Supervisor:
                 "task_type": sections.get("task_type", "feature"),
                 "base_commit": run.base_commit,
                 "agreement_revision": run.agreement_revision,
-                "decision_sequence": run.decision_sequence,
                 "completion": run.completion,
                 "target_branch": run.target_branch,
                 **brief_context(sections),
@@ -355,7 +354,7 @@ class Supervisor:
                     "Correction inputs "
                     "retain both source and target ancestry; resolve conflict markers within scope "
                     "without changing Git metadata. Ask if the required fix changes intent. "
-                    "Read nonempty project/milestone constraints, decisions, handoff, questions, "
+                    "Read nonempty project/milestone constraints, handoff, questions, "
                     "prerequisite results and predecessor "
                     "context before implementing. read_context provides complete "
                     "sections in pages; search_context searches only this frozen assignment. "

@@ -119,7 +119,6 @@ def test_review_api_files_and_successor_use_captured_commits(tmp_path: Path, mon
         TaskPublish(
             completion="code",
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
         ),
     )
 

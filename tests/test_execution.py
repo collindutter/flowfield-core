@@ -50,7 +50,6 @@ def fixture(tmp_path: Path, *, count: int = 1, cap: int = 1, stages=None) -> Exe
                 stages=fixture_stage_change(workspace, "harbor", task.id),
                 completion="report",
                 expected_revision=task.revision,
-                expected_decision_sequence=task.decision_sequence,
             ),
         )
     execution = Execution(workspace)
@@ -193,7 +192,6 @@ def test_review_is_bound_to_code_and_current_intent(tmp_path: Path) -> None:
             stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             completion="report",
             expected_revision=upcoming.revision,
-            expected_decision_sequence=upcoming.decision_sequence,
         ),
     )
     revised = execution.claim("harbor", BASE, {BASE: set()})
@@ -217,7 +215,6 @@ def test_report_prerequisite_does_not_require_code_availability(tmp_path: Path) 
             stages=fixture_stage_change(workspace, "harbor", second.id),
             completion="report",
             expected_revision=second.revision,
-            expected_decision_sequence=second.decision_sequence,
         ),
     )
     run = result(execution)
@@ -309,7 +306,6 @@ def test_followup_checks_prerequisites_in_its_own_base(tmp_path: Path) -> None:
             stages=fixture_stage_change(execution.workspace, "harbor", task.id),
             completion="report",
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
         ),
     )
     with pytest.raises(ApplicationError, match="prerequisite code"):

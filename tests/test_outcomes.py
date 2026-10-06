@@ -181,7 +181,6 @@ def test_reconciled_blocked_scope_offers_correction_without_approving_old_code(t
         task.id,
         TaskReconcile(
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
             completion="code",
             note="Human clarified the remaining outcome",
         ),
@@ -210,7 +209,6 @@ def test_report_reconciliation_does_not_offer_a_code_correction(tmp_path):
         task.id,
         TaskReconcile(
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
             completion="report",
             note="Scope needs findings rather than this code change",
         ),

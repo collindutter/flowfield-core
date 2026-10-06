@@ -41,7 +41,7 @@ def test_context_growth_pagination_and_full_text(
     )
     for _ in range(25):
         service.add_activity(
-            "harbor", ActivityCreate(task_id="t15", kind="decision", body='🦉\\"' * 50000)
+            "harbor", ActivityCreate(task_id="t15", kind="note", body='🦉\\"' * 50000)
         )
     reconcile_fixture_stages(service, "harbor", "t15")
     reads = ContextReads(service)
@@ -68,7 +68,7 @@ def test_context_growth_pagination_and_full_text(
         assert size(result) <= PAGE_BYTES
     activities, before = [], None
     while True:
-        result = reads.activity("harbor", task_id="t15", kind="decision", limit=50, before=before)
+        result = reads.activity("harbor", task_id="t15", kind="note", limit=50, before=before)
         assert size(result) <= PAGE_BYTES
         activities += [e["id"] for e in result["items"]]
         before = result["next_cursor"]

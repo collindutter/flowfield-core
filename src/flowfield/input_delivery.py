@@ -20,7 +20,6 @@ def question_delivery(
     import json
 
     from flowfield.execution_models import Run
-    from flowfield.publication import decision_sequence
 
     row = db.execute(
         "SELECT task_id,status,json_extract(data,'$.origin_run_id') AS origin, "
@@ -111,7 +110,6 @@ def question_delivery(
         or task["archived"]
         or task["reconciliation_reason"]
         or task["agreement_revision"] != run.agreement_revision
-        or decision_sequence(db, project_id, row["task_id"]) != run.decision_sequence
         or (run.completion == "code" and target != run.target_branch)
     ):
         return state(

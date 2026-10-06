@@ -283,9 +283,6 @@ def main() -> None:
                         )
                         command("task", "note", "HAR-1", "--body", "Serializer verified.", "--json")
                         command(
-                            "task", "decide", "HAR-1", "--body", "Include hidden columns.", "--json"
-                        )
-                        command(
                             "task",
                             "handoff",
                             "HAR-1",
@@ -303,10 +300,10 @@ def main() -> None:
                     assert task["key"] == "HAR-1"
                     assert task["handoff"]["id"] == "installed-handoff"
                     assert task["handoff"]["needs_recheck"] is False
-                    decisions = json.loads(
+                    activity = json.loads(
                         command("task", "activity", "HAR-1", "--current", "--json")
                     )
-                    assert decisions["items"][0]["body"] == "Include hidden columns."
+                    assert activity["items"][0]["id"] == "installed-handoff"
                     assert json.loads(read("/api/context/projects/harbor/tasks/HAR-1")) == task
                     assert task["revision"] == 3
                     assert task["status"] == "up_next"
@@ -352,7 +349,7 @@ def main() -> None:
                         process.wait()
     print(
         "Installed package: project setup, CLI/API/MCP/UI, "
-        "task board, briefing/handoff, activity/decisions, revisions, restart "
+        "task board, briefing/handoff, activity, revisions, restart "
         "offline storage upgrade/recovery, persistent notifications and update status passed."
     )
 

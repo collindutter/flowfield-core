@@ -114,7 +114,6 @@ def test_human_testing_records_exact_result_without_work_and_reaches_successor(t
             TaskPublish(
                 completion="report",
                 expected_revision=task.revision,
-                expected_decision_sequence=task.decision_sequence,
             ),
         )
         queue(service.execution, True)

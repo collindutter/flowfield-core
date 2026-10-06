@@ -35,7 +35,6 @@ if sys.argv[2] == "create":
         TaskPublish(
             completion="report",
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
         ),
     )
     execution.configure(

@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import BaseModel, ValidationError
 
-from flowfield.activity import ActivityCreate, DecisionWithdraw, EntryKind
+from flowfield.activity import ActivityCreate, EntryKind
 from flowfield.application import (
     MilestoneCreate,
     MilestoneEdit,
@@ -242,7 +242,7 @@ def create_mcp(
     ) -> CallToolResult:
         """Search words in project evidence with bounded snippets and exact source references.
         Defaults to current sources; history/all includes old task/question revisions and
-        superseded decisions/results, clearly labeled. kind filters decision/note/handoff/
+        superseded handoffs/results, clearly labeled. kind filters note/handoff/
         event or task type. Dates use YYYY-MM-DD. Follow sources before treating a hit as intent.
         """
         return await invoke(
@@ -392,8 +392,8 @@ def create_mcp(
         """Capture agreed work, default feature in Backlog; first search for an existing task.
 
         Include one to eight outcome stages in this same call, even for a draft.
-        For actionable intent include preparation with completion and expected_decision_sequence
-        zero for a new task. Capture and preparation commit atomically or neither is saved. Check
+        For actionable intent include preparation with completion. Capture and preparation
+        commit atomically or neither is saved. Check
         code destination/check settings first; if genuinely missing, save intent without
         preparation and explain the setup blocker. Never label code as report to bypass setup.
         Does not enable the queue. Only choose Up next with human execution authorization.
@@ -408,8 +408,8 @@ def create_mcp(
     ) -> CallToolResult:
         """Refine the existing task; read complete description/dependencies before replacement.
 
-        Include preparation for actionable upcoming work, using completion and the decision
-        sequence from get_task, to save and prepare atomically. Failure leaves prior intent
+        Include preparation for actionable upcoming work, using completion, to save and prepare
+        atomically. Failure leaves prior intent
         unchanged. Preserves priority/queue; active work requires reconciliation instead.
         Read get_task_stages and include stages (expected_revision, stages, reason) here
         to reconcile the plan with the new agreement atomically while idle.
@@ -441,7 +441,7 @@ def create_mcp(
         """Prepare an existing task's assignment after reading its full intent and task evidence.
         Prefer create_task/edit_task with preparation when also authoring intent. This legacy
         operation name means preparation, not scheduling: it neither moves the task nor enables
-        the queue. Use revision and decision_sequence from get_task. Resolve consequential
+        the queue. Use revision from get_task. Resolve consequential
         gaps first; unfinished prerequisites may remain. Include stages to reconcile a stale
         plan in this same operation. Never grants code approval.
         """
@@ -494,9 +494,9 @@ def create_mcp(
         before: int | None = None,
         limit: int = 20,
     ) -> CallToolResult:
-        """Read task activity or retained project history; next_cursor pages older entries.
+        """Read task activity or project events; next_cursor pages older entries.
 
-        current_only returns only decisions that have not been superseded.
+        current_only excludes superseded handoffs.
         Omitted task_id means project scope, never all tasks.
         """
         return await invoke(
@@ -512,10 +512,9 @@ def create_mcp(
 
     @mcp.tool(annotations=write)
     async def add_activity(project_id: Identifier, entry: ActivityCreate) -> CallToolResult:
-        """Append a Markdown note, decision or handoff to a task.
+        """Append a Markdown note or handoff to a task.
 
-        Notes preserve findings/results, never launch or steer workers. A decision does not
-        update requirements automatically. supersedes replaces a current same-scope decision.
+        Notes preserve findings/results, never launch or steer workers.
         An optional stable id makes identical retries safe; entries cannot be edited/deleted.
         Handoffs require expected_task_revision and explicit supersedes (selected handoff ID,
         or null initially). Use short paragraphs for outcome, evidence/limits and next step;
@@ -653,22 +652,6 @@ def create_mcp(
             lambda: (
                 Questions(workspace())
                 .retract_answer(project_id, question_id, attributed(retraction))
-                .model_dump()
-            )
-        )
-
-    @mcp.tool(annotations=write)
-    async def withdraw_decision(
-        project_id: Identifier, decision_id: Identifier, withdrawal: DecisionWithdraw
-    ) -> CallToolResult:
-        """Withdraw a current decision with a reason; preserve its history.
-
-        Does not undo code or requirements.
-        """
-        return await mutate(
-            lambda: (
-                workspace()
-                .withdraw_decision(project_id, decision_id, attributed(withdrawal))
                 .model_dump()
             )
         )

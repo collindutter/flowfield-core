@@ -337,7 +337,7 @@ def label(value: str) -> str:
 
 def readiness_text(task: dict[str, Any]) -> str:
     if task.get("readiness") == "needs_reconciliation" and not task.get("reconciliation_reason"):
-        return "Changed decisions or requirements need reconciliation"
+        return "Changed requirements need reconciliation"
     if task.get("reconciliation_reason"):
         return f"Needs reconciliation: {task['reconciliation_reason']}"
     if task.get("blocking_question_count") or task.get("blocking_questions"):
@@ -859,11 +859,10 @@ def task_publish(
     ] = None,
     project: ProjectOption = None,
     expected_revision: Expected = None,
-    expected_decision_sequence: Annotated[int | None, typer.Option(min=0)] = None,
     author: Author = "coordinator",
     json_output: Json = False,
 ) -> None:
-    """Coordinator: publish a clarified assignment after checking requirements and decisions.
+    """Coordinator: publish a clarified assignment after checking requirements.
 
     Clarify gaps first. This does not start work or accept code.
     """
@@ -877,9 +876,6 @@ def task_publish(
             {
                 **({"stages": stages_value(stages_file)} if stages_file else {}),
                 "completion": completion,
-                "expected_decision_sequence": expected_decision_sequence
-                if expected_decision_sequence is not None
-                else current["decision_sequence"],
             },
             expected_revision if expected_revision is not None else current["revision"],
             author,
@@ -911,9 +907,6 @@ def task_reconcile(
             {
                 "note": note,
                 **({"completion": completion} if completion else {}),
-                "expected_decision_sequence": ctx.obj.request(
-                    "GET", "context/" + item_path(project, "tasks", task)
-                )["decision_sequence"],
             },
             expected_revision,
             author,
@@ -1081,7 +1074,6 @@ def read_activity(
     ctx: typer.Context,
     project: str | None,
     task: str | None,
-    decisions: bool,
     current: bool,
     before: int | None,
     limit: int,
@@ -1092,8 +1084,6 @@ def read_activity(
     query: dict[str, Any] = {"limit": limit, "current_only": str(current).lower()}
     if task is not None:
         query["task_id"] = task
-    if decisions:
-        query["kind"] = "decision"
     if before is not None:
         query["before"] = before
     output(
@@ -1109,26 +1099,13 @@ def task_activity(
     ctx: typer.Context,
     task: str,
     project: ProjectOption = None,
-    decisions: bool = False,
     current: bool = False,
     before: int | None = None,
     limit: int = 20,
     json_output: Json = False,
 ) -> None:
-    """Read task activity; --decisions filters choices, --current excludes superseded ones."""
-    read_activity(ctx, project, task, decisions, current, before, limit, json_output)
-
-
-@project_app.command("history")
-def project_history(
-    ctx: typer.Context,
-    project: ProjectOption = None,
-    before: int | None = None,
-    limit: int = 20,
-    json_output: Json = False,
-) -> None:
-    """Read retained project activity, including decisions from earlier releases."""
-    read_activity(ctx, project, None, False, False, before, limit, json_output)
+    """Read task activity; --current excludes superseded handoffs."""
+    read_activity(ctx, project, task, current, before, limit, json_output)
 
 
 def append_activity(
@@ -1173,24 +1150,6 @@ def task_note(
 ) -> None:
     """Append a Markdown finding, progress update or result; never steers work."""
     append_activity(ctx, task, project, "note", body, body_file, None, id, author, json_output)
-
-
-@task_app.command("decide")
-def task_decide(
-    ctx: typer.Context,
-    task: str,
-    body: str | None = None,
-    body_file: Path | None = None,
-    supersedes: str | None = None,
-    project: ProjectOption = None,
-    id: str | None = None,
-    author: Author = "human",
-    json_output: Json = False,
-) -> None:
-    """Record a choice and rationale; optionally replace a prior task decision."""
-    append_activity(
-        ctx, task, project, "decision", body, body_file, supersedes, id, author, json_output
-    )
 
 
 @task_app.command("handoff")
@@ -1655,27 +1614,6 @@ def inbox_retract_answer(
             expected_revision,
             author,
             operation="retract-answer",
-        ),
-        json_output,
-    )
-
-
-@task_app.command("withdraw-decision")
-def decision_withdraw(
-    ctx: typer.Context,
-    decision: str,
-    reason: Annotated[str, typer.Option()],
-    project: ProjectOption = None,
-    id: str | None = None,
-    author: Author = "human",
-    json_output: Json = False,
-) -> None:
-    """Withdraw a current decision with a reason, preserving its original scope and history."""
-    output(
-        lambda: ctx.obj.request(
-            "POST",
-            item_path(project, "activity", decision) + "/withdraw",
-            {"reason": reason, "author": author, **({"id": id} if id else {})},
         ),
         json_output,
     )

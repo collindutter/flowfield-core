@@ -26,11 +26,10 @@ def result_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
         task_id: str,
         offset: int = Query(default=0, ge=0),
         limit: int = Query(default=30, ge=1, le=50),
-        mode: Literal["all", "notes", "decisions", "attempts"] = "all",
-        include_superseded: bool = False,
+        mode: Literal["all", "notes", "attempts"] = "all",
     ) -> TaskHistoryPage:
         return ExecutionHistory(supervisor().workspace).timeline(
-            project_id, task_id, offset, limit, mode, include_superseded
+            project_id, task_id, offset, limit, mode
         )
 
     @router.get("/tasks/{task_id}/executions")

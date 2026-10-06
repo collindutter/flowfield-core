@@ -12,7 +12,6 @@ from flowfield.application import STATUSES, TaskRevision, Workspace, now
 from flowfield.errors import ApplicationError
 from flowfield.input_delivery import question_delivery
 from flowfield.publication import (
-    decision_sequence,
     preparation_issue,
     publication_status,
     readiness,
@@ -76,7 +75,6 @@ def receipt(item: dict[str, Any]) -> dict[str, Any]:
         "readiness",
         "publication_status",
         "agreement_revision",
-        "decision_sequence",
         "archived",
         "updated_at",
         "updated_by",
@@ -86,8 +84,6 @@ def receipt(item: dict[str, Any]) -> dict[str, Any]:
         "created_at",
         "supersedes",
         "superseded_by",
-        "withdrawn_by",
-        "withdraws",
         "task_prefix",
         "path",
         "version",
@@ -157,8 +153,7 @@ class ContextReads:
     ) -> dict[str, Any]:
         blocked = [p for p in item.dependencies if p not in completed]
         questions = blocking_questions(db, item.project_id, item.id)
-        decisions = decision_sequence(db, item.project_id, item.id)
-        publication = publication_status(item, decisions)
+        publication = publication_status(item)
         return excerpt(
             {
                 "id": item.id,
@@ -180,9 +175,8 @@ class ContextReads:
                     ),
                 ),
                 "publication_status": publication,
-                "preparation_issue": preparation_issue(db, item, decisions),
+                "preparation_issue": preparation_issue(db, item),
                 "agreement_revision": item.agreement_revision,
-                "decision_sequence": decisions,
                 "prerequisite_count": len(item.dependencies),
                 "blocked_count": len(blocked),
                 "blocked_by_keys": [records[key].key for key in blocked[:3]],
@@ -451,7 +445,7 @@ class ContextReads:
             (
                 "reconcile",
                 [t for t in summaries if t["readiness"] == "needs_reconciliation"],
-                "Changed requirements, decisions or prerequisites need reconciliation.",
+                "Changed requirements or prerequisites need reconciliation.",
             ),
             (
                 "apply_answer",
@@ -544,23 +538,6 @@ class ContextReads:
             ),
         }
 
-    def _decisions(
-        self, db: sqlite3.Connection, project_id: str, task_id: str | None = None
-    ) -> dict[str, Any]:
-        rows = db.execute(
-            "SELECT a.id, a.body, count(*) OVER () AS total FROM activity a "
-            "WHERE a.project_id=? AND a.task_id IS ? AND a.kind='decision' "
-            "AND NOT EXISTS (SELECT 1 FROM activity b WHERE b.supersedes=a.id "
-            "OR b.withdraws=a.id) ORDER BY a.sequence DESC LIMIT 3",
-            (project_id, task_id),
-        ).fetchall()
-        count = rows[0]["total"] if rows else 0
-        return {
-            "items": [excerpt({"id": r["id"], "body": r["body"]}, 500) for r in rows],
-            "count": count,
-            "omitted_count": max(0, count - len(rows)),
-        }
-
     def _handoff(
         self, db: sqlite3.Connection, project_id: str, task: TaskRevision
     ) -> dict[str, Any] | None:
@@ -575,7 +552,7 @@ class ContextReads:
             **excerpt(dict(row), 1500),
             "needs_recheck": row["task_revision"] != task.revision,
             "freshness_scope": (
-                "Task revision only; verify repository state and current decisions/questions "
+                "Task revision only; verify repository state and current questions "
                 "before continuing."
             ),
         }
@@ -614,7 +591,6 @@ class ContextReads:
             latest = self.workspace._latest_update(db, project_id, item.id)
             result["latest_update"] = excerpt(latest.model_dump(), 1000) if latest else None
             result["handoff"] = self._handoff(db, project_id, item)
-            result["current_decisions"] = self._decisions(db, project_id, item.id)
             proposed = result_brief(self.workspace, db, project_id, item.id, 1)["items"]
             if proposed:
                 result["proposed_result"] = proposed[0]

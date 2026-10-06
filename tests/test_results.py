@@ -64,7 +64,6 @@ def fixture(
         TaskPublish(
             completion=completion,
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
         ),
     )
     settings = service.execution.configure(
@@ -111,12 +110,23 @@ def test_task_history_pages_one_chronology_and_nests_service_evidence(tmp_path):
     workspace = service.workspace
     note = workspace.add_activity("harbor", ActivityCreate(task_id="work", body="Keep this note"))
     decision = workspace.add_activity(
-        "harbor", ActivityCreate(task_id="work", kind="decision", body="First choice")
+        "harbor",
+        ActivityCreate(
+            task_id="work",
+            kind="handoff",
+            expected_task_revision=workspace.task("harbor", "work").revision,
+            supersedes=None,
+            body="First handoff",
+        ),
     )
     replacement = workspace.add_activity(
         "harbor",
         ActivityCreate(
-            task_id="work", kind="decision", body="Current choice", supersedes=decision.id
+            task_id="work",
+            kind="handoff",
+            expected_task_revision=workspace.task("harbor", "work").revision,
+            body="Current handoff",
+            supersedes=decision.id,
         ),
     )
     workspace.create_task("harbor", task_request(id="other", title="Unrelated"))
@@ -135,9 +145,6 @@ def test_task_history_pages_one_chronology_and_nests_service_evidence(tmp_path):
             break
         offset = page.next_offset
     assert [item.id for item in paged] == [item.id for item in full]
-    assert [item.id for item in history.timeline("harbor", "work", mode="decisions").items] == [
-        replacement.id
-    ]
     assert {item.id for item in history.timeline("harbor", "work", mode="notes").items} == {
         note.id,
         decision.id,

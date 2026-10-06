@@ -93,10 +93,9 @@ WITH definitions AS (
             json_extract(data,'$.status') != json_extract(previous,'$.status'))
     UNION ALL
     SELECT 'activity:'||a.id, 'activity', a.created_at, a.author, a.id, NULL,
-        json_object('kind',a.kind,'body',a.body,'supersedes',a.supersedes,'withdraws',a.withdraws,
+        json_object('kind',a.kind,'body',a.body,'supersedes',a.supersedes,
           'question_id',a.question_id,'task_revision',a.task_revision,
-          'superseded_by',(SELECT id FROM activity b WHERE b.supersedes=a.id),
-          'withdrawn_by',(SELECT id FROM activity b WHERE b.withdraws=a.id))
+          'superseded_by',(SELECT id FROM activity b WHERE b.supersedes=a.id))
     FROM activity a WHERE project_id=:project AND task_id=:task AND kind!='event'
       AND NOT (a.kind='note' AND a.author='flowfield' AND EXISTS (
         SELECT 1 FROM runs r WHERE r.project_id=a.project_id AND r.task_id=a.task_id

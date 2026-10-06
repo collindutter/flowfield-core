@@ -31,7 +31,6 @@ def test_changed_stage_agreement_blocks_only_its_task_until_coordinator_reconcil
     publication = TaskPublish(
         completion="report",
         expected_revision=task.revision,
-        expected_decision_sequence=task.decision_sequence,
     )
     with pytest.raises(ApplicationError, match="current stages"):
         workspace.publish_task("harbor", task.id, publication)
@@ -110,7 +109,6 @@ def test_answer_continues_once_beside_independent_work(tmp_path, restart):
         TaskPublish(
             completion="report",
             expected_revision=task.revision,
-            expected_decision_sequence=task.decision_sequence,
         ),
     )
     assert execution.claim("harbor", BASE, {BASE: set()}) is None

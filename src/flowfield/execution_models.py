@@ -161,7 +161,6 @@ class Run(Record):
     model: str
     effort: str
     agreement_revision: int
-    decision_sequence: int
     base_commit: str
     completion: Literal["code", "report"] = "code"
     target_branch: str | None = None

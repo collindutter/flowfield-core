@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from project_fixtures import adopt, fixture_stage_change, task_request
 
-from flowfield.activity import ActivityCreate
 from flowfield.application import (
     ProjectSetup,
     TaskEdit,
@@ -27,8 +26,8 @@ def setup(tmp_path: Path):
     return w
 
 
-def preparation(sequence=0, completion="report"):
-    return TaskPreparation(expected_decision_sequence=sequence, completion=completion)
+def preparation(completion="report"):
+    return TaskPreparation(completion=completion)
 
 
 def test_capture_refinement_and_queue_are_separate(tmp_path: Path):
@@ -82,13 +81,6 @@ def test_capture_refinement_and_queue_are_separate(tmp_path: Path):
         )
     assert w.task("project", task.id).body == task.body
     assert execution.claim("project", "a" * 40, {}) is None
-    w.add_activity(
-        "project", ActivityCreate(task_id=task.id, kind="decision", body="Reconsider the audience.")
-    )
-    changed = w.task("project", task.id)
-    assert changed.publication_status == "needs_reconciliation"
-    assert "Decisions changed" in changed.preparation_issue
-    assert BrowserReads(w).task("project", task.id).preparation_issue == changed.preparation_issue
 
 
 def test_failed_preparation_rolls_back_creation_edits_history_and_notifications(tmp_path: Path):
@@ -110,31 +102,27 @@ def test_failed_preparation_rolls_back_creation_edits_history_and_notifications(
         task_request(title="Report", body="Original agreement", preparation=preparation()),
     )
     assert task.key.endswith("-1")
-    w.add_activity(
-        "project", ActivityCreate(task_id=task.id, kind="decision", body="Use recorded evidence.")
+    w.edit_task(
+        "project", task.id, TaskEdit(expected_revision=task.revision, body="Use recorded evidence.")
     )
     before = w.task("project", task.id)
     notifications.clear()
-    with pytest.raises(ApplicationError, match="Decisions changed"):
+    with pytest.raises(ApplicationError, match="stale"):
         w.edit_task(
             "project",
             task.id,
             TaskEdit(
-                expected_revision=before.revision,
+                expected_revision=task.revision,
                 body="Overwrite original",
                 preparation=preparation(),
             ),
         )
     assert w.task("project", task.id) == before and not notifications
-    sequence = before.decision_sequence
-    assert "decision_sequence" not in ContextReads(w).overview("project")
     with pytest.raises(ApplicationError):
         w.edit_task(
             "project",
             task.id,
-            TaskEdit(
-                expected_revision=1, body="Stale overwrite", preparation=preparation(sequence)
-            ),
+            TaskEdit(expected_revision=1, body="Stale overwrite", preparation=preparation()),
         )
     q = Questions(w).ask(
         "project",
@@ -154,7 +142,7 @@ def test_failed_preparation_rolls_back_creation_edits_history_and_notifications(
             TaskEdit(
                 expected_revision=before.revision,
                 body="Wrong audience",
-                preparation=preparation(sequence),
+                preparation=preparation(),
             ),
         )
     assert w.task("project", task.id) == before
