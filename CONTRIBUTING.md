@@ -56,6 +56,8 @@ Browser journeys live in focused `web/e2e/*.spec.ts` suites and run with two wor
 Each journey owns its project IDs, task prefixes and directories; tests must not depend
 on another test's records or order. `support.ts` shares CLI/MCP helpers and model-free
 catalog interception. Test the actual app rather than a separate mock interface.
+Notification journeys run afterward because they change service-wide preferences and
+clear shared notices. Scope alert assertions to the relevant form or notification.
 After building the UI, run a focused suite with
 `pnpm --dir web exec playwright test e2e/navigation.spec.ts`.
 Use `uv run pytest --durations=25` to profile backend checks before optimizing them;

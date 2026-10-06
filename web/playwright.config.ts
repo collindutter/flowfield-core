@@ -11,6 +11,15 @@ export default defineConfig({
   testDir: "./e2e",
   workers: 2,
   forbidOnly: !!process.env.CI,
+  projects: [
+    { name: "journeys", testIgnore: "notifications.spec.ts" },
+    {
+      name: "notifications",
+      testMatch: "notifications.spec.ts",
+      // These journeys change service-wide preferences and clear shared notices.
+      dependencies: ["journeys"],
+    },
+  ],
   use: {
     baseURL: "http://127.0.0.1:8766",
     browserName: "chromium",
