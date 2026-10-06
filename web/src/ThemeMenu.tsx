@@ -49,9 +49,7 @@ export function ThemeMenu() {
           aria-label={`Appearance: ${options[theme]}`}
         >
           <Icon />
-          <span className="group-data-[collapsible=icon]:hidden">
-            Appearance
-          </span>
+          <span data-sidebar="label">Appearance</span>
         </SidebarMenuButton>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

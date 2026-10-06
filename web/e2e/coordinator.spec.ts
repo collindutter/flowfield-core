@@ -39,9 +39,16 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   const turns: Turn[] = [];
   let active: Turn | null = null;
   let sends = 0;
+  let recovery: string | null = null;
   await page.route(`**${historyPath}{,?*}`, (route) =>
     route.fulfill({
-      json: { conversation, items: turns, active, next_before: null },
+      json: {
+        conversation,
+        items: turns,
+        active,
+        next_before: null,
+        session_recovery_turn_id: recovery,
+      },
     }),
   );
   await page.route(`**${historyPath}/messages`, async (route) => {
@@ -262,6 +269,34 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     await timeline.nth(0).evaluate((el) => getComputedStyle(el).color),
   );
   await page.getByRole("button", { name: "Collapse projects" }).click();
+  const rail = page.locator('[data-sidebar="sidebar"]').first();
+  for (const control of [
+    page.getByRole("button", { name: "Expand projects" }),
+    page.getByRole("button", { name: /^Appearance:/ }),
+    page.getByRole("button", { name: /^Notifications/ }),
+    page.getByRole("button", { name: "Add project", exact: true }),
+    page.getByRole("link", { name: "Chat Browser", exact: true }),
+    page.locator(".connection"),
+  ]) {
+    await expect
+      .poll(
+        async () => {
+          const bounds = await rail.boundingBox();
+          const icon = await control
+            .locator("svg, .project-badge, .live-dot")
+            .first()
+            .boundingBox();
+          return Math.abs(
+            bounds!.x + bounds!.width / 2 - icon!.x - icon!.width / 2,
+          );
+        },
+        {
+          message: `Centered ${(await control.getAttribute("aria-label")) ?? "connection"}`,
+        },
+      )
+      .toBeLessThan(1);
+  }
+  await page.screenshot({ path: testInfo.outputPath("collapsed-sidebar.png") });
   const connection = page.locator(".connection");
   await expect(connection.locator(".live-dot")).toBeVisible();
   await expect
@@ -276,6 +311,9 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     )
     .toBeLessThan(1);
   await page.getByRole("button", { name: "Expand projects" }).click();
+  await expect(
+    page.locator(".coordinator-message").last().locator(":scope > :last-child"),
+  ).toHaveText("Coordinator · stopped");
   await expect(
     page.getByText("Read project · completed", { exact: false }),
   ).toContainText("/project/README.md");
@@ -320,6 +358,39 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   await expect(
     page.getByRole("combobox", { name: "Conversation history" }),
   ).toHaveCount(0);
+  expect(sends).toBe(1);
+  turns[0].status = "failed";
+  turns[0].session = "unavailable";
+  turns[0].activity.items = [];
+  turns[0].notice = "The saved agent session could not be resumed.";
+  recovery = turns[0].id;
+  let resets = 0;
+  await page.route(`**${historyPath}/turns/*/reset-session`, async (route) => {
+    resets++;
+    recovery = null;
+    await route.fulfill({ status: 204 });
+  });
+  await page.reload();
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(
+    page.getByText("Coordinator · failed", { exact: true }),
+  ).toBeVisible();
+  const reset = page.getByRole("button", {
+    name: "Start new session",
+    exact: true,
+  });
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain(
+      "native tool history will not be restored",
+    );
+    await dialog.dismiss();
+  });
+  await reset.click();
+  expect(resets).toBe(0);
+  page.once("dialog", (dialog) => dialog.accept());
+  await reset.click();
+  await expect(reset).toHaveCount(0);
+  expect(resets).toBe(1);
   expect(sends).toBe(1);
 });
 
@@ -442,16 +513,16 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   await page.screenshot({
     path: testInfo.outputPath("coordinator-model-settings.png"),
   });
-  await page.getByRole("button", { name: "Save model", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(send).toBeEnabled();
   await expect(model).not.toBeVisible();
   await page
     .getByRole("button", { name: "second · high", exact: true })
     .click();
   await expect(model).toHaveValue("second");
-  await expect(
-    page.getByRole("button", { name: "Use project defaults" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Use defaults" })).toHaveCount(
+    0,
+  );
   await send.click();
   await expect(page.getByRole("alert")).toContainText("Model is unavailable");
   await expect(page.getByRole("button", { name: "Refresh chat" })).toHaveCount(
@@ -490,6 +561,7 @@ test("long project chat preserves loaded history while live pages advance", asyn
     text: `Planning exchange ${number}`,
     created_at: new Date().toISOString(),
     status: "completed",
+    session: "resumed",
     native_started: true,
     notice: "",
     settings: {

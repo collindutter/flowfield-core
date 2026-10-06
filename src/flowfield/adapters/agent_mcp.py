@@ -28,7 +28,7 @@ class ScopeServer(uvicorn.Server):
 
 @asynccontextmanager
 async def serve_scope(
-    grant: ScopedTools, *, lifetime: float = 3600
+    grant: ScopedTools, *, lifetime: float = 3600, name: str | None = None
 ) -> AsyncIterator[HttpMcpServer]:
     """No public route, access logs, persisted token or ambient workspace authority.
 
@@ -36,7 +36,7 @@ async def serve_scope(
     require a separate transport adapter; never silently omit their Flowfield tools.
     """
     token = secrets.token_urlsafe(32)
-    name = "flowfield_" + uuid4().hex[:16]
+    name = name or "flowfield_" + uuid4().hex[:16]
     expires = time.monotonic() + lifetime
     manager = StreamableHTTPSessionManager(
         grant.server,

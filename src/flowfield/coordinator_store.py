@@ -21,6 +21,43 @@ class CoordinatorStore:
     def __init__(self, workspace: Workspace):
         self.workspace = workspace
 
+    def session(self, project: str, harness: str, cwd: str) -> str | None:
+        with self.workspace.connection() as db:
+            row = db.execute(
+                "SELECT harness,session_id,cwd FROM coordinator_sessions WHERE project_id=?",
+                (project,),
+            ).fetchone()
+        if row and (row[0] != harness or row[2] != cwd):
+            raise ApplicationError(
+                "agent_resume_failed",
+                "The saved session belongs to a different harness or project directory. "
+                "Start a new session to continue here.",
+                409,
+            )
+        return row[1] if row else None
+
+    @staticmethod
+    def _recovery(db: sqlite3.Connection, project: str) -> str | None:
+        row = db.execute(
+            "SELECT t.id FROM coordinator_turns t JOIN coordinator_sessions s "
+            "ON s.project_id=t.project_id WHERE t.project_id=? "
+            "AND t.number=(SELECT MAX(number) FROM coordinator_turns WHERE project_id=?) "
+            "AND json_extract(t.data,'$.session')='unavailable'",
+            (project, project),
+        ).fetchone()
+        return row[0] if row and not CoordinatorStore._active(db, project) else None
+
+    def reset_session(self, project: str, failed_turn: str) -> None:
+        with self.workspace.connection(write=True, project_id=project) as db:
+            if self._recovery(db, project) != failed_turn:
+                raise ApplicationError(
+                    "session_changed", "Session recovery changed. Refresh before continuing.", 409
+                )
+            db.execute("DELETE FROM coordinator_sessions WHERE project_id=?", (project,))
+            turn = self._get(db, project, failed_turn)
+            turn.notice += " You chose a new native session; saved chat remains."
+            self._save(db, turn)
+
     @staticmethod
     def _conversation(
         db: sqlite3.Connection, project: str, identity: str
@@ -111,6 +148,7 @@ class CoordinatorStore:
                 items=items if after is not None else list(reversed(items)),
                 next_before=items[-1].number if len(rows) > 20 else None,
                 active=self._active(db, project),
+                session_recovery_turn_id=self._recovery(db, project),
             )
 
     def reserve(

@@ -376,7 +376,7 @@ export function NotificationButton() {
       onClick={show}
     >
       <Bell aria-hidden="true" />
-      <span className="group-data-[collapsible=icon]:hidden">
+      <span data-sidebar="label">
         Notifications{count ? ` (${count})` : ""}
       </span>
       {count > 0 && (

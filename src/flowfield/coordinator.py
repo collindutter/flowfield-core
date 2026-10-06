@@ -18,16 +18,17 @@ from flowfield.coordinator_models import CoordinatorSend, CoordinatorTurn
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
 from flowfield.reads import size
-from flowfield.run_activity import ActivityRecorder
+from flowfield.run_activity import ActivityRecorder, ActivityUpdate
 
 if TYPE_CHECKING:
     from flowfield.supervisor import Supervisor
 
 GUIDANCE = """You are this project's Flowfield coordinator. Help the human shape intent,
-prepare tasks and resolve saved input. This is a fresh native session with a bounded recent
-conversation handoff, not a replay of an earlier session. Read get_project and get_board
-first; canonical Flowfield state takes precedence over old messages. Follow full-text and
-pagination links before editing, and read current revisions before every consequential write.
+prepare tasks and resolve saved input. Native session history carries this conversation;
+any recent_conversation field is a one-time handoff from earlier Flowfield chat.
+Read get_project and get_board first; canonical Flowfield state takes precedence over old
+messages. Follow full-text and pagination links before editing, and read current revisions
+before every consequential write.
 Use only the named scoped MCP connection for Flowfield operations. Do not use ambient
 Flowfield connections, CLI or database files. Project identity is already bound to these tools.
 Read repository files as needed; do not edit code, run setup, install tools, launch workers or
@@ -67,7 +68,15 @@ class Coordinator:
             job.add_done_callback(lambda _: self.finishing.discard(turn.id))
         return turn
 
-    def _prompt(self, turn: CoordinatorTurn, server: str) -> str:
+    def _prompt(self, turn: CoordinatorTurn, server: str, *, resumed: bool = False) -> str:
+        instructions = {
+            "instructions": f"Use the {server} MCP connection.\n" + GUIDANCE,
+            "project_id": turn.project_id,
+            "flowfield_connection": server,
+            "human_message": turn.text,
+        }
+        if resumed:
+            return json.dumps(instructions, ensure_ascii=False)
         page = self.store.page(turn.project_id, turn.conversation_id, before=turn.number)
         history: list[dict[str, str]] = []
         remaining = 48000 - 2  # JSON array delimiters; budget encoded UTF-8, not characters.
@@ -101,9 +110,7 @@ class Coordinator:
             remaining -= size(entry) + 2
         return json.dumps(
             {
-                "instructions": f"Use the {server} MCP connection.\n" + GUIDANCE,
-                "project_id": turn.project_id,
-                "flowfield_connection": server,
+                **instructions,
                 "history_is_partial": bool(
                     abridged or page.next_before or len(history) < len(page.items)
                 ),
@@ -121,8 +128,14 @@ class Coordinator:
         status: Literal["completed", "failed", "stopped"] = "failed"
         notice = ""
         try:
+            project = workspace.project(turn.project_id)
+            session_id = self.store.session(
+                turn.project_id, turn.settings.choice.harness, project.path
+            )
             grant = await coordinator_scope(workspace, turn.project_id)
-            async with serve_scope(grant) as server:
+            # The same name replaces the previous endpoint on resume; credentials
+            # and grants remain fresh and are revoked at the end of every turn.
+            async with serve_scope(grant, name="flowfield_" + turn.conversation_id) as server:
                 try:
                     project = workspace.project(turn.project_id)
                     temporary = tempfile.TemporaryDirectory(prefix="flowfield-coordinator-")
@@ -137,16 +150,45 @@ class Coordinator:
                             return
                         current.native_started = True
                         self.store._save(db, current)
-                    await client.start([server])
+                    await client.start([server], resume=session_id, persistent=True)
                     applied = await client.configure(turn.settings.choice, read_only=True)
+                    attachments = Attachments(workspace).inputs(turn.project_id, None, turn.text)
+                    # Reject unsupported input before saving a new session identity:
+                    # native history is only materialized by its first prompt.
+                    client.validate_attachments(attachments)
+                    assert client.session.session_id
                     with workspace.connection(write=True, project_id=turn.project_id) as db:
                         current = self.store._get(db, turn.project_id, turn.id)
                         if current.status != "starting":
                             status = "stopped"
                             return
                         current.status = "running"
+                        current.session = "resumed" if session_id else "new"
                         current.applied = turn.settings.model_copy(update={"choice": applied})
+                        db.execute(
+                            "INSERT INTO coordinator_sessions VALUES (?,?,?,?) "
+                            "ON CONFLICT(project_id) DO NOTHING",
+                            (
+                                turn.project_id,
+                                turn.settings.choice.harness,
+                                client.session.session_id,
+                                project.path,
+                            ),
+                        )
                         self.store._save(db, current)
+                    prompt = self._prompt(turn, server.name, resumed=session_id is not None)
+                    handoff = json.loads(prompt).get("recent_conversation", [])
+                    session_note = (
+                        "Agent session resumed with native conversation history."
+                        if session_id
+                        else "New agent session started."
+                    )
+                    if handoff:
+                        session_note += (
+                            f" Included {len(handoff)} recent saved exchanges; "
+                            "earlier native tool history is not available in this session."
+                        )
+                    recorder.emit(ActivityUpdate(key="session", kind="status", text=session_note))
                     client.on_activity = recorder.emit
                     assert client.session.session_id
                     async with self.supervisor.permissions.turn(
@@ -158,11 +200,9 @@ class Coordinator:
                     ):
                         # Read-only coordination cannot authorize native escalation.
                         outcome = await client.prompt(
-                            self._prompt(turn, server.name),
+                            prompt,
                             None,
-                            attachments=Attachments(workspace).inputs(
-                                turn.project_id, None, turn.text
-                            ),
+                            attachments=attachments,
                         )
                     status = "completed" if outcome.get("status") == "completed" else "failed"
                     if status == "failed":
@@ -186,6 +226,11 @@ class Coordinator:
             notice = "Stopped. Saved task changes remain; workers continue independently."
         except ApplicationError as error:
             notice = str(error)
+            if error.code == "agent_resume_failed":
+                with workspace.connection(write=True, project_id=turn.project_id) as db:
+                    current = self.store._get(db, turn.project_id, turn.id)
+                    current.session = "unavailable"
+                    self.store._save(db, current)
         except Exception:
             notice = (
                 "The coordinator disconnected or could not complete this turn. "

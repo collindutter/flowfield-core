@@ -41,6 +41,7 @@ class CoordinatorTurn(AgentRecord):
     activity: RunActivityPage = Field(default_factory=RunActivityPage)
     notice: str = ""
     native_started: bool = False
+    session: Literal["new", "resumed", "unavailable"] | None = None
 
 
 class CoordinatorPage(AgentRecord):
@@ -48,3 +49,4 @@ class CoordinatorPage(AgentRecord):
     items: list[CoordinatorTurn]
     next_before: int | None = None
     active: CoordinatorTurn | None = None
+    session_recovery_turn_id: str | None = None

@@ -130,7 +130,7 @@ jobs:
       - name: Install and exercise the original bundle without Node or models
         run: |
           for bundle in bridges/codex-acp/.work/packages/*.zip; do
-            for scenario in complete cancel background cleanup-refused; do
+            for scenario in complete cancel background cleanup-refused resume; do
               uv run --no-sync python scripts/check_codex_acp.py "$bundle" --bundle --cleanup --scenario "$scenario"
             done
           done

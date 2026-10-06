@@ -60,6 +60,10 @@ def coordinator_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     def recover(project_id: str, turn_id: str) -> CoordinatorTurn:
         return supervisor().coordinator.store.confirm_stopped(project_id, turn_id)
 
+    @router.post("/turns/{turn_id}/reset-session", status_code=204)
+    def reset_session(project_id: str, turn_id: str) -> None:
+        supervisor().coordinator.store.reset_session(project_id, turn_id)
+
     @router.get("/{conversation_id}/settings")
     def settings(project_id: str, conversation_id: str) -> AgentSettingsView:
         supervisor().coordinator.store.page(project_id, conversation_id)

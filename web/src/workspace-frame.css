@@ -3,6 +3,28 @@
   min-height: 0;
   overflow: hidden;
 }
+.workspace-frame [data-collapsible="icon"] {
+  & [data-sidebar="header"],
+  & [data-sidebar="footer"] {
+    align-items: center;
+    justify-content: center;
+  }
+  & [data-sidebar="menu"] {
+    align-items: center;
+  }
+  & [data-sidebar="menu-button"],
+  & .connection {
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  & [data-sidebar="label"] {
+    display: none;
+  }
+  & .connection {
+    width: 32px;
+    padding-inline: 0;
+  }
+}
 .workspace-sidebar-header {
   height: 64px;
   flex-direction: row;

@@ -57,14 +57,19 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
       });
     },
   );
-  await page.route("**/api/worker-models", (route) =>
-    route.fulfill({
+  let releaseModels!: () => void;
+  const discovery = new Promise<void>((resolve) => {
+    releaseModels = resolve;
+  });
+  await page.route("**/api/worker-models", async (route) => {
+    await discovery;
+    await route.fulfill({
       json: [
         { id: "first", name: "First", efforts: ["low", "high"], modes },
         { id: "second", name: "Second", efforts: ["medium"], modes },
       ],
-    }),
-  );
+    });
+  });
   await page.route("**/agent-settings", async (route) => {
     if (route.request().method() === "PUT") {
       const payload = route.request().postDataJSON();
@@ -137,6 +142,13 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
     name: "Worker model settings",
     exact: true,
   });
+  for (const label of ["Model", "Reasoning effort"]) {
+    const select = picker.getByRole("combobox", { name: label, exact: true });
+    await expect(select).toBeDisabled();
+    await expect(select.locator("option:checked")).toHaveText(/^Loading/);
+    await expect(select).not.toContainText("unavailable");
+  }
+  releaseModels();
   await expect(picker.getByLabel("Model", { exact: true })).toHaveValue(
     "first",
   );
@@ -144,6 +156,19 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await expect(picker.getByLabel("Reasoning effort")).toHaveValue("");
   await picker.getByLabel("Reasoning effort").selectOption("medium");
   await picker.getByLabel("Native access mode").selectOption("read-only");
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const tops = await Promise.all(
+      ["Save", "Use defaults", "Cancel"].map(
+        async (name) =>
+          (await picker
+            .getByRole("button", { name, exact: true })
+            .boundingBox())!.y,
+      ),
+    );
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(1);
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Ask worker", exact: true }).click();
   await page.getByRole("button", { name: "first · low", exact: true }).click();
@@ -153,7 +178,7 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   await expect(picker.getByLabel("Reasoning effort")).toHaveValue("medium");
   await picker.getByLabel("Native access mode").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/tmp/flowfield-slice3-native-modes.png" });
-  await picker.getByRole("button", { name: "Save agent settings" }).click();
+  await picker.getByRole("button", { name: "Save" }).click();
   await page
     .getByRole("button", { name: "second · medium", exact: true })
     .click();
@@ -171,15 +196,13 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
     ),
   ).toBeVisible();
   await expect(picker.getByLabel("Reasoning effort")).toHaveValue("high");
-  await expect(
-    picker.getByRole("button", { name: "Save agent settings" }),
-  ).toBeDisabled();
+  await expect(picker.getByRole("button", { name: "Save" })).toBeDisabled();
   page.once("dialog", (dialog) => dialog.accept());
-  await picker.getByRole("button", { name: "Load latest settings" }).click();
+  await picker.getByRole("button", { name: "Reload" }).click();
   await expect(picker.getByLabel("Model", { exact: true })).toHaveValue(
     "second",
   );
-  await picker.getByRole("button", { name: "Use project defaults" }).click();
+  await picker.getByRole("button", { name: "Use defaults" }).click();
   await page.getByRole("button", { name: "first · low", exact: true }).click();
   await expect(
     picker.getByText("Using project defaults", { exact: true }),

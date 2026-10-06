@@ -117,9 +117,48 @@ async def probe(
         stopped = await client.close(timeout=15)
     if cleanup and stopped.owned_work_stopped is not (scenario != "cleanup-refused"):
         raise AssertionError("Unexpected managed cleanup receipt")
+    if scenario == "resume":
+        session_id = client.session_id
+        events.clear()
+        client = AcpSession(event, request_timeout=10, turn_timeout=10, cleanup=quiesce)
+        await client.start(
+            [node, str(bridge)] if node else [str(bridge)],
+            cwd=attempt.workspace.checkout,
+            mcp_servers=[
+                HttpMcpServer(
+                    name="flowfield_probe_session",
+                    type="http",
+                    url="http://127.0.0.1:2/renewed-scope",
+                    headers=[],
+                )
+            ],
+            env=attempt.launch_environment(),
+            resume_session_id=session_id,
+        )
+        try:
+            await client.select("mode", mode)
+            result = await client.prompt("Continue without replaying the first message")
+        finally:
+            stopped = await client.close(timeout=15)
+        assert stopped.owned_work_stopped is True and stopped.process_group_exited
+        resumed_text = [item.data["text"] for item in events if item.kind == "text"]
+        assert resumed_text == ["Offline native history: 2 turns"], resumed_text
     if unexpected_logs.exists():
         raise AssertionError("The runtime loaded project dotenv settings")
     messages = [json.loads(line) for line in record.read_text().splitlines()]
+    if scenario == "resume":
+        assert (
+            sum(
+                item.get("method") == "thread/start" and not item["params"].get("ephemeral")
+                for item in messages
+            )
+            == 1
+        )
+        resumes = [item["params"] for item in messages if item.get("method") == "thread/resume"]
+        assert len(resumes) == 1
+        assert resumes[0]["config"]["mcp_servers"]["flowfield_probe_session"]["url"] == (
+            "http://127.0.0.1:2/renewed-scope"
+        )
     thread = next(item["params"] for item in messages if item.get("method") == "thread/start")
     configured_scope = (
         thread.get("config", {}).get("mcp_servers", {}).get("flowfield_probe_session")
@@ -186,7 +225,7 @@ def main():
     parser.add_argument(
         "--scenario",
         default="complete",
-        choices=["complete", "cancel", "slow-shutdown", "background", "cleanup-refused"],
+        choices=["complete", "cancel", "slow-shutdown", "background", "cleanup-refused", "resume"],
     )
     args = parser.parse_args()
     node = None if args.standalone or args.bundle else shutil.which("node")

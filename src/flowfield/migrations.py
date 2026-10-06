@@ -138,6 +138,13 @@ def message_attachments(db: sqlite3.Connection) -> None:
     db.execute("CREATE INDEX attachment_project ON attachments(project_id,task_id)")
 
 
+def coordinator_sessions(db: sqlite3.Connection) -> None:
+    db.execute(
+        "CREATE TABLE coordinator_sessions (project_id TEXT PRIMARY KEY REFERENCES projects(id), "
+        "harness TEXT NOT NULL, session_id TEXT NOT NULL, cwd TEXT NOT NULL)"
+    )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
@@ -146,6 +153,7 @@ MIGRATIONS = (
     Migration(34, coordinator_chat),
     Migration(35, project_coordinator_and_local_default),
     Migration(36, message_attachments),
+    Migration(37, coordinator_sessions),
 )
 
 

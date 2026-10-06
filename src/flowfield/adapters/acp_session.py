@@ -102,9 +102,13 @@ class AcpSession:
         env: Mapping[str, str],
         mcp_servers: list[HttpMcpServer],
         load_session_id: str | None = None,
+        resume_session_id: str | None = None,
+        require_resume: bool = False,
     ) -> None:
         if self.state != "new":
             raise RuntimeError("Session has already been started")
+        if load_session_id and resume_session_id:
+            raise ValueError("Choose load or resume, not both")
         if not command or not cwd.is_absolute() or not cwd.is_dir():
             raise ValueError(
                 "An agent command and existing absolute working directory are required"
@@ -140,7 +144,19 @@ class AcpSession:
                 )
                 if mcp_servers and not self.capabilities.get("mcpCapabilities", {}).get("http"):
                     raise RuntimeError("Agent does not support scoped HTTP MCP servers")
-                if load_session_id is not None:
+                if (require_resume or resume_session_id is not None) and "resume" not in (
+                    self.capabilities.get("sessionCapabilities", {})
+                ):
+                    raise RuntimeError("Agent does not support resuming sessions")
+                if resume_session_id is not None:
+                    self.session_id = resume_session_id
+                    resumed = await self.connection.resume_session(
+                        cwd=str(cwd), session_id=resume_session_id, mcp_servers=[*mcp_servers]
+                    )
+                    self.config = [
+                        item.model_dump(by_alias=True) for item in resumed.config_options or []
+                    ]
+                elif load_session_id is not None:
                     if not self.capabilities.get("loadSession"):
                         raise RuntimeError("Agent does not support loading sessions")
                     # Bind before load so replay can be filtered; never resend a prompt.

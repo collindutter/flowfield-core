@@ -69,6 +69,7 @@ async def main():
     tasks = set()
     servers = []
     session_closed = False
+    resumed = False
 
     async def prompt(request):
         if "expect-attachments" in sys.argv:
@@ -84,7 +85,7 @@ async def main():
             assert control["flowfield_connection"] in control["instructions"]
             assert CONFIG[2]["currentValue"] == "read-only"
             if "continuity" in control["human_message"]:
-                assert control["recent_conversation"]
+                assert resumed and "recent_conversation" not in control
             control = {
                 "mode": os.environ.get("FLOWFIELD_TEST_SCENARIO", "normal"),
                 "calls": [
@@ -293,15 +294,19 @@ async def main():
                         "loadSession": "no-load" not in sys.argv,
                         "promptCapabilities": {"image": "no-images" not in sys.argv},
                         "mcpCapabilities": {"http": "no-http" not in sys.argv},
-                        "sessionCapabilities": (
-                            {"close": {}} if "close-session" in sys.argv else {}
-                        ),
+                        "sessionCapabilities": {
+                            **({"close": {}} if "close-session" in sys.argv else {}),
+                            **({"resume": {}} if "no-resume" not in sys.argv else {}),
+                        },
                     },
                 },
             )
-        elif method in {"session/new", "session/load"}:
+        elif method in {"session/new", "session/load", "session/resume"}:
+            resumed = method == "session/resume"
             servers = request["params"]["mcpServers"]
-            if request["params"].get("sessionId") == "missing":
+            if request["params"].get("sessionId") == "missing" or (
+                resumed and "resume-missing" in sys.argv
+            ):
                 send({"id": request["id"], "error": {"code": -32000, "message": "Session missing"}})
             else:
                 reply(request, {"sessionId": "test-session", "configOptions": CONFIG})

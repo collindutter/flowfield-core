@@ -73,6 +73,11 @@ def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
             service.coordinator.send("harbor", conversation.id, message())
         completed = await settled(service, turn)
         assert completed.status == "completed", completed.notice
+        assert completed.session == "new"
+        native = service.coordinator.store.session("harbor", "codex", str(tmp_path / "harbor"))
+        assert native == "test-session"
+        with pytest.raises(ApplicationError, match="different harness or project directory"):
+            service.coordinator.store.session("harbor", "codex", str(tmp_path / "elsewhere"))
         assert completed.applied.choice.mode == "read-only"
         assert completed.settings.choice.mode is None
         assert service.workspace.task("harbor", "chat-task").updated_by == "agent"
@@ -80,8 +85,13 @@ def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
         public = completed.model_dump_json()
         assert "finished" in public and "PRIVATE" not in public and "WRONG SESSION" not in public
         assert "do-not-persist-host-secrets" not in public
+        assert "test-session" not in public
         second = service.coordinator.send("harbor", conversation.id, message("Check continuity"))
-        assert (await settled(service, second)).status == "completed"
+        resumed = await settled(service, second)
+        assert resumed.status == "completed"
+        assert resumed.session == "resumed"
+        assert resumed.activity.items[0].kind == "status"
+        assert "resumed" in resumed.activity.items[0].text
         assert service.coordinator.send("harbor", conversation.id, request).id == turn.id
         assert not service.coordinator.jobs
         await service.close()
@@ -93,6 +103,93 @@ def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
     new = restored.new("harbor")
     assert new.id == conversation.id
     assert restored.page("harbor").items == page.items
+
+
+def test_native_session_survives_restart_and_interruption_without_replay(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch)
+
+    async def exercise():
+        first = service.coordinator.send("harbor", conversation.id, message())
+        assert (await settled(service, first)).session == "new"
+        await service.close()
+        restored = Supervisor(Workspace(service.workspace.directory))
+        pending, _ = restored.coordinator.store.reserve("harbor", conversation.id, message())
+        with restored.workspace.connection(write=True) as db:
+            pending.native_started = True
+            restored.coordinator.store._save(db, pending)
+        restored.coordinator.store.restart()
+        assert restored.coordinator.store.get("harbor", pending.id).status == "uncertain"
+        with pytest.raises(ApplicationError, match="active turn"):
+            restored.coordinator.send("harbor", conversation.id, message())
+        assert not restored.coordinator.jobs
+        restored.coordinator.store.confirm_stopped("harbor", pending.id)
+        next_turn = restored.coordinator.send(
+            "harbor", conversation.id, message("Check continuity")
+        )
+        completed = await settled(restored, next_turn)
+        assert completed.status == "completed" and completed.session == "resumed"
+        assert restored.coordinator.store.get("harbor", pending.id).status == "interrupted"
+        await restored.close()
+
+    asyncio.run(exercise())
+
+
+def test_missing_native_session_requires_explicit_bound_reset(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch, flags=("resume-missing",))
+
+    async def exercise():
+        initial = service.coordinator.send("harbor", conversation.id, message())
+        assert (await settled(service, initial)).session == "new"
+        retry = service.coordinator.send("harbor", conversation.id, message())
+        failed = await settled(service, retry)
+        assert failed.status == "failed" and failed.session == "unavailable"
+        assert "Nothing was replayed" in failed.notice
+        assert service.coordinator.store.page("harbor").session_recovery_turn_id == failed.id
+        with pytest.raises(ApplicationError, match="recovery changed"):
+            service.coordinator.store.reset_session("harbor", initial.id)
+        pending = service.coordinator.send("harbor", conversation.id, message("Retry resume"))
+        with pytest.raises(ApplicationError, match="recovery changed"):
+            service.coordinator.store.reset_session("harbor", failed.id)
+        failed = await settled(service, pending)
+        assert failed.session == "unavailable"
+        service.coordinator.store.reset_session("harbor", failed.id)
+        assert service.coordinator.store.page("harbor").session_recovery_turn_id is None
+        with pytest.raises(ApplicationError, match="recovery changed"):
+            service.coordinator.store.reset_session("harbor", failed.id)
+        fresh = service.coordinator.send("harbor", conversation.id, message())
+        done = await settled(service, fresh)
+        assert done.status == "completed" and done.session == "new"
+        assert "recent saved exchanges" in done.activity.items[0].text
+        await service.close()
+
+    asyncio.run(exercise())
+
+
+def test_schema36_history_is_preserved_for_one_time_native_bootstrap(tmp_path, monkeypatch):
+    with monkeypatch.context() as older:
+        older.setattr(
+            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 36)
+        )
+        service, conversation = setup(tmp_path, monkeypatch)
+        old, _ = service.coordinator.store.reserve(
+            "harbor", conversation.id, message("Keep existing intent")
+        )
+        with service.workspace.connection(write=True) as db:
+            old.status = "completed"
+            service.coordinator.store._save(db, old)
+    restored = Supervisor(Workspace(service.workspace.directory))
+    assert restored.workspace.schema_version == migrations.current_version()
+    assert restored.coordinator.store.get("harbor", old.id) == old
+    assert restored.coordinator.store.session("harbor", "codex", str(tmp_path / "harbor")) is None
+
+    async def exercise():
+        first = restored.coordinator.send("harbor", conversation.id, message())
+        assert (await settled(restored, first)).session == "new"
+        second = restored.coordinator.send("harbor", conversation.id, message("Check continuity"))
+        assert (await settled(restored, second)).session == "resumed"
+        await restored.close()
+
+    asyncio.run(exercise())
 
 
 def test_planning_before_worker_delivery_configuration(tmp_path, monkeypatch):

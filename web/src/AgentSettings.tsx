@@ -38,7 +38,7 @@ export function AgentModelFields({
         Model
         <NativeSelect
           aria-label="Model"
-          value={model}
+          value={loading ? "" : model}
           required
           disabled={loading || !models.length}
           onChange={(event) => change(event.target.value, "", mode)}
@@ -50,7 +50,7 @@ export function AgentModelFields({
                 ? "Models unavailable"
                 : "Choose a model"}
           </option>
-          {model && !selected && (
+          {!loading && model && !selected && (
             <option value={model}>{model} (unavailable)</option>
           )}
           {models.map((item) => (
@@ -64,7 +64,7 @@ export function AgentModelFields({
         Reasoning effort
         <NativeSelect
           aria-label="Reasoning effort"
-          value={effort}
+          value={loading ? "" : effort}
           required
           disabled={loading || !model || !selected?.efforts.length}
           onChange={(event) => change(model, event.target.value, mode)}
@@ -78,7 +78,7 @@ export function AgentModelFields({
                   ? "Efforts unavailable"
                   : "Choose an effort"}
           </option>
-          {effort && !selected?.efforts.includes(effort) && (
+          {!loading && effort && !selected?.efforts.includes(effort) && (
             <option value={effort}>{effort} (unavailable)</option>
           )}
           {selected?.efforts.map((value) => (
@@ -93,7 +93,7 @@ export function AgentModelFields({
           Native access mode
           <NativeSelect
             aria-label="Native access mode"
-            value={mode}
+            value={loading ? "" : mode}
             required
             disabled={loading}
             onChange={(event) => change(model, effort, event.target.value)}
@@ -101,9 +101,11 @@ export function AgentModelFields({
             <option value="">
               {loading ? "Loading modes…" : "Choose a mode"}
             </option>
-            {mode && !selected.modes.some((item) => item.id === mode) && (
-              <option value={mode}>{mode} (unavailable)</option>
-            )}
+            {!loading &&
+              mode &&
+              !selected.modes.some((item) => item.id === mode) && (
+                <option value={mode}>{mode} (unavailable)</option>
+              )}
             {selected.modes.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -276,11 +278,7 @@ function useAgentSettingsContent(
                 )
               }
             >
-              {busy
-                ? "Saving…"
-                : coordinator
-                  ? "Save model"
-                  : "Save agent settings"}
+              {busy ? "Saving…" : "Save"}
             </Button>
             {!coordinator && (
               <Button
@@ -290,7 +288,7 @@ function useAgentSettingsContent(
                 disabled={stale || (!data?.selection && !draft)}
                 onClick={() => void save(true)}
               >
-                Use project defaults
+                Use defaults
               </Button>
             )}
             {(draft || error || resource.error) && (
@@ -322,9 +320,7 @@ function useAgentSettingsContent(
                   }
                 }}
               >
-                {stale || error || resource.error
-                  ? "Load latest settings"
-                  : "Cancel changes"}
+                {stale || error || resource.error ? "Reload" : "Cancel"}
               </Button>
             )}
           </div>

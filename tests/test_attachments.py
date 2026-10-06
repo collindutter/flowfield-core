@@ -141,7 +141,7 @@ def test_http_upload_size_limit_and_schema35_upgrade(tmp_path, monkeypatch):
         workspace = fixture(tmp_path).workspace
         before = workspace.task("harbor", "task-0")
     restored = Workspace(workspace.directory)
-    assert restored.schema_version == 36
+    assert restored.schema_version == migrations.current_version()
     assert restored.task("harbor", "task-0") == before
     with TestClient(create_app(data_dir=restored.directory), base_url="http://localhost") as client:
         path = "/api/projects/harbor/attachments"
@@ -185,6 +185,14 @@ def test_unsupported_images_fail_explicitly_without_silently_dropping_them(tmp_p
         assert saved.status == "failed"
         assert "cannot receive images" in saved.notice
         assert not saved.activity.items
+        assert (
+            service.coordinator.store.session(
+                "harbor", "codex", service.workspace.project("harbor").path
+            )
+            is None
+        )
+        retry = service.coordinator.send("harbor", conversation.id, message("Use text instead"))
+        assert (await settled(service, retry)).session == "new"
         await service.close()
 
     asyncio.run(exercise())

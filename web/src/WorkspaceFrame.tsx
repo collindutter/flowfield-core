@@ -85,7 +85,7 @@ function ProjectItem({
               }}
             >
               <ProjectBadge id={project.id} name={project.name} />
-              <span ref={text} className="group-data-[collapsible=icon]:hidden">
+              <span ref={text} data-sidebar="label">
                 {project.name}
               </span>
             </a>
@@ -161,13 +161,14 @@ function ProjectNavigation({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Add project"
+                  aria-label="Add project"
                   onClick={() => {
                     onAddProject();
                     setOpenMobile(false);
                   }}
                 >
                   <Plus />
-                  <span>Add project</span>
+                  <span data-sidebar="label">Add project</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}

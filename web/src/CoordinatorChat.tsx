@@ -116,7 +116,17 @@ export function CoordinatorChat({
       setBusy(false);
     }
   }
-  async function action(turn: Turn, operation: "stop" | "confirm-stopped") {
+  async function action(
+    turn: Pick<Turn, "id">,
+    operation: "stop" | "confirm-stopped" | "reset-session",
+  ) {
+    if (
+      operation === "reset-session" &&
+      !window.confirm(
+        "Start a new agent session? Your saved chat stays here. Only a bounded recent chat handoff will be carried into the new session; native tool history will not be restored.",
+      )
+    )
+      return;
     if (
       operation === "confirm-stopped" &&
       !window.confirm(
@@ -192,9 +202,6 @@ export function CoordinatorChat({
                 <Markdown>{turn.text}</Markdown>
               </div>
               <div className="coordinator-message">
-                <div className="detail-metadata">
-                  Coordinator · {turn.status}
-                </div>
                 {turn.activity.items.map((entry) =>
                   entry.kind === "agent" ? (
                     <div key={entry.key} data-kind="agent">
@@ -213,6 +220,9 @@ export function CoordinatorChat({
                   </p>
                 )}
                 {turn.notice && <p role="status">{turn.notice}</p>}
+                <div className="detail-metadata" role="status">
+                  Coordinator · {turn.status}
+                </div>
               </div>
             </article>
           ))}
@@ -245,6 +255,27 @@ export function CoordinatorChat({
                 onClick={() => void action(active, "confirm-stopped")}
               >
                 Confirm coordinator stopped
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        {page?.session_recovery_turn_id && (
+          <Alert>
+            <AlertDescription>
+              The saved agent session is unavailable. You can retry after fixing
+              the host, or start a new session with recent chat.
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  void action(
+                    { id: page.session_recovery_turn_id! },
+                    "reset-session",
+                  )
+                }
+              >
+                Start new session
               </Button>
             </AlertDescription>
           </Alert>

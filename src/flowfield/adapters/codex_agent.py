@@ -148,13 +148,27 @@ class CodexAgent:
         # ACP context occupancy is not billable input/output usage. Keep unsupported
         # token counters unknown rather than presenting context as consumed tokens.
 
-    async def start(self, servers: list[HttpMcpServer]) -> None:
+    async def start(
+        self, servers: list[HttpMcpServer], *, resume: str | None = None, persistent: bool = False
+    ) -> None:
         self.cleanup_confirmed = False
         try:
             await self.session.start(
-                self.command, cwd=self.cwd, env=self.environment, mcp_servers=servers
+                self.command,
+                cwd=self.cwd,
+                env=self.environment,
+                mcp_servers=servers,
+                resume_session_id=resume,
+                require_resume=persistent,
             )
         except RequestError as error:
+            if resume:
+                raise ApplicationError(
+                    "agent_resume_failed",
+                    "The saved agent session could not be resumed. Check Codex on the host "
+                    "and retry, or explicitly start a new session. Nothing was replayed.",
+                    409,
+                ) from error
             if error.code == -32000:
                 raise ApplicationError(
                     "codex_login_required",
@@ -169,6 +183,13 @@ class CodexAgent:
                 409,
             ) from error
         except (OSError, RuntimeError, TimeoutError) as error:
+            if resume:
+                raise ApplicationError(
+                    "agent_resume_failed",
+                    "The saved agent session could not be resumed. Check Codex on the host "
+                    "and retry, or explicitly start a new session. Nothing was replayed.",
+                    409,
+                ) from error
             raise ApplicationError(
                 "codex_start_failed",
                 "Codex could not open an ACP session. Check the service PATH, native "
@@ -207,6 +228,16 @@ class CodexAgent:
                 409,
             ) from error
 
+    def validate_attachments(self, attachments: list[dict[str, str]]) -> None:
+        if any(item["mime"].startswith("image/") for item in attachments) and not (
+            self.session.capabilities.get("promptCapabilities", {}).get("image")
+        ):
+            raise ApplicationError(
+                "images_unavailable",
+                "This harness cannot receive images. Send text/code instead.",
+                409,
+            )
+
     async def prompt(
         self,
         text: str,
@@ -216,17 +247,12 @@ class CodexAgent:
     ) -> dict[str, str]:
         if self.stopping:
             return {"status": "stopped"}
+        self.validate_attachments(attachments or [])
         self.session.on_permission = on_permission
         content: list[ImageContentBlock | TextContentBlock] = []
         for item in attachments or []:
             content.append(TextContentBlock(type="text", text=f"Human attachment: {item['name']}"))
             if item["mime"].startswith("image/"):
-                if not self.session.capabilities.get("promptCapabilities", {}).get("image"):
-                    raise ApplicationError(
-                        "images_unavailable",
-                        "This harness cannot receive images. Send text/code instead.",
-                        409,
-                    )
                 content.append(
                     ImageContentBlock(type="image", data=item["data"], mime_type=item["mime"])
                 )

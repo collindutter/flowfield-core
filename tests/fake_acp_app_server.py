@@ -15,6 +15,7 @@ def main():
     record = Path(os.environ["FLOWFIELD_TEST_RPC_RECORD"])
     scenario = os.environ.get("FLOWFIELD_TEST_SCENARIO", "complete")
     active = False
+    threads = set()
     background = scenario in {"background", "cleanup-refused"}
     model = {
         "id": "test-model",
@@ -50,9 +51,14 @@ def main():
             result = {"data": [model], "nextCursor": None}
         elif method == "skills/list":
             result = {"data": []}
-        elif method == "thread/start":
+        elif method in {"thread/start", "thread/resume"}:
+            thread_id = "title-thread" if request["params"].get("ephemeral") else "test-thread"
+            threads.add(thread_id)
+            if method == "thread/resume":
+                assert request["params"]["threadId"] == "test-thread"
+                assert request["params"]["excludeTurns"] is True
             result = {
-                "thread": {"id": "test-thread", "turns": []},
+                "thread": {"id": thread_id, "turns": []},
                 "model": "test-model",
                 "reasoningEffort": "low",
                 "modelProvider": "openai",
@@ -62,13 +68,18 @@ def main():
             }
         elif method == "turn/start":
             active = True
+            if scenario == "resume" and request["params"]["threadId"] == "test-thread":
+                history = record.with_suffix(".history.json")
+                turns = json.loads(history.read_text()) if history.exists() else []
+                turns.append(request["params"]["input"])
+                history.write_text(json.dumps(turns))
             result = {
                 "turn": {"id": "test-turn", "items": [], "status": "inProgress", "error": None}
             }
         elif method == "mcpServerStatus/list":
             result = {"data": [], "nextCursor": None}
         elif method == "thread/loaded/list":
-            result = {"data": ["test-thread"], "nextCursor": None}
+            result = {"data": sorted(threads), "nextCursor": None}
         elif method == "thread/goal/get":
             result = {"goal": None}
         elif method == "thread/backgroundTerminals/list":
@@ -85,27 +96,32 @@ def main():
         elif method == "thread/read":
             result = {
                 "thread": {
-                    "id": "test-thread",
+                    "id": request["params"]["threadId"],
                     "ephemeral": False,
                     "status": {"type": "active" if active else "idle"},
                 }
             }
         emit({"id": request["id"], "result": result})
         if method == "turn/start":
+            thread_id = request["params"]["threadId"]
             emit(
                 {
                     "method": "turn/started",
-                    "params": {"threadId": "test-thread", "turn": result["turn"]},
+                    "params": {"threadId": thread_id, "turn": result["turn"]},
                 }
             )
             emit(
                 {
                     "method": "item/agentMessage/delta",
                     "params": {
-                        "threadId": "test-thread",
+                        "threadId": thread_id,
                         "turnId": "test-turn",
                         "itemId": "message",
-                        "delta": "Offline proof",
+                        "delta": (
+                            f"Offline native history: {len(turns)} turns"
+                            if scenario == "resume" and thread_id == "test-thread"
+                            else "Offline proof"
+                        ),
                     },
                 }
             )
@@ -116,7 +132,7 @@ def main():
                 {
                     "method": "turn/completed",
                     "params": {
-                        "threadId": "test-thread",
+                        "threadId": thread_id,
                         "turn": {
                             "id": "test-turn",
                             "items": [],

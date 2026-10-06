@@ -12,7 +12,7 @@ from flowfield.adapters.acp_session import AcpSession
 FAKE = Path(__file__).with_name("fake_acp.py")
 
 
-async def start(tmp_path, events, *flags, permission=None, load=None):
+async def start(tmp_path, events, *flags, permission=None, load=None, resume=None):
     client = AcpSession(events.append, on_permission=permission, request_timeout=2, turn_timeout=4)
     await client.start(
         [sys.executable, str(FAKE), *flags],
@@ -20,8 +20,27 @@ async def start(tmp_path, events, *flags, permission=None, load=None):
         env={},
         mcp_servers=[],
         load_session_id=load,
+        resume_session_id=resume,
     )
     return client
+
+
+def test_resume_negotiates_capability_and_does_not_replay_history(tmp_path):
+    async def exercise():
+        events = []
+        client = await start(tmp_path, events, resume="test-session")
+        try:
+            assert not events
+            assert client.session_id == "test-session"
+            assert await client.prompt('{"mode":"normal"}') == "end_turn"
+        finally:
+            assert (await client.close()).process_group_exited
+        with pytest.raises(RuntimeError, match="does not support resuming"):
+            await start(tmp_path, [], "no-resume", resume="test-session")
+        with pytest.raises(ValueError, match="load|resume"):
+            await start(tmp_path, [], load="test-session", resume="test-session")
+
+    asyncio.run(exercise())
 
 
 def test_stream_model_scope_and_no_private_reasoning(tmp_path, caplog):

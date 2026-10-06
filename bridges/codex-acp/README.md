@@ -74,7 +74,12 @@ uv run scripts/check_codex_acp.py bridges/codex-acp/.work/upstream/dist/index.js
 uv run scripts/check_codex_acp.py bridges/codex-acp/.work/upstream/dist/index.js --cleanup --scenario cancel
 uv run scripts/check_codex_acp.py bridges/codex-acp/.work/upstream/dist/index.js --cleanup --scenario background
 uv run scripts/check_codex_acp.py bridges/codex-acp/.work/upstream/dist/index.js --cleanup --scenario cleanup-refused
+uv run scripts/check_codex_acp.py bridges/codex-acp/.work/upstream/dist/index.js --cleanup --scenario resume
 ```
+
+The resume scenario closes the first process, resumes the native thread in a second,
+and checks renewed scoped MCP configuration and retained fake-native history without
+replaying earlier messages. It does not prove live-model context or compaction behavior.
 
 Ordinary tests never invoke native Codex or models. Native foreground-command exit was
 measured on macOS with Codex 0.159.1 and 0.159.2. Background-terminal termination and

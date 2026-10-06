@@ -1395,6 +1395,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/{project_id}/coordinator/turns/{turn_id}/reset-session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reset Session */
+    post: operations["reset_session_api_projects__project_id__coordinator_turns__turn_id__reset_session_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/coordinator/{conversation_id}/settings": {
     parameters: {
       query?: never;
@@ -2350,6 +2367,8 @@ export interface components {
       /** Next Before */
       next_before: number | null;
       active: components["schemas"]["CoordinatorTurn"] | null;
+      /** Session Recovery Turn Id */
+      session_recovery_turn_id: string | null;
     };
     /** CoordinatorSend */
     CoordinatorSend: {
@@ -2402,6 +2421,8 @@ export interface components {
        * @default false
        */
       native_started: boolean;
+      /** Session */
+      session: ("new" | "resumed" | "unavailable") | null;
     };
     /** Correction */
     Correction: {
@@ -7992,6 +8013,36 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["CoordinatorTurn"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  reset_session_api_projects__project_id__coordinator_turns__turn_id__reset_session_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        turn_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
