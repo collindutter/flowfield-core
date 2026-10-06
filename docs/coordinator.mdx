@@ -3,9 +3,9 @@ title: Coordinator Chat
 description: Plan work and capture tasks beside the board.
 ---
 
-Coordinator Chat is the conversation beside your project's board. Discuss an outcome,
-ask it to capture and prepare tasks, or reconcile saved project answers. Task links open
-the same feeds you use for questions and review.
+Coordinator Chat stays beside your board and task feeds. Use it to explore an idea,
+break it into milestones and tasks, or change the plan while workers are building.
+Open a card to discuss that task without losing the conversation.
 
 ## Start planning
 
@@ -30,11 +30,10 @@ message; a running turn keeps its saved choice. Standalone coding-agent settings
 Save to apply your choices; closing the popup cancels unsaved changes.
 
 Access modes come from Codex, including Read only, workspace access and Auto review.
-Existing chats retain read-only access until you change it. Auto review uses Codex's native
+Auto review uses Codex's native
 reviewer; permission requests that need your answer appear in the chat and **Needs you**.
 Answer one of the offered options while the turn is waiting. Stopping or ending the turn
 closes its requests. Tool permission does not approve a worker's code result.
-Default/Plan collaboration modes are separate and are not exposed here.
 
 ## Composer controls
 
@@ -98,6 +97,8 @@ Discuss planning, card changes and result questions here. Task feeds retain work
 questions, answers, testing and exact-result review. Their text inputs are for those specific
 interactions. Selecting a task never launches a worker.
 
+![Task feed and review beside Coordinator Chat](/images/overview.png)
+
 ## Follow and stop
 
 Replies and public tool activity stream in order, with tool activity shown in grey;
@@ -123,13 +124,9 @@ Messages resume the same native Codex session, including its tool history and na
 context management, across turns and service restarts. Each turn gets a fresh scoped
 Flowfield connection. Stopping a turn ends its processes without deleting the saved session.
 
-Chats created before native continuity use a one-time handoff of up to eight recent saved
-exchanges within a bounded context budget. Omissions are marked; old native tool history
-cannot be reconstructed. Later messages resume the new session normally.
-
 If Codex cannot resume a session, Flowfield keeps the chat and reports the failure. Check
 Codex on the service host and send a new message to retry, or choose **Start new session**.
-That choice requires confirmation and uses the same bounded handoff; it does not restore
+That choice requires confirmation and sends a bounded summary of recent exchanges; it does not restore
 native tool history or earlier attachment contents. No failed prompt is replayed automatically.
 Record ongoing work in tasks; keep enduring project decisions in the repository’s existing documents.
 

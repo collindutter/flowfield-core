@@ -94,7 +94,7 @@ async def check_mcp(base: str, task: dict) -> None:
             },
         )
         assert not activity.isError
-        assert activity.structuredContent["items"][0]["body"] == "Include hidden columns."
+        assert activity.structuredContent["items"][0]["id"] == "installed-handoff"
 
 
 def main() -> None:

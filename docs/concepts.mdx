@@ -29,6 +29,8 @@ other tasks in the same project; an incomplete prerequisite blocks execution.
 
 A **milestone** groups related tasks. Dependencies connect tasks, not milestones.
 
+![The board filtered to one milestone beside Coordinator Chat](/images/milestones.png)
+
 ## The task feed
 
 Each task has a feed bringing together its definition and revisions, progress, worker attempts,
@@ -48,8 +50,6 @@ Every task has one to eight outcome stages, including drafts. Your coordinator i
 the initial stages when creating a task and keeps them aligned when its definition changes.
 Manual creation starts with one stage describing the entered outcome. Workers report
 progress against those stages; completing them does not approve code or mark a task Done.
-Existing tasks without a plan receive a single stage from their title during migration;
-existing plans and task history are preserved.
 
 Tasks move through **Backlog**, **Up next**, **In progress**, **In review** and **Done**.
 Up next expresses your execution priorities. Run queue enables eligible starts; an enabled
@@ -79,8 +79,8 @@ selected beside the chat input. Changes apply to subsequent messages and do not 
 your standalone coding agent.
 
 Flowfield uses Local automatically, with the installed host tools and Codex ACP runtime.
-Choose a native mode beside the chat input or in Workers settings; its supported modes
-include its own approval and review behavior. Historical attempts remain inspectable.
+Choose an access mode beside the chat input or in Workers settings; its supported modes
+include its own approval and review behavior.
 
 Tool permission requests from connected harness sessions have durable answers
 and response controls in Coordinator Chat, the task view and **Needs you**. Requests expire or close when
@@ -122,4 +122,3 @@ authoritative files in task definitions instead of copying rules into every task
 During adoption, identify the delivery branch, reproducible setup commands and meaningful
 checks for your project. Preserve its existing workflow. For parallel work, give tests and
 services separate databases, ports and other mutable resources, or serialize that work.
-

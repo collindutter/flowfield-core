@@ -3,36 +3,25 @@ title: Getting Started
 description: Add your project, plan in Coordinator Chat, and review your first task.
 ---
 
-Flowfield is a workspace for you and your coding agents. Plan work, run tasks in parallel,
-and review results in one workspace. Discuss work in [Coordinator Chat](/coordinator) or your coding
-harness; use Flowfield's board and each task's feed to follow progress, questions,
-feedback and results.
+Plan with [Coordinator Chat](/coordinator), let workers handle tasks, and review their
+results beside the conversation. This guide takes an existing project from its first
+conversation to a completed task.
 
 ![Flowfield board with tasks, priorities and work ready for review](/images/board-overview.png)
 
 ## Install and start
 
-Install with [uv](https://docs.astral.sh/uv/getting-started/installation/):
+Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/). Then install Flowfield with [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```sh
 uv tool install --python 3.12 flowfield-core
+flowfield harness install codex
 flowfield serve
 ```
 
-Open [localhost:8765](http://127.0.0.1:8765). Keep the terminal open;
-Ctrl-C stops the service. See [Installation](/installation) for the pip alternative.
-Built-in chat and managed workers need an installed, signed-in Codex CLI and the managed runtime:
-
-```sh
-flowfield harness install codex
-```
-
-Managed workers also need Git.
-
-Choose a project in the sidebar, then use **Board**, **Needs you**, **Milestones**,
-and **Archive** above its work. The sidebar keeps projects in a compact icon rail. On a phone, open the project menu and scroll the
-board horizontally. Use **Coordinator** and **Work** to switch between chat and the board on narrow screens. **Appearance** in the sidebar offers **System**, **Light** and
-**Dark**; Flowfield remembers your choice in this browser.
+Your browser opens at [localhost:8765](http://127.0.0.1:8765). Keep the terminal open;
+Ctrl-C stops the service. Use `--no-open` to keep the browser closed.
+See [Installation](/installation#alternative-pip) for the pip alternative. Managed workers also need Git.
 
 ## Add your project
 
@@ -55,7 +44,11 @@ chooser, use the CLI option.
 ## Start planning
 
 Choose your model, reasoning effort and access mode beside the input in [Coordinator Chat](/coordinator)
-and save. Describe what you want to achieve. Chat is scoped to the selected project.
+and save. Describe what you want to achieve. For example:
+
+> Help me add CSV export to this project. Review the existing code and suggest a small first task before starting implementation.
+
+Chat is scoped to the selected project.
 Flowfield automatically uses the local machine; worker checks and delivery configuration
 can wait until you are ready to run tasks.
 
@@ -63,7 +56,7 @@ Built-in chat supplies its own MCP connection. To plan from a standalone Codex s
 follow [standalone coordinator setup](/integrations/codex#connect-a-standalone-coordinator)
 instead.
 
-## Agree on work
+## Prepare the first task
 
 When you’re ready to run tasks, preview and install project guidance in **Coordinator**
 settings or through the CLI:
@@ -82,14 +75,8 @@ branch, dependency setup, checks and a local run command, then validate the envi
 Choose a worker model and reasoning effort explicitly. These settings are also available
 under the settings icon beside the project name.
 
-Project **Workers** settings supply the defaults. Use the model button in a task's reply area
-(labeled **Worker settings** before loading)
-to choose a different model and effort, or **Use project defaults** to reset it.
-Task replies share the coordinator's attachment and agent settings controls. Files accompany
-requested changes and answers; attachments to testing observations are saved as
-evidence without starting a worker.
-Changes apply to the next attempt, including answer continuations and retries; a running attempt
-keeps its saved settings.
+Project **Workers** settings supply defaults for model, effort and access. Individual
+tasks can override them; changes apply to the next attempt. See [Concepts](/concepts#agent-settings-and-permissions) for the worker environment.
 
 Describe one small change and its success criteria. Ask the coordinator to capture and
 prepare the task in Flowfield. Open its feed to read the agreed definition. The coordinator
@@ -111,7 +98,11 @@ When the task reaches **In review**, read its result and checks. Inspect the dif
 **Try result** to test an independent copy of that exact version. Record testing in the
 feed, request changes, or choose **Approve and integrate** for the selected result.
 
-![A task result with its report, checks and review controls](/images/overview.png)
+![A task feed beside Coordinator Chat, with a result ready for review](/images/overview.png)
+
+Open **Code changes** to inspect the exact candidate before approving it.
+
+![Code review beside the coordinator conversation](/images/code-review.png)
 
 Flowfield delivers approved code to your configured project checkout, then marks the task
 **Done**. Local edits that prevent delivery remain intact and the result explains the next
