@@ -1,4 +1,4 @@
-"""Durable, exactly bound task replies; messages and revision requests have distinct effects."""
+"""Exactly bound task input and retained historical replies."""
 
 from typing import Literal
 from uuid import uuid4
@@ -18,15 +18,19 @@ class ReplyBinding(Record):
     question_revision: int | None = None
 
 
-class ReplyCreate(Record):
+class ReplyFields(Record):
     id: Identifier = Field(default_factory=lambda: uuid4().hex)
     binding: ReplyBinding
     body: str = Field(min_length=1, max_length=8000)
-    action: Literal["message", "changes", "answer", "observation"] = "message"
     author: str = Field(default="human", min_length=1, max_length=200)
 
 
-class Reply(ReplyCreate):
+class ReplyCreate(ReplyFields):
+    action: Literal["changes", "answer", "observation"]
+
+
+class Reply(ReplyFields):
+    action: Literal["message", "changes", "answer", "observation"] = "message"
     project_id: str
     task_id: str
     created_at: str

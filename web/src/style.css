@@ -480,17 +480,38 @@
   .markdown .task-list-item > ol {
     margin-left: 1.4rem;
   }
-  .change-before,
-  .change-after {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.75rem;
+  .text-changes {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.6;
   }
-  .change-before {
-    background: var(--muted);
+  .text-changes del,
+  .text-changes ins {
+    padding: 1px 2px;
+    border-radius: 2px;
+    box-decoration-break: clone;
   }
-  .change-after {
-    background: var(--muted);
+  .text-changes del {
+    background: color-mix(in srgb, var(--destructive) 25%, transparent);
+    text-decoration: line-through;
+  }
+  .text-changes ins {
+    background: color-mix(in srgb, var(--success-foreground) 25%, transparent);
+    text-decoration: underline;
+  }
+  .field-change {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow-wrap: anywhere;
+  }
+  .field-change > :first-child {
+    color: var(--muted-foreground);
+  }
+  .field-change svg {
+    flex-shrink: 0;
+    align-self: center;
   }
 
   .question-meta {
@@ -753,6 +774,17 @@
   .queue-controls .muted {
     font-size: 11px;
   }
+  .entity-pane {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .workspace-project-view[hidden] {
+    display: none;
+  }
   .entity-overlay-body {
     min-height: 0;
     flex: 1;
@@ -765,8 +797,8 @@
     outline: none;
   }
 
-  .entity-overlay .editor,
-  .entity-overlay .question-detail {
+  :is(.entity-overlay, .entity-pane) .editor,
+  :is(.entity-overlay, .entity-pane) .question-detail {
     width: 100%;
     min-width: 0;
     max-width: none;
@@ -775,6 +807,8 @@
     padding: 20px 24px;
   }
   .entity-overlay-title {
+    max-height: 40%;
+    overflow-y: auto;
     flex-shrink: 0;
     background: var(--chrome);
   }
@@ -784,12 +818,12 @@
     padding: 14px 24px;
     border-bottom: 1px solid var(--border);
   }
-  .entity-overlay .card-tabs {
+  :is(.entity-overlay, .entity-pane) .card-tabs {
     margin-bottom: 16px;
   }
   @media (max-width: 700px) {
-    .entity-overlay .editor,
-    .entity-overlay .question-detail {
+    :is(.entity-overlay, .entity-pane) .editor,
+    :is(.entity-overlay, .entity-pane) .question-detail {
       padding: 16px;
     }
     .entity-overlay-title .editor-heading,
@@ -1150,4 +1184,28 @@
   --diff-omit-gutter-line-color: var(--muted-foreground);
   --diff-gutter-selected-background-color: #36516b;
   --diff-code-selected-background-color: #304456;
+}
+
+@layer components {
+  .coordinator-task-context {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    min-width: 0;
+  }
+  .coordinator-task-context > a {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .coordinator-task-context > button {
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .coordinator-task-reference {
+    display: inline-block;
+    font-size: 12px;
+    margin-block: 4px;
+  }
 }

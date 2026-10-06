@@ -42,10 +42,14 @@ test("long definitions collapse with a fade and history loads only when expanded
   });
   await expect(collapse).toHaveAttribute("aria-expanded", "true");
   await expect(preview).toHaveCSS("mask-image", "none");
-  const bottom = await definition
-    .getByText("Paragraph 24:", { exact: false })
-    .boundingBox();
-  expect((await collapse.boundingBox())!.y).toBeGreaterThan(bottom!.y);
+  expect(
+    await definition.evaluate(
+      (node) =>
+        node.querySelector(".definition-toggle")!.getBoundingClientRect().top >=
+        node.querySelector(".definition-preview")!.getBoundingClientRect()
+          .bottom,
+    ),
+  ).toBe(true);
   await collapse.click();
   await expect(expand).toBeVisible();
   await expect(
@@ -75,10 +79,32 @@ test("long definitions collapse with a fade and history loads only when expanded
   const updated = page.locator('[data-message-id="definition:2"]');
   await expect(updated.locator(".markdown")).toHaveCount(0);
   await updated.getByText("View definition changes", { exact: true }).click();
-  await expect(updated.locator(".change-before")).toContainText("Paragraph 24");
-  await expect(updated.locator(".change-after")).toContainText(
-    "A short replacement.",
-  );
+  await expect
+    .poll(() =>
+      updated.locator(".text-changes").evaluateAll((nodes) =>
+        nodes
+          .map((node) => {
+            const copy = node.cloneNode(true) as HTMLElement;
+            copy.querySelectorAll("ins, .sr-only").forEach((el) => el.remove());
+            return copy.textContent;
+          })
+          .join(" "),
+      ),
+    )
+    .toContain("Paragraph 24");
+  await expect
+    .poll(() =>
+      updated.locator(".text-changes").evaluateAll((nodes) =>
+        nodes
+          .map((node) => {
+            const copy = node.cloneNode(true) as HTMLElement;
+            copy.querySelectorAll("del, .sr-only").forEach((el) => el.remove());
+            return copy.textContent;
+          })
+          .join(" "),
+      ),
+    )
+    .toContain("A short replacement.");
 });
 
 test("project workers have no speed setting even when the model supports Fast", async ({
@@ -124,4 +150,57 @@ test("project workers have no speed setting even when the model supports Fast", 
   const form = page.getByRole("region", { name: "Worker settings" });
   await form.getByLabel("Model", { exact: true }).selectOption("test");
   await expect(form.getByRole("button", { name: "Fast mode" })).toHaveCount(0);
+});
+
+test("definition revisions show focused word diffs and compact field values", async ({
+  page,
+  request,
+}, testInfo) => {
+  const project = "definition-diffs";
+  mkdirSync(join(process.env.FLOWFIELD_SMOKE_STATE!, project), {
+    recursive: true,
+  });
+  await request.post("/api/projects/initialize", {
+    data: {
+      path: join(process.env.FLOWFIELD_SMOKE_STATE!, project),
+      task_prefix: "DIF",
+    },
+  });
+  const task = await (
+    await request.post(`/api/projects/${project}/tasks`, {
+      data: {
+        title: "Search café",
+        body: "Keep all rows. Preserve café labels.",
+      },
+    })
+  ).json();
+  await request.put(`/api/projects/${project}/tasks/${task.id}`, {
+    data: {
+      expected_revision: task.revision,
+      body: "Keep selected rows. Preserve café labels.",
+      task_type: "bug",
+    },
+  });
+  await page.goto(`/projects/${project}/tasks/${task.key}`);
+  const revision = page.locator('[data-message-id="definition:2"]');
+  await revision.getByText("View definition changes", { exact: true }).click();
+  await expect(revision.locator("del")).toHaveText("all");
+  await expect(revision.locator("ins")).toHaveText("selected");
+  await expect(revision.locator(".text-changes")).toContainText(
+    "Preserve café labels.",
+  );
+  await expect(revision.locator(".field-change")).toContainText(
+    "Before: Feature",
+  );
+  await expect(revision.locator(".field-change")).toContainText("After: Bug");
+  await page.screenshot({
+    path: testInfo.outputPath("definition-diff.png"),
+    animations: "disabled",
+  });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("html")).toHaveClass("dark");
+  await page.screenshot({
+    path: testInfo.outputPath("definition-diff-dark.png"),
+    animations: "disabled",
+  });
 });

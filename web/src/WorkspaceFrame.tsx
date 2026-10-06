@@ -201,10 +201,12 @@ export function WorkspaceFrame({
   footer,
   onHome,
   onAddProject,
+  workLocation,
 }: {
   projects: WorkspaceProject[];
   activeProjectId: string;
   onProjectSelect: (project: WorkspaceProject) => void;
+  workLocation?: string;
   coordinator?: ReactNode | ((visible: boolean) => ReactNode);
   work: ReactNode;
   footer?: ReactNode;
@@ -217,6 +219,11 @@ export function WorkspaceFrame({
     () => false,
   );
   const [surface, setSurface] = useState("work");
+  const [location, setLocation] = useState(workLocation);
+  if (location !== workLocation) {
+    setLocation(workLocation);
+    setSurface("work");
+  }
   const [sidebarOpen, setSidebarOpen] = useState(
     () =>
       !document.cookie

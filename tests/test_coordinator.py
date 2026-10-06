@@ -1,6 +1,7 @@
 """Durable browser coordination using real ACP subprocesses and scoped MCP, without models."""
 
 import asyncio
+import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
@@ -498,3 +499,111 @@ def test_long_unicode_reply_keeps_latest_exchange_in_bounded_context(tmp_path, m
     assert prompt["history_is_partial"] is True
     assert prompt["human_message"] == "Yes, proceed."
     assert store.get("harbor", previous.id).activity == previous.activity
+
+
+def test_task_focus_is_scoped_revision_bound_and_idempotent(tmp_path, monkeypatch):
+    from flowfield.application import TaskCreate, TaskEdit
+    from flowfield.coordinator_models import CoordinatorTaskSelection
+
+    service, conversation = setup(tmp_path, monkeypatch)
+    ws, store = service.workspace, service.coordinator.store
+    task = ws.create_task("harbor", TaskCreate(title="Focused work", body="Original"))
+    request = CoordinatorSend(
+        id=uuid4().hex,
+        text="Explain this task",
+        task_context=CoordinatorTaskSelection(task_id=task.key, task_revision=task.revision),
+    )
+    turn, fresh = store.reserve("harbor", conversation.id, request)
+    assert fresh and turn.task_context.task_id == task.id
+    assert turn.task_context.title == task.title
+    prompt = json.loads(service.coordinator._prompt(turn, "scoped-tools", resumed=True))
+    assert prompt["selected_task"]["task_id"] == task.id
+    changed = ws.edit_task(
+        "harbor", task.id, TaskEdit(expected_revision=task.revision, title="New title")
+    )
+    assert store.reserve("harbor", conversation.id, request) == (turn, False)
+    assert store.get("harbor", turn.id).task_context.title == "Focused work"
+    with pytest.raises(ApplicationError, match="different content"):
+        store.reserve("harbor", conversation.id, request.model_copy(update={"task_context": None}))
+    with pytest.raises(ApplicationError, match="selected task changed"):
+        store.reserve("harbor", conversation.id, request.model_copy(update={"id": uuid4().hex}))
+    with pytest.raises(ApplicationError):
+        store.reserve(
+            "harbor",
+            conversation.id,
+            CoordinatorSend(
+                id=uuid4().hex,
+                text="Wrong reference",
+                task_context=CoordinatorTaskSelection(task_id="missing-task", task_revision=1),
+            ),
+        )
+    with ws.connection(write=True) as db:
+        turn.status = "completed"
+        store._save(db, turn)
+    with pytest.raises(ApplicationError):
+        store.reserve(
+            "harbor",
+            conversation.id,
+            CoordinatorSend(
+                id=uuid4().hex,
+                text="Wrong result",
+                task_context=CoordinatorTaskSelection(
+                    task_id=task.id, task_revision=changed.revision, result_id="missing"
+                ),
+            ),
+        )
+    plain, _ = store.reserve("harbor", conversation.id, message("Discuss the project"))
+    assert plain.task_context is None
+    prompt = json.loads(service.coordinator._prompt(plain, "scoped-tools"))
+    assert prompt["selected_task"] is None
+    assert json.loads(prompt["recent_conversation"][0]["selected_task"])["task_id"] == task.id
+
+
+def test_selected_result_is_exact_and_must_belong_to_the_task(tmp_path, monkeypatch):
+    from test_execution import result
+
+    from flowfield.application import TaskCreate
+    from flowfield.coordinator_models import CoordinatorTaskSelection
+
+    service, conversation = setup(tmp_path, monkeypatch)
+    result(service.execution, process=False)
+    selected = service.results.page("harbor", "task-0").items[0]
+    task = service.workspace.task("harbor", "task-0")
+    other = service.workspace.create_task("harbor", TaskCreate(title="Other task"))
+    store = service.coordinator.store
+    with pytest.raises(ApplicationError, match="does not belong"):
+        store.reserve(
+            "harbor",
+            conversation.id,
+            CoordinatorSend(
+                id=uuid4().hex,
+                text="Explain",
+                task_context=CoordinatorTaskSelection(
+                    task_id=other.id, task_revision=other.revision, result_id=selected.id
+                ),
+            ),
+        )
+    request = CoordinatorSend(
+        id=uuid4().hex,
+        text="Explain this result",
+        task_context=CoordinatorTaskSelection(
+            task_id=task.id, task_revision=task.revision, result_id=selected.id
+        ),
+    )
+    turn, _ = store.reserve("harbor", conversation.id, request)
+    assert turn.task_context.result_id == selected.id
+    assert service.results.page("harbor", task.id).items[0] == selected
+    assert (
+        json.loads(service.coordinator._prompt(turn, "tools", resumed=True))["selected_task"][
+            "result_id"
+        ]
+        == selected.id
+    )
+    with pytest.raises(ApplicationError, match="different content"):
+        store.reserve(
+            "harbor",
+            conversation.id,
+            request.model_copy(
+                update={"task_context": request.task_context.model_copy(update={"result_id": None})}
+            ),
+        )

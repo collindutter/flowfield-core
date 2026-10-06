@@ -204,6 +204,12 @@ export function TaskConversation({
   const [notice, setNotice] = useState("");
   const [olderBusy, setOlderBusy] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [seenResult, setSeenResult] = useState<string | null>(null);
+  if (gate.data?.result_id && gate.data.result_id !== seenResult) {
+    if (seenResult)
+      setExpanded((values) => ({ ...values, ["result:" + seenResult]: true }));
+    setSeenResult(gate.data.result_id);
+  }
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const [actionHost, setActionHost] = useState<HTMLDivElement | null>(null);
@@ -275,14 +281,14 @@ export function TaskConversation({
     !!currentBinding &&
     JSON.stringify(draft.binding) !== JSON.stringify(currentBinding);
   function updateBody(body: string) {
-    if (!currentBinding) return;
+    if (!currentBinding || !composerAction) return;
     setDrafts((values) => ({
       ...values,
       [key]: {
         ...(values[key] ?? {
           id: crypto.randomUUID(),
           binding: currentBinding,
-          action: gate.data?.question_id ? "answer" : "message",
+          action: composerAction!,
         }),
         body,
       },
@@ -345,13 +351,11 @@ export function TaskConversation({
       });
       setChosen(null);
       setNotice(
-        draft.action === "message"
-          ? "Message saved. The worker will reply when the queue and capacity allow."
-          : draft.action === "answer"
-            ? "Answer sent."
-            : draft.action === "observation"
-              ? "Testing recorded for this result."
-              : "Feedback sent for the selected result.",
+        draft.action === "answer"
+          ? "Answer sent."
+          : draft.action === "observation"
+            ? "Testing recorded for this result."
+            : "Feedback sent for the selected result.",
       );
       setRevision((n) => n + 1);
     } catch (e) {
@@ -484,17 +488,18 @@ export function TaskConversation({
                             <MessageBody message={message} path={path} />
                           )}
                           {message.kind === "result" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                setExpanded((values) => ({
-                                  ...values,
-                                  [message.id]: true,
-                                }))
-                              }
-                            >
-                              Inspect earlier result
+                            <Button size="sm" variant="outline" asChild>
+                              <WorkspaceLink
+                                onClick={() =>
+                                  setExpanded((values) => ({
+                                    ...values,
+                                    [message.id]: true,
+                                  }))
+                                }
+                                to={messageHref(projectId, task, message.id)}
+                              >
+                                Inspect earlier result
+                              </WorkspaceLink>
                             </Button>
                           )}
                         </>
@@ -598,7 +603,7 @@ export function TaskConversation({
                           ? (replyResult.status === "ready"
                               ? "Review "
                               : "Message about ") + replyResult.title
-                          : "Message the worker"}
+                          : "Task response"}
                 </strong>
                 {replyBinding?.question_id && questionText && (
                   <p>{questionText}</p>
@@ -615,11 +620,6 @@ export function TaskConversation({
                   </p>
                 )}
               </div>
-            )}
-            {composerAction === "message" && (
-              <p>
-                Starts a fresh read-only turn with your selected worker model.
-              </p>
             )}
             {composerAction === "observation" && (
               <p>
@@ -646,7 +646,7 @@ export function TaskConversation({
                     ? "Testing observations"
                     : composerAction === "answer"
                       ? "Your answer"
-                      : "Message the worker"
+                      : "Task response"
               }
               disabled={busy || !inputEnabled}
               onBusy={setUploading}
@@ -770,20 +770,6 @@ export function TaskConversation({
               )}
               {!showComposer &&
                 gate.data?.enabled &&
-                gate.data.reason === "idle" && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      currentBinding && beginDraft("message", currentBinding)
-                    }
-                  >
-                    Ask worker
-                  </Button>
-                )}
-              {!showComposer &&
-                gate.data?.enabled &&
                 gate.data.reason === "idle" &&
                 currentBinding?.result_id && (
                   <Button
@@ -823,26 +809,6 @@ export function TaskConversation({
                   !!gate.data?.question_id
                 }
               />
-              {draft?.action === "changes" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={uploading}
-                  onClick={() =>
-                    setDrafts((values) => ({
-                      ...values,
-                      [key]: {
-                        ...draft,
-                        id: crypto.randomUUID(),
-                        action: "message",
-                      },
-                    }))
-                  }
-                >
-                  Ask without requesting changes
-                </Button>
-              )}
               {gate.data?.pending_reply_id && (
                 <Button
                   type="button"

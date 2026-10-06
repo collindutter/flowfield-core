@@ -3,13 +3,13 @@
 import json
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 from flowfield.application import ProjectSetup, TaskCreate, TaskPublish, Workspace
 from flowfield.conversation import Conversation
 from flowfield.execution import Execution
 from flowfield.execution_models import QueueEdit, SettingsEdit, Usage, WorkerResult
-from flowfield.replies import Replies
-from flowfield.reply_models import ReplyBinding, ReplyCreate
+from flowfield.reply_models import Reply, ReplyBinding
 from flowfield.run_activity import ActivityUpdate, RunActivity
 
 ws = Workspace(Path(sys.argv[1]))
@@ -81,20 +81,38 @@ elif sys.argv[2] == "stop-race":
     execution.usage("stream-project", run.id, Usage(total_tokens=400, cached_input_tokens=200))
 elif sys.argv[2] == "discussion":
     gate = Conversation(ws).eligibility("stream-project", "stream")
-    Replies(ws).submit(
-        "stream-project",
-        "stream",
-        ReplyCreate(
-            binding=ReplyBinding.model_validate(
-                gate.model_dump(include=set(ReplyBinding.model_fields))
-            ),
-            body="Why this approach?",
-            action="message",
+    # A retained legacy discussion, seeded as historical state rather than new input.
+    reply = Reply(
+        binding=ReplyBinding.model_validate(
+            gate.model_dump(include=set(ReplyBinding.model_fields))
         ),
+        body="Why this approach?",
+        action="message",
+        project_id="stream-project",
+        task_id="stream",
+        created_at=run.created_at,
+        status="assigned",
     )
-    settings = execution.settings("stream-project")
-    execution.queue("stream-project", QueueEdit(expected_revision=settings.revision, enabled=True))
-    run = execution.claim("stream-project", "a" * 40, {})
+    run = run.model_copy(
+        update={
+            "id": uuid4().hex,
+            "purpose": "discussion",
+            "reply_id": reply.id,
+            "status": "preparing",
+            "revision": 1,
+            "result": None,
+        }
+    )
+    reply.run_id = run.id
+    with ws.connection(write=True) as db:
+        db.execute(
+            "INSERT INTO task_replies VALUES (?,?,?,?,?)",
+            (reply.project_id, reply.task_id, reply.id, reply.created_at, reply.model_dump_json()),
+        )
+        db.execute(
+            "INSERT INTO runs(id,project_id,task_id,status,data,assignment) VALUES (?,?,?,?,?,?)",
+            (run.id, run.project_id, run.task_id, run.status, run.model_dump_json(), "{}"),
+        )
     execution.started("stream-project", run.id)
     settings = execution.settings("stream-project")
     execution.queue("stream-project", QueueEdit(expected_revision=settings.revision, enabled=False))

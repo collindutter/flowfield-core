@@ -20,8 +20,9 @@ Use the actual project branch as destination. Terminal
 success alone does not prove the service has the same environment.
 
 For task input, get_task_input supplies the exact binding for reply_to_task. Managed answers
-continue through the service; do not apply them manually. Read-only messages do not request
-code changes. Follow get_result's next_action for recovery. review_result records explicit
+continue through the service; do not apply them manually. Task replies answer questions or
+record exact-result feedback/testing. Discuss scope and results with the coordinator; do not
+start worker discussions. Follow get_result's next_action for recovery. review_result records explicit
 human approval of the exact candidate or requests changes; inspection is optional. The
 service integrates approved code; verify delivery before claiming Done. Older run/integration
 operations support compatibility and diagnostics, not a second normal approval workflow.

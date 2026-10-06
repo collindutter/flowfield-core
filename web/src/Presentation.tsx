@@ -5,7 +5,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type ReactNode } from "react";
 import { followLink } from "./navigation";
@@ -29,9 +29,10 @@ export function CloseControl({
       type="button"
       className="close-control -me-2"
       aria-label={label}
+      title={label}
       onClick={dismiss}
     >
-      <X />
+      {label === "Back to board" ? <ArrowLeft /> : <X />}
     </Button>
   );
 }

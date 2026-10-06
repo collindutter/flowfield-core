@@ -97,6 +97,10 @@ export function WorkerActions({
         {(error || resource.error) && (
           <p role="alert">{error || resource.error}</p>
         )}
+        {run?.purpose === "discussion" &&
+          ["stopped", "failed"].includes(run.status) && (
+            <p>Continue this discussion with the coordinator.</p>
+          )}
         {run?.status === "stopping" && (
           <p role="status">Stopping worker. Unfinished work is preserved.</p>
         )}
@@ -122,17 +126,19 @@ export function WorkerActions({
               : "Stop worker"}
         </ConfirmButton>
       )}
-      {run && ["stopped", "failed"].includes(run.status) && (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => void act("retry")}
-        >
-          Retry worker
-        </Button>
-      )}
+      {run &&
+        run.purpose !== "discussion" &&
+        ["stopped", "failed"].includes(run.status) && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void act("retry")}
+          >
+            Retry worker
+          </Button>
+        )}
     </>
   );
 }

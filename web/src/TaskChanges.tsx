@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useResource } from "./useResource";
 import { useState } from "react";
 import { Markdown } from "./Markdown";
+import { TextChanges } from "./TextChanges";
+import { ArrowRight } from "lucide-react";
 import {
   label,
   type Milestone,
@@ -53,6 +55,7 @@ export function TaskChanges({
     if (field === "milestone_id")
       return (
         milestones.find((e) => e.id === record.milestone_id)?.title ??
+        record.milestone_id ??
         "No milestone"
       );
     if (field === "dependencies")
@@ -96,14 +99,24 @@ export function TaskChanges({
         (changed.length ? (
           changed.map(([key, name]) => (
             <DetailSection key={key} title={name}>
-              <div className="change-before content-stack" data-space="tight">
-                <strong>Before</strong>
-                <Markdown>{value(before, key) || "Empty"}</Markdown>
-              </div>
-              <div className="change-after content-stack" data-space="tight">
-                <strong>After</strong>
-                <Markdown>{value(after, key) || "Empty"}</Markdown>
-              </div>
+              {key === "body" || key === "title" ? (
+                <TextChanges
+                  before={value(before, key)}
+                  after={value(after, key)}
+                />
+              ) : (
+                <div className="field-change">
+                  <span>
+                    <span className="sr-only">Before: </span>
+                    {value(before, key)}
+                  </span>
+                  <ArrowRight size={14} aria-hidden="true" />
+                  <span>
+                    <span className="sr-only">After: </span>
+                    {value(after, key)}
+                  </span>
+                </div>
+              )}
             </DetailSection>
           ))
         ) : (

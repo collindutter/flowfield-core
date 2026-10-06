@@ -70,8 +70,12 @@ export function TaskDetail({
     }
   }
   return (
-    <section className="editor task-detail" aria-label="Task details">
-      <DetailHeader title={task.key + " · " + task.title} close={close}>
+    <section className="editor task-detail">
+      <DetailHeader
+        title={task.key + " · " + task.title}
+        close={close}
+        closeLabel="Back to board"
+      >
         <div className="task-conversation-header content-stack">
           <div className="entity-labels">
             <TaskTypeBadge type={task.task_type} />

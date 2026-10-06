@@ -23,7 +23,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
-import { EntityOverlay } from "./EntityOverlay";
+import { EntityOverlay, EntityPane } from "./EntityOverlay";
 import { DecisionDetail } from "./Decisions";
 import { DetailHeader } from "./Presentation";
 import { useResource } from "./useResource";
@@ -174,6 +174,7 @@ export function App() {
   return (
     <>
       <WorkspaceFrame
+        workLocation={pathname}
         projects={projects.map((project) => ({
           id: project.id,
           name: project.name,
@@ -218,9 +219,18 @@ export function App() {
                   refresh={`${refresh}:${projectRefresh[projectId] ?? 0}`}
                   drafts={chatDrafts}
                   onSettingsDirty={setChatSettingsDirty}
+                  taskKey={params.taskKey}
+                  selectedResultId={
+                    params.tab === "result" || params.tab === "changes"
+                      ? params.runId
+                      : params.tab === "conversation" &&
+                          params.runId?.startsWith("result:")
+                        ? params.runId.slice(7)
+                        : undefined
+                  }
                   controlsActive={
                     visible &&
-                    !entityPage(pathname) &&
+                    (!entityPage(pathname) || !!params.taskKey) &&
                     !params.overlayQuestionId
                   }
                 />
@@ -622,6 +632,7 @@ function ProjectBoard({
       </header>
       <Tabs
         className="workspace-project-view"
+        hidden={!!taskRef}
         activationMode="manual"
         value={view}
         onValueChange={(value) =>
@@ -968,39 +979,45 @@ function ProjectBoard({
           )}
         </TabsContent>
       </Tabs>
-      {selection && (
-        <EntityOverlay
-          identity={`${selection.kind}:${selection.id ?? "new"}`}
-          title={
-            selection.kind === "task"
-              ? selection.id
-                ? "Task details"
-                : "New task"
-              : selection.kind === "milestone"
+      {selection?.kind === "task" && selection.id ? (
+        <EntityPane identity={selection.id} close={() => choose(null)}>
+          {editorPanel}
+        </EntityPane>
+      ) : (
+        selection && (
+          <EntityOverlay
+            identity={`${selection.kind}:${selection.id ?? "new"}`}
+            title={
+              selection.kind === "task"
                 ? selection.id
-                  ? "Milestone details"
-                  : "New milestone"
-                : "Project details"
-          }
-          wide={selection.kind === "task"}
-          suspended={!!params.overlayQuestionId}
-          close={() => choose(null)}
-        >
-          {selection.kind === "milestone" ? (
-            incoming ? (
-              <MilestoneDetail
-                milestone={incoming as Milestone}
-                close={() => choose(null)}
-              >
-                {editorPanel}
-              </MilestoneDetail>
+                  ? "Task details"
+                  : "New task"
+                : selection.kind === "milestone"
+                  ? selection.id
+                    ? "Milestone details"
+                    : "New milestone"
+                  : "Project details"
+            }
+            wide={selection.kind === "task"}
+            suspended={!!params.overlayQuestionId}
+            close={() => choose(null)}
+          >
+            {selection.kind === "milestone" ? (
+              incoming ? (
+                <MilestoneDetail
+                  milestone={incoming as Milestone}
+                  close={() => choose(null)}
+                >
+                  {editorPanel}
+                </MilestoneDetail>
+              ) : (
+                editorPanel
+              )
             ) : (
               editorPanel
-            )
-          ) : (
-            editorPanel
-          )}
-        </EntityOverlay>
+            )}
+          </EntityOverlay>
+        )
       )}
       {params.decisionId && (
         <EntityOverlay

@@ -2407,9 +2407,33 @@ export interface components {
       id: string;
       /** Text */
       text: string;
+      task_context?: components["schemas"]["CoordinatorTaskSelection"] | null;
+    };
+    /** CoordinatorTaskContext */
+    CoordinatorTaskContext: {
+      /** Task Id */
+      task_id: string;
+      /** Task Revision */
+      task_revision: number;
+      /** Result Id */
+      result_id: string | null;
+      /** Key */
+      key: string;
+      /** Title */
+      title: string;
+    };
+    /** CoordinatorTaskSelection */
+    CoordinatorTaskSelection: {
+      /** Task Id */
+      task_id: string;
+      /** Task Revision */
+      task_revision: number;
+      /** Result Id */
+      result_id?: string | null;
     };
     /** CoordinatorTurn */
     CoordinatorTurn: {
+      task_context: components["schemas"]["CoordinatorTaskContext"] | null;
       /** Id */
       id: string;
       /**
@@ -3527,16 +3551,16 @@ export interface components {
       /** Body */
       body: string;
       /**
+       * Author
+       * @default human
+       */
+      author: string;
+      /**
        * Action
        * @default message
        * @enum {string}
        */
       action: "message" | "changes" | "answer" | "observation";
-      /**
-       * Author
-       * @default human
-       */
-      author: string;
       /** Project Id */
       project_id: string;
       /** Task Id */
@@ -3590,16 +3614,15 @@ export interface components {
       /** Body */
       body: string;
       /**
-       * Action
-       * @default message
-       * @enum {string}
-       */
-      action: "message" | "changes" | "answer" | "observation";
-      /**
        * Author
        * @default human
        */
       author: string;
+      /**
+       * Action
+       * @enum {string}
+       */
+      action: "changes" | "answer" | "observation";
     };
     /** ResultAction */
     ResultAction: {

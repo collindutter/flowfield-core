@@ -183,7 +183,6 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
   }
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Ask worker", exact: true }).click();
   await page.getByRole("button", { name: "first · low", exact: true }).click();
   await expect(picker.getByLabel("Model", { exact: true })).toHaveValue(
     "first",

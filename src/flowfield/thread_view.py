@@ -124,6 +124,8 @@ class ThreadView(Conversation):
                 "observation": "Human testing",
             }.get(data["action"], "Message")
             body = data["body"]
+            if data["action"] == "message" and data.get("status") == "cancelled":
+                title = "Message · cancelled"
             if data["action"] == "observation":
                 version = db.execute(
                     "SELECT version FROM result_versions WHERE project_id=? AND id=?",

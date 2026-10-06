@@ -789,6 +789,7 @@ test("long project chat preserves loaded history while live pages advance", asyn
   const historyPath = "/api/projects/long-chat-project/coordinator";
   let count = 40;
   const turn = (number: number): Turn => ({
+    task_context: null,
     id: `history-message-${number}`,
     number,
     project_id: "long-chat-project",
@@ -883,4 +884,173 @@ test("long project chat preserves loaded history while live pages advance", asyn
   await expect(
     page.getByText("Planning exchange 60", { exact: true }),
   ).toBeAttached();
+});
+
+test("task focus preserves one coordinator, records context at send and restores the board", async ({
+  page,
+  request,
+}, testInfo) => {
+  const project = "focused-chat";
+  mkdirSync(join(state, project), { recursive: true });
+  await request.post("/api/projects/initialize", {
+    data: { path: join(state, project), task_prefix: "FOC" },
+  });
+  const tasks: { id: string; key: string; revision: number }[] = [];
+  for (const title of ["Define the search", "Review the index"]) {
+    tasks.push(
+      await (
+        await request.post(`/api/projects/${project}/tasks`, {
+          data: { title, body: "Keep the interaction simple." },
+        })
+      ).json(),
+    );
+  }
+  const choice = {
+    harness: "codex",
+    model: "test-model",
+    effort: "low",
+    mode: "read-only",
+    fast: false,
+  };
+  await page.route("**/api/worker-models*", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "test-model",
+          name: "Test",
+          efforts: ["low"],
+          modes: [{ id: "read-only", name: "Read only" }],
+        },
+      ],
+    }),
+  );
+  await page.route(`**/api/projects/${project}/coordinator-settings`, (route) =>
+    route.fulfill({
+      json: {
+        revision: 1,
+        selection: choice,
+        effective: {
+          choice,
+          source: "project",
+          default_revision: 1,
+          override_revision: null,
+        },
+      },
+    }),
+  );
+  const turns: unknown[] = [];
+  const attempts: unknown[] = [];
+  const messages: {
+    task_context: { task_id: string; task_revision: number } | null;
+  }[] = [];
+  await page.route(`**/api/projects/${project}/coordinator{,?*}`, (route) =>
+    route.fulfill({
+      json: { items: turns, active: null, next_before: null, context: null },
+    }),
+  );
+  await page.route(
+    `**/api/projects/${project}/coordinator/messages`,
+    (route) => {
+      const message = route.request().postDataJSON();
+      attempts.push(message);
+      if (attempts.length === 1) return route.abort("failed");
+      messages.push(message);
+      turns.push({
+        ...message,
+        task_context: message.task_context
+          ? {
+              ...message.task_context,
+              key: tasks.find((t) => t.id === message.task_context.task_id)!
+                .key,
+              title: "Captured task",
+            }
+          : null,
+        number: turns.length + 1,
+        created_at: new Date().toISOString(),
+        status: "completed",
+        activity: { items: [], omitted: false },
+      });
+      return route.fulfill({ json: turns.at(-1) });
+    },
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/projects/${project}`);
+  const input = page.getByLabel("Message coordinator", { exact: true });
+  await input.fill("Explain this scope");
+  await page.getByRole("link", { name: /FOC-1.*Define the search/ }).click();
+  const detail = page.getByRole("region", {
+    name: "Task details",
+    exact: true,
+  });
+  await expect(detail).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Task details" })).toHaveCount(
+    0,
+  );
+  await expect(input).toHaveValue("Explain this scope");
+  await expect(
+    page.getByRole("group", { name: "Message task context" }),
+  ).toContainText("FOC-1");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await request.put(`/api/projects/${project}/tasks/${tasks[0].id}`, {
+    data: {
+      expected_revision: tasks[0].revision,
+      body: "Updated scope after the uncertain response.",
+    },
+  });
+  await expect(detail).toContainText(
+    "Updated scope after the uncertain response.",
+  );
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect.poll(() => messages.length).toBe(1);
+  expect(attempts[0]).toEqual(attempts[1]);
+  expect(messages[0].task_context).toMatchObject({
+    task_id: tasks[0].id,
+    task_revision: tasks[0].revision,
+  });
+  await expect(
+    page.getByRole("region", { name: "Coordinator conversation" }),
+  ).toContainText("FOC-1");
+  await page.screenshot({
+    path: testInfo.outputPath("task-beside-coordinator.png"),
+  });
+  await detail.getByRole("button", { name: "Back to board" }).click();
+  await page.getByRole("link", { name: /FOC-2.*Review the index/ }).click();
+  await expect(
+    page.getByRole("group", { name: "Message task context" }),
+  ).toContainText("FOC-2");
+  await expect(
+    page.getByRole("region", { name: "Coordinator conversation" }),
+  ).toContainText("FOC-1");
+  await page.getByRole("button", { name: "Remove task context" }).click();
+  await input.fill("Discuss the whole project");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect.poll(() => messages.length).toBe(2);
+  expect(messages[1].task_context).toBeNull();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(detail).toBeVisible();
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(input).toBeVisible();
+  await page
+    .getByRole("region", { name: "Coordinator conversation" })
+    .getByRole("link", { name: "FOC-1", exact: true })
+    .click();
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText("Define the search");
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(
+    page.getByRole("group", { name: "Message task context" }),
+  ).toContainText("FOC-1");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await expect(
+    page.getByRole("tab", { name: "Coordinator", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await page.screenshot({
+    path: testInfo.outputPath("task-context-mobile.png"),
+    animations: "disabled",
+  });
 });

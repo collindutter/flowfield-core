@@ -241,20 +241,9 @@ class Execution:
             ):
                 return None
             project = self.workspace._project(db, project_id)
-            from flowfield.replies import Replies
-
-            discussion = Replies(self.workspace).claim(db, project_id, settings, baseline)
-            if discussion:
-                return discussion
             waiting_for_code = []
             exhausted_corrections = []
             for task in self.workspace._tasks(db, project_id, False):
-                if db.execute(
-                    "SELECT 1 FROM task_replies WHERE project_id=? AND task_id=? "
-                    "AND json_extract(data,'$.status')='pending'",
-                    (project_id, task.id),
-                ).fetchone():
-                    continue
                 previous = db.execute(
                     "SELECT data FROM work_runs WHERE project_id=? AND task_id=? "
                     "ORDER BY number DESC LIMIT 1",
@@ -825,33 +814,9 @@ class Execution:
                 )
             task = self.workspace._task(db, project_id, run.task_id)
             if run.purpose == "discussion":
-                from flowfield.conversation import Conversation
-                from flowfield.reply_models import Reply
-
-                reply = Reply.model_validate_json(
-                    db.execute(
-                        "SELECT data FROM task_replies WHERE id=?", (run.reply_id,)
-                    ).fetchone()[0]
+                raise ApplicationError(
+                    "discussion_retired", "Continue this discussion with the coordinator.", 409
                 )
-                if reply.run_id != run.id or task.archived:
-                    raise ApplicationError(
-                        "run_changed", "Only the latest reply can be retried.", 409
-                    )
-                gate = Conversation(self.workspace)._eligibility(db, project_id, task.id)
-                if not gate.enabled or any(
-                    getattr(gate, name) != value
-                    for name, value in reply.binding.model_dump().items()
-                ):
-                    raise ApplicationError(
-                        "reply_stale",
-                        "This reply cannot resume now. Read the task and send new input.",
-                        409,
-                    )
-                reply.status, reply.run_id = "pending", None
-                db.execute(
-                    "UPDATE task_replies SET data=? WHERE id=?", (reply.model_dump_json(), reply.id)
-                )
-                return run
             if run.correction and self._correction_count(db, project_id, run.task_id) >= 2:
                 raise ApplicationError(
                     "correction_limit",

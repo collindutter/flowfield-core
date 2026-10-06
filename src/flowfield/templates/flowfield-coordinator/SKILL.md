@@ -97,12 +97,11 @@ Repository instructions govern development conventions and permission to commit/
 ## Input, results and recovery
 
 - `get_task_input` supplies exact bindings for `reply_to_task`. Answer an expected question,
-  ask a read-only worker question with message, or request selected-result changes. Messages
-  start fresh managed read-only turns using the selected worker model; they do not reopen
-  Done or replace candidates. Prefer a focused question to an implicit broad review.
-  Do not steer during processing. `answer_editable`
+  request selected-result changes, or record human testing. Discuss scope and explain
+  results here in the coordinator conversation; do not start separate worker discussions.
+  Read the selected exact result before explaining it. Do not steer a worker during processing. `answer_editable`
   means input is already saved, not that another answer is needed. Reuse the reply ID after
-  uncertain responses; never silently retarget drafts. Cancel only unassigned messages.
+  uncertain responses; never silently retarget drafts.
 - Managed questions stop an attempt and preserve unfinished code. A saved answer continues
   through the service in a fresh attempt when ownership, queue, scope and capacity permit.
   Do not apply it manually or routinely retry after answering. Receipt/reservation does not
@@ -110,7 +109,7 @@ Repository instructions govern development conventions and permission to commit/
   input and creates coordinator reconciliation. Project-wide questions also need your judgment.
 - Read the current result and its `next_action`; distinguish worker claims from observed
   checks. Human testing feedback belongs to the exact result and can resolve test limitations;
-  it is neither observed checks nor approval. Read-only questions are fresh managed turns.
+  it is neither observed checks nor approval.
   Use `reply_to_task` with action `observation` to record what the human tried and observed
   against the current exact result without requesting changes or starting a worker. Read
   those observations in the task conversation on resume; they do not test successor code.

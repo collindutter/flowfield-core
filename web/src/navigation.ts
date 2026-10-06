@@ -91,11 +91,19 @@ export function entityNavigationState(
   const current = withoutQuestionOverlay(pathname);
   const sameEditor =
     entityPage(current) && editorIdentity(current) === editorIdentity(target);
+  const sameProject = current.split("/")[2] === target.split("/")[2];
+  const betweenTasks =
+    sameProject &&
+    /^\/projects\/[^/]+\/tasks\/[^/]+/.test(current) &&
+    /^\/projects\/[^/]+\/tasks\/[^/]+/.test(target);
   const index = window.history.state?.idx;
   return {
-    backgroundPath: state?.backgroundPath ?? collectionPath(current),
-    returnTo:
-      replace || sameEditor || current.endsWith("/new")
+    backgroundPath: sameProject
+      ? (state?.backgroundPath ?? collectionPath(current))
+      : collectionPath(target),
+    returnTo: !sameProject
+      ? undefined
+      : replace || sameEditor || betweenTasks || current.endsWith("/new")
         ? state?.returnTo
         : typeof index === "number"
           ? { path: pathname, index }

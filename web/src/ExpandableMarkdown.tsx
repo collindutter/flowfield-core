@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Markdown } from "./Markdown";
 
 /** Bound the rendered preview, so wrapped paragraphs count as lines too. */
@@ -54,11 +54,9 @@ export function ExpandableMarkdown({
         <Markdown>{children}</Markdown>
       </div>
       {preview.long && (
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
-          className="definition-toggle"
+          className="disclosure-control definition-toggle"
           aria-expanded={expanded}
           aria-controls={id}
           onClick={() => {
@@ -69,8 +67,13 @@ export function ExpandableMarkdown({
               );
           }}
         >
+          {expanded ? (
+            <ChevronUp aria-hidden="true" />
+          ) : (
+            <ChevronDown aria-hidden="true" />
+          )}
           {expanded ? "Collapse definition" : "Expand definition"}
-        </Button>
+        </button>
       )}
     </div>
   );

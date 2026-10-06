@@ -98,19 +98,14 @@ def test_schema31_upgrade_preserves_worker_settings_and_run(tmp_path, monkeypatc
         assert db.execute("SELECT count(*) FROM agent_permissions").fetchone()[0] == 0
 
 
-def test_discussion_uses_override_and_retry_resolves_again(tmp_path):
-    from test_replies import message
-
+def test_worker_retry_resolves_override_again(tmp_path):
     from flowfield.execution_models import RunAction
-    from flowfield.replies import Replies
 
     execution = fixture(tmp_path)
     settings = AgentSettings(execution.workspace)
     settings.edit("harbor", "worker", edit(), "task-0")
-    replies = Replies(execution.workspace)
-    replies.submit("harbor", "task-0", message(execution.workspace))
     run = execution.claim("harbor", BASE, {})
-    assert run.purpose == "discussion" and run.model == "other"
+    assert run.purpose == "work" and run.model == "other"
     execution.finish("harbor", run.id, "stopped")
     stopped = execution.get("harbor", run.id)
     settings.edit("harbor", "worker", edit(2, "retry-model"), "task-0")

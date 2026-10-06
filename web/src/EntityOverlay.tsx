@@ -124,3 +124,58 @@ export function EntityOverlay({
     </OverlayClose.Provider>
   );
 }
+
+// Inline details share the same heading, scroll and footer owners as modal editors.
+export function EntityPane({
+  children,
+  close,
+  identity,
+}: {
+  children: ReactNode;
+  close: () => void;
+  identity: string;
+}) {
+  const [title, setTitle] = useState<HTMLDivElement | null>(null);
+  const [body, setBody] = useState<HTMLDivElement | null>(null);
+  const [footer, setFooter] = useState<HTMLDivElement | null>(null);
+  const opener = useRef(document.activeElement as HTMLElement | null);
+  useLayoutEffect(() => {
+    body?.scrollTo({ top: 0 });
+    body?.focus({ preventScroll: true });
+  }, [identity, body]);
+  useLayoutEffect(
+    () => () => {
+      requestAnimationFrame(() => {
+        if (opener.current?.isConnected)
+          opener.current.focus({ preventScroll: true });
+      });
+    },
+    [],
+  );
+  return (
+    <OverlayClose.Provider value={close}>
+      <OverlayTitleHost.Provider value={title}>
+        <OverlayBody.Provider value={body}>
+          <OverlayFooterHost.Provider value={footer}>
+            <section
+              className="entity-pane"
+              aria-label="Task details"
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && !event.defaultPrevented) {
+                  event.preventDefault();
+                  close();
+                }
+              }}
+            >
+              <div className="entity-overlay-title" ref={setTitle} />
+              <div className="entity-overlay-body" ref={setBody} tabIndex={-1}>
+                {children}
+              </div>
+              <div className="entity-overlay-footer" ref={setFooter} />
+            </section>
+          </OverlayFooterHost.Provider>
+        </OverlayBody.Provider>
+      </OverlayTitleHost.Provider>
+    </OverlayClose.Provider>
+  );
+}

@@ -450,31 +450,6 @@ def test_recovery_never_signals_a_saved_local_pid(tmp_path, monkeypatch):
     assert stopped.status == "uncertain"
 
 
-def test_discussion_uses_read_only_native_mode_and_keeps_current_result(tmp_path, monkeypatch):
-    from test_replies import message
-
-    from flowfield.replies import Replies
-
-    service, repo, _ = configured(tmp_path, monkeypatch)
-    base = baseline(repo)
-    run = service.execution.claim("harbor", base, {base: set()})
-    asyncio.run(service._execute(run, repo))
-    service.results.process("harbor")
-    selected = service.results.page("harbor", run.task_id).items[0]
-    Replies(service.workspace).submit(
-        "harbor", run.task_id, message(service.workspace, run.task_id)
-    )
-    reply = service.execution.claim("harbor", base, {})
-    assert reply.purpose == "discussion"
-    monkeypatch.setenv("FLOWFIELD_TEST_SCENARIO", "discussion")
-    asyncio.run(service._execute(reply, repo))
-    current = service.execution.get("harbor", reply.id)
-    assert current.status == "accepted", current.problem
-    assert current.applied_agent.mode == "read-only"
-    assert current.agent_settings.choice.mode == "workspace-write"
-    assert service.results.page("harbor", run.task_id).items[0] == selected
-
-
 def test_stop_during_local_setup_stops_owned_command_before_freeing_slot(tmp_path, monkeypatch):
     service, repo, settings = configured(tmp_path, monkeypatch)
     service.integrations.configure(

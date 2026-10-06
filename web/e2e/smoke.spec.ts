@@ -113,7 +113,9 @@ function cli(args: string[], cwd?: string) {
 async function closeOverlay(page: Page) {
   for (let depth = 0; depth < 6; depth++) {
     const dialog = page
-      .locator("[data-slot=dialog-content][data-state=open]:not(.suspended)")
+      .locator(
+        "[data-slot=dialog-content][data-state=open]:not(.suspended), .entity-pane",
+      )
       .last();
     if (!(await dialog.count())) return;
     const url = page.url();
@@ -131,16 +133,6 @@ async function closeOverlay(page: Page) {
   await expect(
     page.locator("[data-slot=dialog-content][data-state=open]"),
   ).toHaveCount(0);
-}
-
-async function askWorker(page: Page) {
-  const trigger = page.getByRole("button", { name: "Ask worker", exact: true });
-  const input = page.getByRole("textbox", {
-    name: "Message the worker",
-    exact: true,
-  });
-  await expect(trigger.or(input).first()).toBeVisible();
-  if (await trigger.isVisible()) await trigger.click();
 }
 
 async function ensureEditing(page: Page) {
@@ -330,13 +322,15 @@ test("three-task board across CLI, browser and MCP, with archive and mobile read
   await page.getByRole("link", { name: /Fix total rounding/ }).click();
   await expect(
     page
-      .getByRole("dialog")
+      .getByRole("region", { name: "Task details", exact: true })
       .getByRole("button", { name: "Archive", exact: true }),
   ).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Move task", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Close editor" }).click();
+  await page
+    .getByRole("button", { name: /^(Close editor|Back to board)$/ })
+    .click();
   await page
     .locator(".card-shell")
     .filter({ hasText: "Add download button" })
@@ -356,7 +350,7 @@ test("three-task board across CLI, browser and MCP, with archive and mobile read
   ).toContainText("Add download button");
   await page.getByRole("link", { name: /Add download button/ }).click();
   await page
-    .getByRole("dialog")
+    .getByRole("region", { name: "Task details", exact: true })
     .getByRole("button", { name: "Archive", exact: true })
     .click();
   const archiveConfirmation = page.getByRole("alertdialog");
@@ -406,7 +400,9 @@ test("three-task board across CLI, browser and MCP, with archive and mobile read
     .getByRole("textbox", { name: "Description", exact: true })
     .fill("Export filtered expenses without losing row order.");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
-  await page.getByRole("button", { name: "Close editor" }).click();
+  await page
+    .getByRole("button", { name: /^(Close editor|Back to board)$/ })
+    .click();
   await closeOverlay(page);
   await page.getByRole("tab", { name: /^Board / }).click();
   await page.getByLabel("Filter by milestone").selectOption("");
@@ -467,7 +463,12 @@ test("coordinator updates refresh the agreement while project editing retains co
   await expect(
     page.getByRole("textbox", { name: "Description", exact: true }),
   ).toHaveValue("Unsaved focus");
-  await page.getByRole("button", { name: "Close editor", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    })
+    .click();
   await page
     .getByRole("button", { name: "Discard changes", exact: true })
     .click();
@@ -540,7 +541,6 @@ test("CLI adoption updates the browser, task creation and initial connection rec
   await expect(
     page.getByRole("link", {
       name: /Investigate large exports/,
-      includeHidden: true,
     }),
   ).toBeVisible();
 });
@@ -561,9 +561,8 @@ test("priority races preserve agent progress and message drafts; touch can prior
   });
   await page.goto("/projects/race");
   await page.getByRole("link", { name: /Race task/ }).click();
-  await askWorker(page);
   await page
-    .getByLabel("Message the worker", { exact: true })
+    .getByLabel("Message coordinator", { exact: true })
     .fill("Keep this unsaved requirement");
   const priorityPage = await page.context().newPage();
   await priorityPage.goto("/projects/race");
@@ -607,7 +606,7 @@ test("priority races preserve agent progress and message drafts; touch can prior
     }),
   ).toContainText("Race task");
   await expect(
-    page.getByLabel("Message the worker", { exact: true }),
+    page.getByLabel("Message coordinator", { exact: true }),
   ).toHaveValue("Keep this unsaved requirement");
   await priorityPage.unrouteAll({ behavior: "wait" });
   await priorityPage.close();
@@ -657,9 +656,8 @@ test("Conversation permalinks preserve message drafts while coordinator revision
   await expect(
     page.getByRole("tab", { name: "Task", exact: true }),
   ).toHaveCount(0);
-  await askWorker(page);
   await page
-    .getByLabel("Message the worker", { exact: true })
+    .getByLabel("Message coordinator", { exact: true })
     .fill("Unsaved draft");
   const history = page.getByRole("list", { name: "Task feed" });
   await history
@@ -677,15 +675,19 @@ test("Conversation permalinks preserve message drafts while coordinator revision
   await history
     .locator('[data-message-id="definition:2"] .task-changes summary')
     .click();
-  await expect(
-    history
-      .locator(".change-after")
-      .getByText("New saved context", { exact: true }),
-  ).toBeVisible();
+  await expect
+    .poll(() =>
+      history.locator(".text-changes").evaluate((node) => {
+        const copy = node.cloneNode(true) as HTMLElement;
+        copy.querySelectorAll("del, .sr-only").forEach((el) => el.remove());
+        return copy.textContent;
+      }),
+    )
+    .toBe("New saved context");
   expect(revisionReads).toHaveLength(2);
   await expect(history).not.toContainText("Unsaved draft");
   await expect(
-    page.getByLabel("Message the worker", { exact: true }),
+    page.getByLabel("Message coordinator", { exact: true }),
   ).toHaveValue("Unsaved draft");
   await expect(page.locator(".task-definition")).toContainText(
     "New saved context",
@@ -694,8 +696,8 @@ test("Conversation permalinks preserve message drafts while coordinator revision
     page.getByRole("button", { name: "Load latest", exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByText("The context changed.", { exact: false }),
-  ).toBeVisible();
+    page.getByRole("group", { name: "Message task context" }),
+  ).toContainText("TAB-1");
 });
 
 test("archive preserves dated records and supports restore and mobile archiving", async ({
@@ -769,12 +771,12 @@ test("archive preserves dated records and supports restore and mobile archiving"
   await expect(archive.getByRole("listitem")).toHaveCount(1);
   await page.getByLabel("Filter by milestone").selectOption("");
   await archive.getByRole("link", { name: /older task/ }).click();
-  const info = page.getByRole("dialog", { name: "Task details", exact: true });
+  const info = page.getByRole("region", { name: "Task details", exact: true });
   await expect(
     info.getByRole("heading", { name: /Up next|Archived/ }),
   ).toHaveCount(0);
   await expect(info.getByText(/Previously|Your agent/)).toHaveCount(0);
-  const actions = page.getByRole("dialog", {
+  const actions = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -852,7 +854,7 @@ test("coordinator dependencies update blockers, links and reconciliation without
       dependencies: [one.id, three.id],
     },
   });
-  const detail = page.getByRole("dialog", {
+  const detail = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -887,7 +889,12 @@ test("coordinator dependencies update blockers, links and reconciliation without
   await expect(
     detail.getByText("Waiting on DEP-3", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Close editor", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    })
+    .click();
   const card = page.locator(".task-card").filter({ hasText: "Download CSV" });
   await expect(
     card.getByText("Waiting on DEP-3", { exact: true }),
@@ -964,39 +971,38 @@ test("task keys link to persistent selections with native tabs, history and draf
   ).toHaveCount(0);
   await blocker.click();
   await expect(page).toHaveURL(/tasks\/NAV-1$/);
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
   await expect(
-    page.getByRole("dialog").getByRole("heading", { name: /NAV-1/ }),
+    page
+      .getByRole("region", { name: "Task details", exact: true })
+      .getByRole("heading", { name: /NAV-1/ }),
   ).toContainText("NAV-1");
   await page.reload();
   await expect(
     page
-      .getByRole("dialog")
+      .getByRole("region", { name: "Task details", exact: true })
       .getByRole("heading", { name: / Prepare the export$/ }),
   ).toBeVisible();
-  await askWorker(page);
-  await editor
-    .getByLabel("Message the worker", { exact: true })
+  await page
+    .getByLabel("Message coordinator", { exact: true })
     .fill("Unsaved title");
   await page.goBack();
-  await page.getByRole("button", { name: "Keep editing", exact: true }).click();
+  await expect(page).toHaveURL(/projects\/navigation$/);
+  await page.goForward();
   await expect(page).toHaveURL(/tasks\/NAV-1$/);
   await expect(
-    editor.getByLabel("Message the worker", { exact: true }),
+    page.getByLabel("Message coordinator", { exact: true }),
   ).toHaveValue("Unsaved title");
   await page.goBack();
-  await page
-    .getByRole("button", { name: "Discard changes", exact: true })
-    .click();
   await expect(page).toHaveURL(/projects\/navigation$/);
   await expect(editor).toHaveCount(0);
   await page.goForward();
   await expect(
     page
-      .getByRole("dialog")
+      .getByRole("region", { name: "Task details", exact: true })
       .getByRole("heading", { name: / Prepare the export$/ }),
   ).toBeVisible();
   await closeOverlay(page);
@@ -1028,7 +1034,7 @@ test("task keys link to persistent selections with native tabs, history and draf
   await expect(page).toHaveURL(/tasks\/NAV-2(?:\/dependencies)?$/);
   await expect(
     page
-      .getByRole("dialog")
+      .getByRole("region", { name: "Task details", exact: true })
       .getByRole("heading", { name: / Download the export$/ }),
   ).toBeVisible();
   await closeOverlay(page);
@@ -1045,7 +1051,7 @@ test("task keys link to persistent selections with native tabs, history and draf
     .click();
   await expect(
     page
-      .getByRole("dialog")
+      .getByRole("region", { name: "Task details", exact: true })
       .getByRole("heading", { name: / Download the export$/ }),
   ).toBeVisible();
   const renamed = await call("edit_task", {
@@ -1069,10 +1075,10 @@ test("task keys link to persistent selections with native tabs, history and draf
   await expect(page).toHaveURL(/tasks\/NAV-3$/);
   await expect(
     page.getByRole("region", { name: "Archived tasks", includeHidden: true }),
-  ).toBeVisible();
+  ).toBeHidden();
   await expect(
     page
-      .getByRole("dialog")
+      .getByRole("region", { name: "Task details", exact: true })
       .getByRole("heading", { name: / Earlier experiment$/ }),
   ).toBeVisible();
   await page.reload();
@@ -1127,7 +1133,12 @@ test("three-letter prefix setup, coordinator dependencies and immediate accessib
   });
   expect(one.key).toBe("UIT-1");
   await expect(page.getByLabel("Prefix", { exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Close editor", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    })
+    .click();
   const card = page.getByRole("link", {
     name: /UIT-1 (?:Feature (?:DRAFT )?)?Build a reliable/,
   });
@@ -1138,7 +1149,7 @@ test("three-letter prefix setup, coordinator dependencies and immediate accessib
   await card.focus();
   await expect(tooltip).toHaveCount(0);
   await card.click();
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -1227,7 +1238,7 @@ test("task activity, Markdown and independently retrievable decisions preserve t
     },
   });
   await page.goto("/projects/activity-trial/tasks/ACT-1");
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -1358,7 +1369,7 @@ test("readable conversation preserves message drafts, revision links and legacy 
     },
   });
   await page.goto("/projects/readable/tasks/REA-1");
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -1374,18 +1385,16 @@ test("readable conversation preserves message drafts, revision links and legacy 
     page.locator(".task-definition").getByRole("checkbox"),
   ).toBeDisabled();
   await expect(editor.getByRole("textbox")).toHaveCount(0);
-  await askWorker(page);
-  await expect(editor.getByRole("textbox")).toHaveCount(1);
-  await askWorker(page);
-  await editor
-    .getByLabel("Message the worker", { exact: true })
+  await expect(editor.getByRole("textbox")).toHaveCount(0);
+  await page
+    .getByLabel("Message coordinator", { exact: true })
     .fill("Export **selected columns**.");
   await thread
     .getByRole("link", { name: "Permalink: Task defined", exact: true })
     .click();
   await page.goBack();
   await expect(
-    editor.getByLabel("Message the worker", { exact: true }),
+    page.getByLabel("Message coordinator", { exact: true }),
   ).toHaveValue("Export **selected columns**.");
   const current = await (
     await request.get("/api/projects/readable/tasks/REA-1")
@@ -1406,10 +1415,32 @@ test("readable conversation preserves message drafts, revision links and legacy 
   await thread
     .locator('[data-message-id="definition:2"] .task-changes summary')
     .click();
-  await expect(thread.locator(".change-before")).toContainText("all columns");
-  await expect(thread.locator(".change-after")).toContainText(
-    "selected columns",
-  );
+  await expect
+    .poll(() =>
+      thread.locator(".text-changes").evaluateAll((nodes) =>
+        nodes
+          .map((node) => {
+            const copy = node.cloneNode(true) as HTMLElement;
+            copy.querySelectorAll("ins, .sr-only").forEach((el) => el.remove());
+            return copy.textContent;
+          })
+          .join(" "),
+      ),
+    )
+    .toContain("all columns");
+  await expect
+    .poll(() =>
+      thread.locator(".text-changes").evaluateAll((nodes) =>
+        nodes
+          .map((node) => {
+            const copy = node.cloneNode(true) as HTMLElement;
+            copy.querySelectorAll("del, .sr-only").forEach((el) => el.remove());
+            return copy.textContent;
+          })
+          .join(" "),
+      ),
+    )
+    .toContain("selected columns");
   const url = page.url();
   await page.reload();
   const other = await page.context().newPage();
@@ -1480,10 +1511,32 @@ test("conversation pages exact revisions without hiding notes or superseded deci
   ).toHaveCount(0);
   const second = activity.locator('[data-message-id="definition:2"]');
   await second.locator(".task-changes summary").click();
-  await expect(second.locator(".change-before")).toContainText(
-    "Original agreement",
-  );
-  await expect(second.locator(".change-after")).toContainText("Description 1");
+  await expect
+    .poll(() =>
+      second.locator(".text-changes").evaluateAll((nodes) =>
+        nodes
+          .map((node) => {
+            const copy = node.cloneNode(true) as HTMLElement;
+            copy.querySelectorAll("ins, .sr-only").forEach((el) => el.remove());
+            return copy.textContent;
+          })
+          .join(" "),
+      ),
+    )
+    .toContain("Original agreement");
+  await expect
+    .poll(() =>
+      second.locator(".text-changes").evaluateAll((nodes) =>
+        nodes
+          .map((node) => {
+            const copy = node.cloneNode(true) as HTMLElement;
+            copy.querySelectorAll("del, .sr-only").forEach((el) => el.remove());
+            return copy.textContent;
+          })
+          .join(" "),
+      ),
+    )
+    .toContain("Description 1");
 });
 
 test("question-only cards omit empty needs while project questions remain visible", async ({
@@ -1646,7 +1699,7 @@ test("Needs you carries a free-text answer from browser to coordinator applicati
     }),
   ).toHaveCount(1);
   await page.reload();
-  const detail = page.getByRole("dialog", {
+  const detail = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -2186,7 +2239,12 @@ test("milestones group tasks with linked details and long project intent stays o
     exact: true,
   });
   await expect(project.getByText(description, { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Close editor", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText(description, { exact: true })).toHaveCount(0);
 });
 
@@ -2229,7 +2287,7 @@ test("collections open and close entity details through the same routes", async 
     await expect(row).toBeVisible();
 
     await row.click();
-    await expect(page.locator(".entity-overlay")).toBeVisible();
+    await expect(page.locator(".entity-overlay, .entity-pane")).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(
@@ -2557,13 +2615,15 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
     },
   });
   await page.goto("/projects/publication/tasks/PRE-1");
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
-  const draft = page.getByRole("dialog").getByText("Draft", { exact: true });
+  const draft = page
+    .getByRole("region", { name: "Task details", exact: true })
+    .getByText("Draft", { exact: true });
   await expect(draft).toBeVisible();
-  await page.getByRole("dialog").getByText("Draft", { exact: true }).focus();
+  await draft.focus();
   await expect(page.getByRole("tooltip")).toContainText(
     "Resume your coordinator to prepare the agreed work.",
   );
@@ -2675,7 +2735,7 @@ test("related questions preserve the page, drafts, focus and router history", as
   });
   await page.goto(`/projects/${project_id}/tasks/OVR-1`);
   const boot = await page.evaluate(() => performance.timeOrigin);
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -2694,7 +2754,7 @@ test("related questions preserve the page, drafts, focus and router history", as
   });
   await page.setViewportSize({ width: 1280, height: 300 });
   await trigger.scrollIntoViewIfNeeded();
-  const taskDialog = page.getByRole("dialog", {
+  const taskDialog = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -2790,7 +2850,7 @@ test("task metadata and internal Markdown links stay inside the router", async (
   });
   await page.goto(`/projects/${project_id}/tasks/LNK-1`);
   const boot = await page.evaluate(() => performance.timeOrigin);
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -3088,12 +3148,13 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
   await page.getByLabel("Filter by milestone").selectOption("group");
   const card = page.locator(".task-card-link");
   await card.click();
-  const dialog = page.getByRole("dialog", {
+  const dialog = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
   await expect(dialog).toBeVisible();
 
+  await expect(dialog.locator(".task-definition")).toBeVisible();
   await page.keyboard.press("Tab");
   expect(
     await dialog.evaluate((el) => el.contains(document.activeElement)),
@@ -3111,7 +3172,9 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
   await expect(page.getByLabel("Filter by milestone")).toHaveValue("group");
   await card.click();
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Close editor" }).click();
+  await dialog
+    .getByRole("button", { name: /^(Close editor|Back to board)$/ })
+    .click();
   await expect(page).toHaveURL(`/projects/${id}`);
   await page
     .getByRole("button", { name: "Project details", exact: true })
@@ -3612,7 +3675,7 @@ test("review journey preserves feedback, navigates complete files and reviews a 
   await runs.getByRole("button", { name: "Split", exact: true }).click();
   await expect(runs.locator(".diff-split")).toBeVisible();
 
-  const dialog = page.getByRole("dialog", {
+  const dialog = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -3660,13 +3723,17 @@ test("review journey preserves feedback, navigates complete files and reviews a 
   await expect(
     page.getByRole("button", { name: "Send feedback", exact: true }),
   ).toBeDisabled();
-  await expect(page.getByRole("status")).toContainText("The context changed");
+  await expect(
+    page
+      .getByRole("region", { name: "Task details", exact: true })
+      .getByRole("status"),
+  ).toContainText("The context changed");
   await page
     .getByRole("button", { name: "Use current context", exact: true })
     .click();
   await page
     .locator('[data-message-id="result:older"]')
-    .getByRole("button", { name: "Inspect earlier result", exact: true })
+    .getByRole("link", { name: "Inspect earlier result", exact: true })
     .click();
   await expect(page.locator('[data-message-id="result:older"]')).toContainText(
     "Validate the input rows.",
@@ -3713,7 +3780,10 @@ test("review journey preserves feedback, navigates complete files and reviews a 
     page.locator('[data-message-id="result:successor"]'),
   ).toContainText("Task complete.");
   await dialog
-    .getByRole("button", { name: "Close editor", exact: true })
+    .getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    })
     .click();
   await expect(page).toHaveURL(`/projects/${project_id}/inbox`);
   await expect(
@@ -3760,38 +3830,12 @@ test("validated result approval delivers real Git code with the worker queue pau
   await expect(result).toContainText("Passed");
   await expect(result).toContainText("Destination: integration");
   await expect(result.locator(".diff-code-insert")).toHaveCount(0);
-  // Offline fixture only: select its fake model without invoking catalog discovery or inference.
-  execFileSync(join(checkout, ".venv/bin/python"), [
-    "-c",
-    "import sys; from pathlib import Path; from flowfield.application import Workspace; from flowfield.execution import Execution; from flowfield.execution_models import SettingsEdit; e=Execution(Workspace(Path(sys.argv[1]))); e.configure(sys.argv[2],SettingsEdit(expected_revision=e.settings(sys.argv[2]).revision,model='offline-fixture',effort='none'))",
-    state,
-    seed.project,
-  ]);
   await expect(
-    page.getByLabel("Message the worker", { exact: true }),
+    page.getByRole("button", { name: "Ask worker", exact: true }),
   ).toHaveCount(0);
-  await askWorker(page);
-  const replyInput = page.getByLabel("Message the worker", { exact: true });
-  await replyInput.fill("Why is this validation sufficient?");
-  await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await expect(replyInput).toHaveCount(0);
-  await expect(page.getByRole("list", { name: "Task feed" })).toContainText(
-    "Why is this validation sufficient?",
-  );
   await expect(
-    page.getByRole("button", { name: "Approve and integrate", exact: true }),
-  ).toBeDisabled();
-  await page.reload();
-  await expect(replyInput).toHaveCount(0);
-  await page
-    .getByRole("button", { name: "Cancel pending message", exact: true })
-    .click();
-  await askWorker(page);
-  await expect(replyInput).toBeEnabled();
-  expect((await (await request.get(base + "/workers")).json()).enabled).toBe(
-    false,
-  );
-
+    page.getByRole("group", { name: "Message task context" }),
+  ).toContainText("selected result");
   await page
     .getByRole("button", { name: "Approve and integrate", exact: true })
     .click();
@@ -3844,9 +3888,8 @@ test("validated result approval delivers real Git code with the worker queue pau
   const timeline = page.locator(".conversation-messages");
   const history = timeline.locator('[data-kind="attempt"]');
   await expect(history).toHaveCount(1);
-  await askWorker(page);
   await page
-    .getByLabel("Message the worker", { exact: true })
+    .getByLabel("Message coordinator", { exact: true })
     .fill("Keep this question draft while inspecting evidence.");
   await expect(
     history.getByText("Execution details", { exact: true }),
@@ -3856,9 +3899,9 @@ test("validated result approval delivers real Git code with the worker queue pau
     result.getByText("Project commands", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByLabel("Message the worker", { exact: true }),
+    page.getByLabel("Message coordinator", { exact: true }),
   ).toHaveValue("Keep this question draft while inspecting evidence.");
-  await page.getByLabel("Message the worker", { exact: true }).fill("");
+  await page.getByLabel("Message coordinator", { exact: true }).fill("");
   await expect(
     history.getByRole("heading", { name: "Worker report", exact: true }),
   ).toHaveCount(0);
@@ -3933,26 +3976,45 @@ test("closing entity overlays returns through history without duplicate collecti
   await page.goto(board);
   await page.getByRole("tab", { name: /^Needs you(?: \d+)?$/ }).click();
   await page.locator(".attention-card").first().click();
-  await page.getByRole("button", { name: "Close editor", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    })
+    .click();
   await expect(page).toHaveURL(inbox);
   await page.goBack();
   await expect(page).toHaveURL(board);
   await page.goForward();
   await expect(page).toHaveURL(inbox);
   await page.goForward();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Task details", exact: true }),
+  ).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Task details", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(inbox);
   await page.goBack();
   await expect(page).toHaveURL(board);
   await page.getByRole("link", { name: /HIS-1/ }).first().click();
-  await page.getByRole("button", { name: "Close editor", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    })
+    .click();
   await expect(page).toHaveURL(board);
   // Direct links have no known in-app origin, so Close stays in the project.
   await page.goto(`${board}/tasks/HIS-1`);
-  await page.getByRole("button", { name: "Close editor", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    })
+    .click();
   await expect(page).toHaveURL(board);
 });
 
@@ -4200,11 +4262,11 @@ test("entity identity and drafts persist across task and project tabs", async ({
 
   await projectLink.click();
   await page.getByRole("link", { name: /IDN-1/ }).click();
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
-  const title = page.getByRole("dialog").getByRole("heading", {
+  const title = editor.getByRole("heading", {
     name: "IDN-1 · First task",
     exact: true,
   });
@@ -4473,7 +4535,7 @@ test("conversation capture prepares atomically while task defaults show only use
   expect(task.status).toBe("backlog");
   expect((await call("get_workers", { project_id })).enabled).toBe(false);
   await page.goto(`/projects/${project_id}/tasks/CAP-1`);
-  const editor = page.getByRole("dialog", {
+  const editor = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -4674,7 +4736,7 @@ test("managed answers show durable pause, safe edits and immutable correction in
     page.getByRole("textbox", { name: "Your answer", exact: true }),
   ).toHaveCount(0);
   await page.goto("/projects/input-browser/inbox/which-records");
-  const detail = page.getByRole("dialog", {
+  const detail = page.getByRole("region", {
     name: "Task details",
     exact: true,
   });
@@ -4801,7 +4863,10 @@ test("inspection preserves exact versions, preview edits and direct approval", a
       "Review Result 1",
     );
     await page
-      .getByRole("button", { name: "Close editor", exact: true })
+      .getByRole("button", {
+        name: /^(Close editor|Back to board)$/,
+        exact: true,
+      })
       .click();
   }
   await page.goto(`/projects/${project}/tasks/IPV-1/changes`);
@@ -4884,27 +4949,9 @@ test("inspection preserves exact versions, preview edits and direct approval", a
     .click();
   const feedback = page.getByLabel("Feedback for this result", { exact: true });
   await expect(feedback).toBeFocused();
-  await page
-    .getByRole("button", {
-      name: "Ask without requesting changes",
-      exact: true,
-    })
-    .click();
-  const message = page.getByRole("textbox", {
-    name: "Message the worker",
-    exact: true,
-  });
-  await expect(message).toBeVisible();
-  await message.fill("A question, not a change request");
-  await message.fill("");
-  await expect(message).toBeVisible();
-  await page
-    .getByRole("button", { name: "Cancel message", exact: true })
-    .click();
-  await expect(message).toHaveCount(0);
-  await page
-    .getByRole("button", { name: "Request changes", exact: true })
-    .click();
+  await feedback.fill("A bound result change request");
+  await feedback.fill("");
+  await expect(feedback).toBeVisible();
   await page
     .getByRole("button", { name: "Cancel feedback", exact: true })
     .click();
@@ -5106,7 +5153,10 @@ test("outcomes finish reports, preserve partial work and offer one contextual re
     ).toContainText("A detailed finding.");
     await expect.poll(reportAtBottom).toBe(true);
     await page
-      .getByRole("button", { name: "Close editor", exact: true })
+      .getByRole("button", {
+        name: /^(Close editor|Back to board)$/,
+        exact: true,
+      })
       .click();
   }
   // Board opens still follow late layout, while an explicit timestamp targets the entry.
@@ -5274,7 +5324,9 @@ test("attempt activity updates without reloading the board and replays on reload
   });
   await expect(output).toContainText("create observed output");
   await expect(
-    page.getByLabel("Message the worker", { exact: true }),
+    page
+      .getByRole("region", { name: "Task details", exact: true })
+      .getByRole("textbox"),
   ).toHaveCount(0);
   let boards = 0;
   page.on("request", (req) => {
@@ -5587,7 +5639,10 @@ test("task feed follows the live end but preserves reading position and timestam
   await page.goto(href!);
   await expect(anchor).toBeInViewport();
   await expect(
-    page.getByRole("button", { name: "Close editor", exact: true }),
+    page.getByRole("button", {
+      name: /^(Close editor|Back to board)$/,
+      exact: true,
+    }),
   ).toBeInViewport();
   await expect(feed.locator(".detail-entry-title a")).toHaveCount(0);
 });
@@ -5697,7 +5752,7 @@ test("archive confirmation retains its selected revision across live changes", a
     .getByRole("button", { name: "Archive", exact: true })
     .click();
   await expect(
-    page.getByRole("dialog", { name: "Task details", exact: true }),
+    page.getByRole("region", { name: "Task details", exact: true }),
   ).toHaveCount(0);
   expect((await (await request.get(path + "/tasks/one")).json()).archived).toBe(
     true,
@@ -5770,24 +5825,20 @@ test("sidebar names disclose only clipped text and idle input opens deliberately
     "Definition",
   );
   await expect(
-    page.getByLabel("Message the worker", { exact: true }),
+    page
+      .getByRole("region", { name: "Task details", exact: true })
+      .getByRole("textbox"),
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Latest", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Ask worker", exact: true }).click();
   await expect(
-    page.getByLabel("Message the worker", { exact: true }),
-  ).toBeFocused();
-  await page
-    .getByLabel("Message the worker", { exact: true })
-    .fill("Explain this outcome");
-  await page
-    .getByRole("button", { name: "Cancel message", exact: true })
-    .click();
-  await expect(
-    page.getByLabel("Message the worker", { exact: true }),
+    page.getByRole("button", { name: "Ask worker", exact: true }),
   ).toHaveCount(0);
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(
+    page.getByRole("group", { name: "Message task context" }),
+  ).toContainText("Read the current agreement");
   expect(
     (await (await request.get(path + "/tasks/idle/thread")).json()).items.some(
       (item: { kind: string }) => item.kind === "reply",
@@ -5991,7 +6042,7 @@ test("workspace navigation, mobile board and appearance work beside the coordina
   ).toBe(true);
   await page.getByRole("link", { name: /Review the workspace layout/ }).click();
   await expect(
-    page.getByRole("dialog", { name: "Task details", exact: true }),
+    page.getByRole("region", { name: "Task details", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("tab", { name: /^Board/ })).toHaveAttribute(

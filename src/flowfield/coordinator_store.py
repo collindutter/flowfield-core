@@ -11,9 +11,11 @@ from flowfield.coordinator_models import (
     CoordinatorConversation,
     CoordinatorPage,
     CoordinatorSend,
+    CoordinatorTaskContext,
     CoordinatorTurn,
 )
 from flowfield.errors import ApplicationError
+from flowfield.results import Results
 from flowfield.run_activity import ActivityUpdate, ContextUsage, update_activity
 
 
@@ -169,6 +171,11 @@ class CoordinatorStore:
     ) -> tuple[CoordinatorTurn, bool]:
         with self.workspace.connection(write=True, project_id=project) as db:
             self._conversation(db, project, conversation)
+            task = (
+                self.workspace._task(db, project, request.task_context.task_id)
+                if request.task_context
+                else None
+            )
             row = db.execute(
                 "SELECT project_id FROM coordinator_turns WHERE id=?", (request.id,)
             ).fetchone()
@@ -178,11 +185,43 @@ class CoordinatorStore:
                         "message_conflict", "Message identity is already used.", 409
                     )
                 old = self._get(db, project, request.id)
-                if old.text != request.text or old.conversation_id != conversation:
+                same_context = (old.task_context is None and request.task_context is None) or (
+                    old.task_context is not None
+                    and request.task_context is not None
+                    and task is not None
+                    and old.task_context.task_id == task.id
+                    and old.task_context.task_revision == request.task_context.task_revision
+                    and old.task_context.result_id == request.task_context.result_id
+                )
+                if (
+                    old.text != request.text
+                    or old.conversation_id != conversation
+                    or not same_context
+                ):
                     raise ApplicationError(
                         "message_conflict", "This message identity has different content.", 409
                     )
                 return old, False
+            if (
+                task
+                and request.task_context
+                and task.revision != request.task_context.task_revision
+            ):
+                raise ApplicationError(
+                    "task_context_changed",
+                    "The selected task changed. Review it before sending again.",
+                    409,
+                )
+            if task and request.task_context and request.task_context.result_id:
+                selected_result = Results(self.workspace)._get(
+                    db, project, request.task_context.result_id
+                )
+                if selected_result.task_id != task.id:
+                    raise ApplicationError(
+                        "context_result_missing",
+                        "Result does not belong to the selected task.",
+                        404,
+                    )
             if not available:
                 raise ApplicationError(
                     "coordinator_capacity",
@@ -203,6 +242,15 @@ class CoordinatorStore:
                     409,
                 )
             turn = CoordinatorTurn(
+                task_context=CoordinatorTaskContext(
+                    task_id=task.id,
+                    task_revision=task.revision,
+                    key=task.key,
+                    title=task.title,
+                    result_id=request.task_context.result_id if request.task_context else None,
+                )
+                if task
+                else None,
                 id=request.id,
                 project_id=project,
                 conversation_id=conversation,

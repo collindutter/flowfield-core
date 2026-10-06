@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { components } from "./api-schema";
 import { useResource } from "./useResource";
 import { request } from "./workspace";
@@ -429,6 +429,7 @@ export function AgentSettingsControl({
     onSaved: () => onOpenChange(false),
     onSaveError: () => onOpenChange(true),
   });
+  const automaticallyOpened = useRef(false);
   return (
     <>
       <Popover.Root open={open} onOpenChange={onOpenChange}>
@@ -450,6 +451,13 @@ export function AgentSettingsControl({
             align="start"
             sideOffset={8}
             className="composer-settings"
+            onOpenAutoFocus={(event) => {
+              automaticallyOpened.current = autoOpened;
+              if (autoOpened) event.preventDefault();
+            }}
+            onCloseAutoFocus={(event) => {
+              if (automaticallyOpened.current) event.preventDefault();
+            }}
             onFocusOutside={(event) => {
               // A newly activated workspace tab can receive focus after its popup mounts.
               if (autoOpened) event.preventDefault();

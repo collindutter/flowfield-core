@@ -14,12 +14,25 @@ class CoordinatorConversation(AgentRecord):
     created_at: str
 
 
+class CoordinatorTaskSelection(AgentRecord):
+    task_id: str = Field(min_length=1, max_length=200)
+    task_revision: int = Field(ge=1)
+    result_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class CoordinatorTaskContext(CoordinatorTaskSelection):
+    key: str
+    title: str
+
+
 class CoordinatorSend(AgentRecord):
     id: str = Field(pattern=r"^[a-zA-Z0-9_-]{16,100}$")
     text: str = Field(min_length=1, max_length=16000)
+    task_context: CoordinatorTaskSelection | None = None
 
 
 class CoordinatorTurn(AgentRecord):
+    task_context: CoordinatorTaskContext | None = None
     id: str
     number: int = 0
     project_id: str

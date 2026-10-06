@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { components } from "./api-schema";
 import { useResource } from "./useResource";
-import { request } from "./workspace";
+import { request, RequestError, type Task } from "./workspace";
 import { Markdown } from "./Markdown";
 import { Timestamp } from "./Timestamp";
 import { AgentSettingsControl } from "./AgentSettings";
@@ -12,11 +12,19 @@ import { ActivityEntries } from "./RunActivity";
 import { useFeedScroll } from "./useFeedScroll";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, Square, X } from "lucide-react";
+import { WorkspaceLink } from "./WorkspaceLink";
+import { taskHref } from "./navigation";
 type Page = components["schemas"]["CoordinatorPage"];
 type Turn = components["schemas"]["CoordinatorTurn"];
 type Choice = components["schemas"]["AgentChoice-Output"];
-export type ChatDrafts = Map<string, { id: string; text: string }>;
+type ChatDraft = {
+  id: string;
+  text: string;
+  contextKey?: string;
+  taskContext?: components["schemas"]["CoordinatorTaskSelection"] | null;
+};
+export type ChatDrafts = Map<string, ChatDraft>;
 
 function mergeTurns(previous: Turn[], updates: Turn[]) {
   return [
@@ -32,13 +40,41 @@ export function CoordinatorChat({
   drafts,
   onSettingsDirty,
   controlsActive = true,
+  taskKey,
+  selectedResultId,
 }: {
   projectId: string;
   refresh: unknown;
   drafts: ChatDrafts;
   onSettingsDirty: (dirty: boolean) => void;
   controlsActive?: boolean;
+  taskKey?: string;
+  selectedResultId?: string;
 }) {
+  const selected = useResource<Task>(
+    taskKey
+      ? `projects/${projectId}/view/tasks/${encodeURIComponent(taskKey)}`
+      : null,
+    refresh,
+  );
+  const selectionKey = JSON.stringify([taskKey, selectedResultId]);
+  const [taskFocus, setTaskFocus] = useState({
+    key: selectionKey,
+    dismissed: false,
+  });
+  if (taskFocus.key !== selectionKey)
+    setTaskFocus({ key: selectionKey, dismissed: false });
+  const attachTask =
+    !!taskKey && (taskFocus.key !== selectionKey || !taskFocus.dismissed);
+  const contextPending = attachTask && (!selected.data || !!selected.error);
+  const taskContext =
+    attachTask && selected.data
+      ? {
+          task_id: selected.data.id,
+          task_revision: selected.data.revision,
+          result_id: selectedResultId ?? null,
+        }
+      : null;
   const base = `projects/${projectId}/coordinator`;
   const [history, setHistory] = useState<{ page: Page | null; items: Turn[] }>({
     page: null,
@@ -135,7 +171,7 @@ export function CoordinatorChat({
     [onSettingsDirty],
   );
   const key = projectId;
-  const [draft, setDraft] = useState(
+  const [draft, setDraft] = useState<ChatDraft>(
     () => drafts.get(key) ?? { id: crypto.randomUUID(), text: "" },
   );
   const [pane, setPane] = useState<HTMLDivElement | null>(null);
@@ -172,16 +208,38 @@ export function CoordinatorChat({
       active ||
       !page ||
       !choice ||
-      settingsDirty
+      settingsDirty ||
+      contextPending
     )
       return;
     setBusy(true);
     setError("");
     try {
-      await request(`${base}/messages`, "POST", draft);
+      const contextKey = JSON.stringify([
+        taskContext?.task_id,
+        taskContext?.result_id,
+      ]);
+      const receipt = {
+        ...draft,
+        id: draft.contextKey === contextKey ? draft.id : crypto.randomUUID(),
+        contextKey,
+        taskContext:
+          draft.contextKey === contextKey ? draft.taskContext : taskContext,
+      };
+      drafts.set(key, receipt);
+      setDraft(receipt);
+      await request(`${base}/messages`, "POST", {
+        id: receipt.id,
+        text: receipt.text,
+        task_context: receipt.taskContext,
+      });
       update("");
       setTick((n) => n + 1);
     } catch (e) {
+      // A rejected stale selection has no effects. Other uncertain failures retain
+      // the original receipt and context, even if live task revisions advance.
+      if (e instanceof RequestError && e.code === "task_context_changed")
+        update(draft.text);
       setError((e as Error).message);
       setTick((n) => n + 1);
     } finally {
@@ -271,6 +329,21 @@ export function CoordinatorChat({
                 <div className="detail-metadata">
                   You · <Timestamp date={turn.created_at} />
                 </div>
+                {turn.task_context && (
+                  <WorkspaceLink
+                    className="coordinator-task-reference"
+                    title={`${turn.task_context.title} · task revision ${turn.task_context.task_revision}`}
+                    to={
+                      taskHref(projectId, turn.task_context) +
+                      (turn.task_context.result_id
+                        ? `/conversation/result:${encodeURIComponent(turn.task_context.result_id)}`
+                        : "")
+                    }
+                  >
+                    {turn.task_context.key}
+                    {turn.task_context.result_id ? " · result" : ""}
+                  </WorkspaceLink>
+                )}
                 <Markdown>{turn.text}</Markdown>
               </div>
               <div className="coordinator-message">
@@ -357,6 +430,44 @@ export function CoordinatorChat({
             </AlertDescription>
           </Alert>
         )}
+        {attachTask && (
+          <div
+            className="coordinator-task-context"
+            role="group"
+            aria-label="Message task context"
+          >
+            {selected.data ? (
+              <WorkspaceLink
+                to={
+                  taskHref(projectId, selected.data) +
+                  (selectedResultId
+                    ? `/conversation/result:${encodeURIComponent(selectedResultId)}`
+                    : "")
+                }
+                title={selected.data.title}
+              >
+                {selected.data.key} · {selected.data.title}
+                {selectedResultId ? " · selected result" : ""}
+              </WorkspaceLink>
+            ) : (
+              <span>
+                {selected.error
+                  ? "Task context unavailable"
+                  : "Loading task context…"}
+              </span>
+            )}
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Remove task context"
+              onClick={() =>
+                setTaskFocus({ key: selectionKey, dismissed: true })
+              }
+            >
+              <X size={12} />
+            </Button>
+          </div>
+        )}
         <Composer
           projectId={projectId}
           nativeCommands={{
@@ -382,8 +493,8 @@ export function CoordinatorChat({
                 path={`projects/${projectId}/coordinator-settings`}
                 refresh={refresh}
                 coordinator
-                open={controlsActive && (settingsOpen ?? !choice)}
-                autoOpened={settingsOpen === undefined && !choice}
+                open={controlsActive && (settingsOpen ?? (!choice && !taskKey))}
+                autoOpened={settingsOpen === undefined && !choice && !taskKey}
                 onOpenChange={setSettingsOpen}
                 onDirty={dirty}
                 onReady={setChoice}
@@ -424,6 +535,7 @@ export function CoordinatorChat({
                   !page ||
                   !choice ||
                   settingsDirty ||
+                  contextPending ||
                   !draft.text.trim()
                 }
                 onClick={() => void send()}

@@ -98,8 +98,8 @@ def add_conversation_tools(mcp: FastMCP, workspace: Callable[[], Workspace]) -> 
 
     @mcp.tool(annotations=write)
     def reply_to_task(project_id: str, task_id: str, request: ReplyCreate) -> Reply:
-        """Send an answer, request changes, ask a worker, or record result testing.
-        Message does not reopen a task or supersede its candidate. Queue pause/capacity apply.
+        """Send an answer, request changes, or record result testing.
+        Discuss task scope and result questions in the coordinator conversation.
         Reuse the same ID after an uncertain response; stale input must be reconciled.
         action=observation saves human testing against the exact result without starting
         a worker, requesting changes or approving code. State what was tried and observed.

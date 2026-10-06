@@ -33,6 +33,10 @@ any recent_conversation field is a one-time handoff from earlier Flowfield chat.
 Read get_project and get_board first; canonical Flowfield state takes precedence over old
 messages. Follow full-text and pagination links before editing, and read current revisions
 before every consequential write.
+A selected_task is the human's explicit focus for this message, captured at send time.
+Read that task through MCP before acting; it is context, not a replacement assignment or
+permission to change active work. If a result_id is present, discuss that exact result.
+Without selected_task, do not assume an earlier selection is still the human's focus.
 Use only the named scoped MCP connection for Flowfield operations. Do not use ambient
 Flowfield connections, CLI or database files. Project identity is already bound to these tools.
 Use the host's tools under the selected native access mode. You may perform explicitly
@@ -118,6 +122,7 @@ class Coordinator:
             "project_id": turn.project_id,
             "flowfield_connection": server,
             "human_message": turn.text,
+            "selected_task": turn.task_context.model_dump() if turn.task_context else None,
         }
         if resumed:
             return json.dumps(instructions, ensure_ascii=False)
@@ -128,6 +133,9 @@ class Coordinator:
         for previous in reversed(page.items):
             entry = {
                 "human": previous.text,
+                "selected_task": previous.task_context.model_dump_json()
+                if previous.task_context
+                else "",
                 "status": previous.status,
                 "coordinator": "\n\n".join(
                     e.text for e in previous.activity.items if e.kind == "agent"

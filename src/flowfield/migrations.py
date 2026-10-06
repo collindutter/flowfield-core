@@ -173,6 +173,15 @@ def task_specific_speed(db: sqlite3.Connection) -> None:
     )
 
 
+def retire_worker_discussions(db: sqlite3.Connection) -> None:
+    # Retain authored evidence and assigned attempts; never launch an old queued chat.
+    db.execute(
+        "UPDATE task_replies SET data=json_set(data,'$.status','cancelled') "
+        "WHERE json_extract(data,'$.action')='message' "
+        "AND json_extract(data,'$.status')='pending'"
+    )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
@@ -185,6 +194,7 @@ MIGRATIONS = (
     Migration(38, coordinator_access_modes),
     Migration(39, explicit_fast_mode),
     Migration(40, task_specific_speed),
+    Migration(41, retire_worker_discussions),
 )
 
 

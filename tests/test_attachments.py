@@ -67,24 +67,27 @@ def test_coordinator_delivers_real_text_images_context_and_durable_download(tmp_
         assert client.get(href.replace("harbor", "elsewhere")).status_code == 404
 
 
-def test_worker_discussion_delivers_attachments_through_existing_reply_binding(
-    tmp_path, monkeypatch
-):
+def test_worker_answer_delivers_attachments_through_existing_reply_binding(tmp_path, monkeypatch):
     service, repo, _ = configured(
-        tmp_path, monkeypatch, scenario="discussion", flags=("expect-attachments",)
+        tmp_path, monkeypatch, scenario="normal", flags=("expect-attachments",)
     )
+    from test_input_continuation import question
+
+    base = baseline(repo)
+    run, _ = question(service.execution)
+    service.execution.finish("harbor", run.id, "waiting_for_input", input_checkpoint=base)
     body = attached(Attachments(service.workspace), "task-0")
-    request = reply_message(service.workspace, body=body)
+    request = reply_message(service.workspace, action="answer", body=body)
     receipt = Replies(service.workspace).submit("harbor", "task-0", request)
     assert Replies(service.workspace).submit("harbor", "task-0", request) == receipt
 
     async def exercise():
         base = baseline(repo)
         run = service.execution.claim("harbor", base, {base: set()})
-        assert run.purpose == "discussion"
+        assert run.purpose == "work"
         await service._execute(run, repo)
         saved = service.execution.get("harbor", run.id)
-        assert saved.status == "accepted", saved.problem
+        assert saved.status == "in_review", saved.problem
         await service.close()
 
     asyncio.run(exercise())

@@ -6,6 +6,28 @@
   .definition-toggle {
     align-self: flex-start;
   }
+  .disclosure-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .disclosure-control svg {
+    width: 12px;
+    height: 12px;
+  }
+  .disclosure-control:hover {
+    text-decoration: underline;
+  }
+  .disclosure-control:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 4px;
+  }
   .content-stack {
     display: flex;
     flex-direction: column;
@@ -260,7 +282,7 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .entity-overlay:has(.task-input) .entity-overlay-body {
+  :is(.entity-overlay, .entity-pane):has(.task-input) .entity-overlay-body {
     min-height: min(20dvh, 8rem);
   }
   .entity-overlay-footer:empty {
