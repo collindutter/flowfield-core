@@ -83,7 +83,7 @@ export function Composer({
   }, [value, draftKey]);
   const textarea = useRef<HTMLTextAreaElement | null>(null);
   const picker = useRef<HTMLInputElement>(null);
-  useImperativeHandle(inputRef, () => textarea.current!, [collapsed]);
+  useImperativeHandle(inputRef, () => textarea.current!);
   const alive = useRef(true);
   const pending = useRef(false);
   const [uploading, setUploading] = useState(false);
