@@ -3,6 +3,7 @@ import { request, label } from "./workspace";
 import type { components } from "./api-schema";
 import { Disclosure } from "./DetailLayout";
 import { UsageSummary } from "./UsageSummary";
+import { ContextRing } from "./ContextRing";
 import { MessageSquare, Wrench, Terminal, AlignLeft, Info } from "lucide-react";
 import {
   Tooltip,
@@ -71,6 +72,12 @@ export function RunActivity({
   }, [page]);
   return (
     <div className="run-activity content-stack" data-space="tight">
+      {page?.context && (
+        <div className="activity-context">
+          <ContextRing context={page.context} active={page.active} />
+          <span className="detail-metadata">Context</span>
+        </div>
+      )}
       {error && (
         <p role="alert">
           Activity disconnected. Retrying; saved output is kept. {error}

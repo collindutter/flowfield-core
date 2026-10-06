@@ -25,6 +25,26 @@ and approve exact code results in their task feeds.
 Use the model button beside the input to change model or effort. Changes apply to the next
 message; a running turn keeps its saved choice. Standalone coding-agent settings are separate.
 
+## Composer controls
+
+The input grows as you write. Use the paperclip, drop files onto the input, or paste an image
+to attach it. Remove an attachment with its × button before sending. Sent files are saved
+with the conversation and can be downloaded from their message links.
+
+You can attach up to four files: UTF-8 text/code up to 64 KiB each, or PNG, JPEG and WebP
+images up to 2 MiB each. Their contents accompany the message sent to the agent; images
+require image support from the connected harness. On a later turn, attach a file again if
+the agent needs its contents. Previously sent files remain available to download.
+Each project has 128 MiB of attachment storage. Unsent uploads expire after 24 hours.
+
+Type `/` for a command menu: `/attach` adds files, `/model` opens model settings, and `/stop`
+stops a running turn. Use arrow keys and Enter to choose, or Escape to continue writing.
+These control the composer; native session commands such as `/compact` are not supported.
+
+Hover or focus the context ring for the agent's reported context usage. During a turn it
+shows that turn's latest report; afterward it shows the last turn. It stays empty until
+the agent reports usage. Context occupancy is separate from billable token usage.
+
 ## Follow and stop
 
 Replies stream into the conversation. Expand **Activity** for public tool activity;

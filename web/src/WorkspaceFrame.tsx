@@ -204,7 +204,7 @@ export function WorkspaceFrame({
   projects: WorkspaceProject[];
   activeProjectId: string;
   onProjectSelect: (project: WorkspaceProject) => void;
-  coordinator?: ReactNode;
+  coordinator?: ReactNode | ((visible: boolean) => ReactNode);
   work: ReactNode;
   footer?: ReactNode;
   onHome?: () => void;
@@ -301,7 +301,9 @@ export function WorkspaceFrame({
                   inert={compact && surface !== "coordinator"}
                   aria-hidden={compact && surface !== "coordinator"}
                 >
-                  {coordinator}
+                  {typeof coordinator === "function"
+                    ? coordinator(!compact || surface === "coordinator")
+                    : coordinator}
                 </TabsContent>
               </ResizablePanel>
               <ResizableHandle

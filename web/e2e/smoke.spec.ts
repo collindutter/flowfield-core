@@ -135,7 +135,10 @@ async function closeOverlay(page: Page) {
 
 async function askWorker(page: Page) {
   const trigger = page.getByRole("button", { name: "Ask worker", exact: true });
-  const input = page.getByLabel("Message the worker", { exact: true });
+  const input = page.getByRole("textbox", {
+    name: "Message the worker",
+    exact: true,
+  });
   await expect(trigger.or(input).first()).toBeVisible();
   if (await trigger.isVisible()) await trigger.click();
 }
@@ -5621,7 +5624,7 @@ test("legacy task-question links resolve into the feed and preserve answers", as
     page.getByRole("heading", { name: "Waiting on", exact: true }),
   ).toHaveCount(0);
   const answer = page.getByLabel("Your answer", { exact: true });
-  await expect(answer).not.toHaveAttribute("placeholder");
+  await expect(answer).toHaveAttribute("placeholder", "Your answer…");
   await expect(
     page.getByRole("button", { name: "JSON", exact: true }),
   ).toHaveCount(0);

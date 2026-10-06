@@ -61,7 +61,8 @@ class FakeWorker:
         self.choice = choice
         return choice
 
-    async def prompt(self, text, on_permission):
+    async def prompt(self, text, on_permission, *, attachments=None):
+        assert not attachments
         return await self.run(self.choice.model, self.choice.effort, text, self.tools)
 
     async def run(self, model, effort, prompt, tools):

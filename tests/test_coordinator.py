@@ -201,7 +201,7 @@ def test_atomic_reservation_frozen_settings_and_bounded_late_output(tmp_path, mo
 
 def test_crash_recovery_never_replays_and_schema33_upgrade(tmp_path, monkeypatch):
     with monkeypatch.context() as old:
-        old.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:-1])
+        old.setattr(migrations, "MIGRATIONS", [m for m in migrations.MIGRATIONS if m.version <= 33])
         workspace = fixture(tmp_path).workspace
         project = workspace.project("harbor")
     upgraded = Workspace(workspace.directory)

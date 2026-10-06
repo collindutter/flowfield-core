@@ -47,7 +47,9 @@ def test_schema34_upgrades_local_and_unifies_chat_without_rewriting_history(
     from flowfield.integration import Integrations
 
     with monkeypatch.context() as older:
-        older.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:-1])
+        older.setattr(
+            migrations, "MIGRATIONS", [m for m in migrations.MIGRATIONS if m.version <= 34]
+        )
         service, repo, run = fixture(tmp_path)
         old = make_legacy(service, inventory=True)
         settings = AgentSettings(service.workspace)

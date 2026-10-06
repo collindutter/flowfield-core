@@ -7,6 +7,7 @@ from typing import Any
 MAX_FRAME = 256 * 1024
 MAX_TRAFFIC = 16 * 1024 * 1024
 MAX_MESSAGES = 20000
+MAX_INPUT_FRAME = 24 * 1024 * 1024  # Bounded human images; inbound activity stays at 256 KiB.
 
 
 class StdioTransport:
@@ -60,7 +61,8 @@ class StdioTransport:
 
     async def send(self, message: dict[str, Any]) -> None:
         data = json.dumps(message, ensure_ascii=False).encode() + b"\n"
-        if len(data) > MAX_FRAME:
+        limit = MAX_INPUT_FRAME if message.get("method") == "session/prompt" else MAX_FRAME
+        if len(data) > limit:
             raise ValueError("ACP frame exceeds limit")
         self.writer.write(data)
         await self.writer.drain()

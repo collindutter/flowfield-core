@@ -1413,6 +1413,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/{project_id}/attachments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Upload */
+    post: operations["upload_api_projects__project_id__attachments_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/attachments/{identity}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download */
+    get: operations["download_api_projects__project_id__attachments__identity__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/integration": {
     parameters: {
       query?: never;
@@ -2082,6 +2116,19 @@ export interface components {
        */
       author: string;
     };
+    /** Attachment */
+    Attachment: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /** Mime */
+      mime: string;
+      /** Size */
+      size: number;
+      /** Href */
+      href: string;
+    };
     /** AttentionItem */
     AttentionItem: {
       /** Id */
@@ -2231,6 +2278,13 @@ export interface components {
       git_device: number;
       /** Git Inode */
       git_inode: number;
+    };
+    /** ContextUsage */
+    ContextUsage: {
+      /** Used */
+      used: number;
+      /** Size */
+      size: number;
     };
     /** ConversationItem */
     ConversationItem: {
@@ -3837,6 +3891,7 @@ export interface components {
        */
       items: components["schemas"]["RunActivityEntry"][];
       usage?: components["schemas"]["Usage"];
+      context?: components["schemas"]["ContextUsage"] | null;
     };
     /** RunLocation */
     RunLocation: {
@@ -8004,6 +8059,82 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AgentSettingsView"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  upload_api_projects__project_id__attachments_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Name */
+          name: string;
+          /** Mime */
+          mime: string;
+          /** Data */
+          data: string;
+          /** Task Id */
+          task_id?: string | null;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Attachment"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  download_api_projects__project_id__attachments__identity__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        identity: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
         };
       };
       /** @description Validation Error */

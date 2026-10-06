@@ -246,10 +246,6 @@
   .task-input label {
     font-size: 12px;
   }
-  .task-input textarea {
-    min-height: 60px;
-    max-height: 12rem;
-  }
   .entity-overlay-footer {
     flex-shrink: 1;
     min-height: 0;

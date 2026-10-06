@@ -71,6 +71,13 @@ async def main():
     session_closed = False
 
     async def prompt(request):
+        if "expect-attachments" in sys.argv:
+            blocks = request["params"]["prompt"]
+            assert blocks[1] == {"type": "text", "text": "Human attachment: notes.txt"}
+            assert blocks[2] == {"type": "text", "text": "Preserve the public API."}
+            assert blocks[3] == {"type": "text", "text": "Human attachment: screen.png"}
+            assert blocks[4]["type"] == "image" and blocks[4]["mimeType"] == "image/png"
+            assert blocks[4]["data"].startswith("iVBOR")
         control = json.loads(request["params"]["prompt"][0]["text"])
         if "coordinator" in sys.argv:
             assert control["flowfield_connection"] == servers[0]["name"]
@@ -284,6 +291,7 @@ async def main():
                             else {}
                         ),
                         "loadSession": "no-load" not in sys.argv,
+                        "promptCapabilities": {"image": "no-images" not in sys.argv},
                         "mcpCapabilities": {"http": "no-http" not in sys.argv},
                         "sessionCapabilities": (
                             {"close": {}} if "close-session" in sys.argv else {}

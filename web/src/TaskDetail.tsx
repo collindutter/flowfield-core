@@ -8,7 +8,6 @@ import { TaskNeeds, TaskState, hasTaskNeeds } from "./TaskNeeds";
 import { TaskConversation, StageHeader } from "./TaskConversation";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "./ConfirmButton";
-import { TaskAgentSettings } from "./AgentSettings";
 import { AgentPermissions } from "./AgentPermissions";
 import { label, request, type Board, type Task } from "./workspace";
 export function TaskDetail({
@@ -115,12 +114,6 @@ export function TaskDetail({
           <strong>Definition</strong>
           <Markdown>{task.body}</Markdown>
         </div>
-        <TaskAgentSettings
-          projectId={board.project.id}
-          taskId={task.id}
-          refresh={board}
-          onDirty={setSettingsDirty}
-        />
         {hasTaskNeeds(task, board.pending_code[task.id], false) && (
           <DetailSection title="Waiting on">
             <TaskNeeds
@@ -167,6 +160,7 @@ export function TaskDetail({
         board={board}
         refresh={board}
         onDirty={setDirty}
+        onSettingsDirty={setSettingsDirty}
         taskActionContext={
           <>
             {error && <p role="alert">{error}</p>}

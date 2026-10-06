@@ -127,6 +127,17 @@ def project_coordinator_and_local_default(db: sqlite3.Connection) -> None:
     db.execute("CREATE INDEX coordinator_project_messages ON coordinator_turns(project_id,number)")
 
 
+def message_attachments(db: sqlite3.Connection) -> None:
+    db.execute(
+        "CREATE TABLE attachments (id TEXT PRIMARY KEY, "
+        "project_id TEXT NOT NULL REFERENCES projects(id), task_id TEXT, name TEXT NOT NULL, "
+        "mime TEXT NOT NULL, created_at TEXT NOT NULL, content BLOB NOT NULL, "
+        "size INTEGER NOT NULL, bound INTEGER NOT NULL DEFAULT 0, "
+        "FOREIGN KEY(project_id,task_id) REFERENCES tasks(project_id,id))"
+    )
+    db.execute("CREATE INDEX attachment_project ON attachments(project_id,task_id)")
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
@@ -134,6 +145,7 @@ MIGRATIONS = (
     Migration(33, explicit_local_runtime),
     Migration(34, coordinator_chat),
     Migration(35, project_coordinator_and_local_default),
+    Migration(36, message_attachments),
 )
 
 

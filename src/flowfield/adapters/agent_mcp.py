@@ -107,6 +107,14 @@ async def serve_scope(
                 server.should_exit = True
                 async with asyncio.timeout(7):
                     await task
+    except BaseExceptionGroup as group:
+        # The session manager's task group wraps errors from the calling turn.
+        # Preserve one original failure (and its actionable application message),
+        # without hiding concurrent endpoint/shutdown failures.
+        error: BaseException = group
+        while isinstance(error, BaseExceptionGroup) and len(error.exceptions) == 1:
+            error = error.exceptions[0]
+        raise error from None
     finally:
         grant.revoke()
         server.should_exit = True

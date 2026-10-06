@@ -5,6 +5,7 @@ import sqlite3
 from uuid import uuid4
 
 from flowfield.application import Workspace, now
+from flowfield.attachments import Attachments
 from flowfield.conversation import Conversation
 from flowfield.environment_models import EnvironmentConfig
 from flowfield.errors import ApplicationError
@@ -53,6 +54,7 @@ class Replies:
                 )
             if not request.body.strip():
                 raise ApplicationError("empty_reply", "Write a reply before sending.")
+            Attachments(self.workspace).references(db, project_id, task_id, request.body, bind=True)
             reply = Reply(
                 **request.model_dump(), project_id=project_id, task_id=task_id, created_at=now()
             )

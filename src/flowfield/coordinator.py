@@ -13,6 +13,7 @@ from flowfield.adapters.agent_mcp import serve_scope
 from flowfield.adapters.codex_agent import CodexAgent
 from flowfield.adapters.local_execution import LocalHost
 from flowfield.agent_tools import coordinator_scope
+from flowfield.attachments import Attachments
 from flowfield.coordinator_models import CoordinatorSend, CoordinatorTurn
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
@@ -156,7 +157,13 @@ class Coordinator:
                         conversation_id=turn.conversation_id,
                     ):
                         # Read-only coordination cannot authorize native escalation.
-                        outcome = await client.prompt(self._prompt(turn, server.name), None)
+                        outcome = await client.prompt(
+                            self._prompt(turn, server.name),
+                            None,
+                            attachments=Attachments(workspace).inputs(
+                                turn.project_id, None, turn.text
+                            ),
+                        )
                     status = "completed" if outcome.get("status") == "completed" else "failed"
                     if status == "failed":
                         notice = (

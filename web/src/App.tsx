@@ -62,6 +62,7 @@ import { Decisions } from "./Decisions";
 import { DiscardChangesDialog } from "./DiscardChangesDialog";
 import {
   followLink,
+  entityPage,
   projectHref,
   taskHref,
   useWorkspaceNavigation,
@@ -209,15 +210,22 @@ export function App() {
           </>
         }
         coordinator={
-          connected && projectId && !notFound ? (
-            <CoordinatorChat
-              key={projectId}
-              projectId={projectId}
-              refresh={`${refresh}:${projectRefresh[projectId] ?? 0}`}
-              drafts={chatDrafts}
-              onSettingsDirty={setChatSettingsDirty}
-            />
-          ) : undefined
+          connected && projectId && !notFound
+            ? (visible) => (
+                <CoordinatorChat
+                  key={projectId}
+                  projectId={projectId}
+                  refresh={`${refresh}:${projectRefresh[projectId] ?? 0}`}
+                  drafts={chatDrafts}
+                  onSettingsDirty={setChatSettingsDirty}
+                  controlsActive={
+                    visible &&
+                    !entityPage(pathname) &&
+                    !params.overlayQuestionId
+                  }
+                />
+              )
+            : undefined
         }
         work={
           <>

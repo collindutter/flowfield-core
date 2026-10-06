@@ -17,9 +17,11 @@ from acp.interfaces import Client
 from acp.schema import (
     ClientCapabilities,
     HttpMcpServer,
+    ImageContentBlock,
     Implementation,
     PermissionOption,
     RequestPermissionResponse,
+    TextContentBlock,
     ToolCallUpdate,
 )
 from pydantic import BaseModel
@@ -202,7 +204,9 @@ class AcpSession:
             await self.close()
             raise
 
-    async def prompt(self, text: str) -> str:
+    async def prompt(
+        self, text: str, *, content: list[ImageContentBlock | TextContentBlock] | None = None
+    ) -> str:
         connection, session_id = self._ready()
         if not text.strip() or len(text.encode()) > MAX_FRAME // 2:
             raise ValueError("Prompt must contain text and fit the session input limit")
@@ -212,7 +216,7 @@ class AcpSession:
         self._tool_activity.clear()
         self.state = "running"
         self._turn = asyncio.create_task(
-            connection.prompt(session_id=session_id, prompt=[text_block(text)])
+            connection.prompt(session_id=session_id, prompt=[text_block(text), *(content or [])])
         )
         try:
             async with asyncio.timeout(self.turn_timeout):

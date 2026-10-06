@@ -130,43 +130,61 @@ test("task settings preserve drafts, reject stale saves and reset; tool answers 
   });
   await page.goto(`/projects/agent-settings/tasks/${task.key}`);
   const detail = page.getByRole("region", { name: "Task details" });
-  await detail.getByText("Worker settings", { exact: true }).click();
-  await expect(detail.getByLabel("Model", { exact: true })).toHaveValue(
+  await page
+    .getByRole("button", { name: "Worker settings", exact: true })
+    .click();
+  const picker = page.getByRole("dialog", {
+    name: "Worker model settings",
+    exact: true,
+  });
+  await expect(picker.getByLabel("Model", { exact: true })).toHaveValue(
     "first",
   );
-  await detail.getByLabel("Model", { exact: true }).selectOption("second");
-  await expect(detail.getByLabel("Reasoning effort")).toHaveValue("");
-  await detail.getByLabel("Reasoning effort").selectOption("medium");
-  await detail.getByLabel("Native access mode").selectOption("read-only");
-  await detail.getByLabel("Native access mode").scrollIntoViewIfNeeded();
+  await picker.getByLabel("Model", { exact: true }).selectOption("second");
+  await expect(picker.getByLabel("Reasoning effort")).toHaveValue("");
+  await picker.getByLabel("Reasoning effort").selectOption("medium");
+  await picker.getByLabel("Native access mode").selectOption("read-only");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Ask worker", exact: true }).click();
+  await page.getByRole("button", { name: "first · low", exact: true }).click();
+  await expect(picker.getByLabel("Model", { exact: true })).toHaveValue(
+    "second",
+  );
+  await expect(picker.getByLabel("Reasoning effort")).toHaveValue("medium");
+  await picker.getByLabel("Native access mode").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/tmp/flowfield-slice3-native-modes.png" });
-  await detail.getByRole("button", { name: "Save agent settings" }).click();
-  await expect(detail.getByText("Task override")).toBeVisible();
+  await picker.getByRole("button", { name: "Save agent settings" }).click();
+  await page
+    .getByRole("button", { name: "second · medium", exact: true })
+    .click();
+  await expect(picker.getByText("Task override")).toBeVisible();
   expect(settings.selection?.mode).toBe("read-only");
-  await detail.getByLabel("Model", { exact: true }).selectOption("first");
-  await detail.getByLabel("Reasoning effort").selectOption("high");
+  await picker.getByLabel("Model", { exact: true }).selectOption("first");
+  await picker.getByLabel("Reasoning effort").selectOption("high");
   settings = { ...settings, revision: 3 };
   await request.post("/api/projects/agent-settings/tasks", {
     data: { title: "Cause settings refresh" },
   });
   await expect(
-    detail.getByText(
+    picker.getByText(
       "Settings changed elsewhere. Load the latest settings before saving.",
     ),
   ).toBeVisible();
-  await expect(detail.getByLabel("Reasoning effort")).toHaveValue("high");
+  await expect(picker.getByLabel("Reasoning effort")).toHaveValue("high");
   await expect(
-    detail.getByRole("button", { name: "Save agent settings" }),
+    picker.getByRole("button", { name: "Save agent settings" }),
   ).toBeDisabled();
   page.once("dialog", (dialog) => dialog.accept());
-  await detail.getByRole("button", { name: "Load latest settings" }).click();
-  await expect(detail.getByLabel("Model", { exact: true })).toHaveValue(
+  await picker.getByRole("button", { name: "Load latest settings" }).click();
+  await expect(picker.getByLabel("Model", { exact: true })).toHaveValue(
     "second",
   );
-  await detail.getByRole("button", { name: "Use project defaults" }).click();
+  await picker.getByRole("button", { name: "Use project defaults" }).click();
+  await page.getByRole("button", { name: "first · low", exact: true }).click();
   await expect(
-    detail.getByText("Using project defaults", { exact: true }),
+    picker.getByText("Using project defaults", { exact: true }),
   ).toBeVisible();
+  await page.keyboard.press("Escape");
   await detail
     .getByText("Run the project checks", { exact: true })
     .scrollIntoViewIfNeeded();

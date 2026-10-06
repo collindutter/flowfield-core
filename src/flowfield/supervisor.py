@@ -19,6 +19,7 @@ from flowfield.adapters.historical_workspace import HistoricalWorkspace
 from flowfield.adapters.local_execution import LocalAttempt, LocalHost
 from flowfield.agent_models import AgentChoice
 from flowfield.application import Workspace
+from flowfield.attachments import Attachments
 from flowfield.errors import ApplicationError
 from flowfield.execution import Execution
 from flowfield.execution_models import (
@@ -437,6 +438,11 @@ class Supervisor:
                     outcome = await client.prompt(
                         json.dumps(brief, ensure_ascii=False),
                         None if run.purpose == "discussion" else request_permission,
+                        attachments=Attachments(self.workspace).inputs(
+                            run.project_id,
+                            run.task_id,
+                            sections.get("feedback", "") + sections.get("input", ""),
+                        ),
                     )
             except TimeoutError as error:
                 raise ApplicationError(

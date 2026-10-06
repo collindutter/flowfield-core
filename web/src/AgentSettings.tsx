@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ContentStack, Disclosure } from "./DetailLayout";
+import { Popover } from "radix-ui";
+import { ChevronDown } from "lucide-react";
+import { ContentStack } from "./DetailLayout";
 
 type Settings = components["schemas"]["AgentSettingsView"];
 type Choice = components["schemas"]["AgentChoice-Output"];
@@ -117,24 +119,33 @@ export function AgentModelFields({
   );
 }
 
-export function AgentSettingsEditor({
-  path,
-  refresh,
-  onDirty,
-  coordinator = false,
-  onReady,
-}: {
+type AgentSettingsProps = {
   projectId: string;
   path: string;
   refresh: unknown;
   onDirty: (value: boolean) => void;
   coordinator?: boolean;
   onReady?: (choice: Choice | null) => void;
-}) {
-  const resource = useResource<Settings>(path, refresh);
+  onSaved?: () => void;
+  compact?: boolean;
+};
+
+function useAgentSettingsContent(
+  {
+    path,
+    refresh,
+    onDirty,
+    coordinator = false,
+    onReady,
+    onSaved,
+    compact = false,
+  }: AgentSettingsProps,
+  enabled = true,
+) {
+  const resource = useResource<Settings>(enabled ? path : null, refresh);
   const [retry, setRetry] = useState(0);
   const catalog = useResource<Model[]>(
-    retry ? "worker-models?refresh=true" : "worker-models",
+    enabled ? (retry ? "worker-models?refresh=true" : "worker-models") : null,
     retry,
     180000,
   );
@@ -153,9 +164,9 @@ export function AgentSettingsEditor({
   const mode = choice?.mode ?? "";
   const stale = !!(draft && data && draft.revision !== data.revision);
   useEffect(() => {
-    onDirty(!!draft);
+    onDirty(!!draft || busy);
     return () => onDirty(false);
-  }, [draft, onDirty]);
+  }, [draft, busy, onDirty]);
   useEffect(() => {
     const saved = data?.effective?.choice;
     const available =
@@ -164,10 +175,8 @@ export function AgentSettingsEditor({
         (item) =>
           item.id === saved?.model && item.efforts.includes(saved.effort),
       );
-    onReady?.(
-      !draft && !busy && !resource.error && available ? (saved ?? null) : null,
-    );
-  }, [data, draft, busy, resource.error, catalog.data, onReady]);
+    onReady?.(!resource.error && available ? (saved ?? null) : null);
+  }, [data, resource.error, catalog.data, onReady]);
   function change(model: string, effort: string, mode: string) {
     if (data)
       setDraft({
@@ -200,6 +209,7 @@ export function AgentSettingsEditor({
       resource.setData(updated);
       setDraft(null);
       setNotice(reset ? "Using project defaults." : "Settings saved.");
+      onSaved?.();
     } catch (error) {
       setError((error as Error).message);
     } finally {
@@ -208,11 +218,13 @@ export function AgentSettingsEditor({
   }
   return (
     <ContentStack space="section">
-      <p>
-        {coordinator
-          ? "Model and effort for your next message."
-          : "Changes apply to the next worker attempt."}
-      </p>
+      {!compact && (
+        <p>
+          {coordinator
+            ? "Model and effort for your next message."
+            : "Changes apply to the next worker attempt."}
+        </p>
+      )}
       {!coordinator && (
         <p className="detail-metadata">
           {data?.selection ? "Task override" : "Using project defaults"}
@@ -242,7 +254,7 @@ export function AgentSettingsEditor({
         <fieldset
           disabled={busy || !data}
           className="content-stack"
-          data-space="section"
+          data-space={compact ? "content" : "section"}
         >
           <AgentModelFields
             model={model}
@@ -281,6 +293,40 @@ export function AgentSettingsEditor({
                 Use project defaults
               </Button>
             )}
+            {(draft || error || resource.error) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={async () => {
+                  if (!stale && !error && !resource.error) {
+                    setDraft(null);
+                    return;
+                  }
+                  if (
+                    draft &&
+                    !window.confirm(
+                      "Discard your edits and load the saved settings?",
+                    )
+                  )
+                    return;
+                  try {
+                    resource.invalidate();
+                    resource.setData(await request<Settings>(path));
+                    resource.setError("");
+                    setDraft(null);
+                    setError("");
+                  } catch (error) {
+                    setError((error as Error).message);
+                  }
+                }}
+              >
+                {stale || error || resource.error
+                  ? "Load latest settings"
+                  : "Cancel changes"}
+              </Button>
+            )}
           </div>
         </fieldset>
       </form>
@@ -293,70 +339,62 @@ export function AgentSettingsEditor({
           </AlertDescription>
         </Alert>
       )}
-      {(draft || error || resource.error) && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={async () => {
-            if (!stale && !error && !resource.error) {
-              setDraft(null);
-              return;
-            }
-            if (
-              draft &&
-              !window.confirm("Discard your edits and load the saved settings?")
-            )
-              return;
-            try {
-              resource.invalidate();
-              resource.setData(await request<Settings>(path));
-              resource.setError("");
-              setDraft(null);
-              setError("");
-            } catch (error) {
-              setError((error as Error).message);
-            }
-          }}
-        >
-          {stale || error || resource.error
-            ? "Load latest settings"
-            : "Cancel changes"}
-        </Button>
-      )}
       {notice && <p role="status">{notice}</p>}
     </ContentStack>
   );
 }
 
-export function TaskAgentSettings({
-  projectId,
-  taskId,
-  refresh,
-  onDirty,
-}: {
-  projectId: string;
-  taskId: string;
-  refresh: unknown;
-  onDirty: (value: boolean) => void;
+export function AgentSettingsControl({
+  open,
+  onOpenChange,
+  label,
+  autoOpened = false,
+  ...props
+}: AgentSettingsProps & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  label: string;
+  autoOpened?: boolean;
 }) {
-  const [opened, setOpened] = useState(false);
+  const [mounted, setMounted] = useState(!!props.coordinator || open);
+  if (open && !mounted) setMounted(true);
+  const fields = useAgentSettingsContent(
+    { ...props, compact: true, onSaved: () => onOpenChange(false) },
+    mounted,
+  );
   return (
-    <Disclosure
-      summary="Worker settings"
-      onToggle={(event) => {
-        if (event.currentTarget.open) setOpened(true);
-      }}
-    >
-      {opened && (
-        <AgentSettingsEditor
-          projectId={projectId}
-          path={`projects/${projectId}/tasks/${taskId}/agent-settings`}
-          refresh={refresh}
-          onDirty={onDirty}
-        />
-      )}
-    </Disclosure>
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="composer-model"
+          title={label}
+        >
+          <span>{label}</span>
+          <ChevronDown size={12} />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side="top"
+          align="start"
+          sideOffset={8}
+          className="composer-settings"
+          onFocusOutside={(event) => {
+            // A newly activated workspace tab can receive focus after its popup mounts.
+            if (autoOpened) event.preventDefault();
+          }}
+          aria-label={
+            props.coordinator
+              ? "Coordinator model settings"
+              : "Worker model settings"
+          }
+        >
+          {fields}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

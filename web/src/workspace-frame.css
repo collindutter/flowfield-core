@@ -253,18 +253,9 @@
 }
 .coordinator-composer {
   flex-shrink: 0;
-  padding: 16px;
+  padding: 12px;
   border-top: 1px solid var(--border);
-  background: var(--muted);
+  background: var(--background);
   max-height: 55%;
   overflow: auto;
-}
-.coordinator-composer textarea {
-  background: var(--background);
-}
-.coordinator-composer .detail-metadata {
-  font-size: 11px;
-}
-.coordinator-settings {
-  padding-block: 12px;
 }

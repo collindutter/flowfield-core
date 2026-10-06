@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -10,8 +11,9 @@ import { useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { OverlayFooter } from "./EntityOverlay";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Composer } from "./Composer";
+import { AgentSettingsControl } from "./AgentSettings";
+import { ArrowUp } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ContentStack, DetailHeading } from "./DetailLayout";
 import type { components } from "./api-schema";
@@ -96,6 +98,7 @@ export function TaskConversation({
   onDirty,
   taskActions,
   taskActionContext,
+  onSettingsDirty,
 }: {
   projectId: string;
   task: Task;
@@ -104,6 +107,7 @@ export function TaskConversation({
   onDirty: (dirty: boolean) => void;
   taskActions: ReactNode;
   taskActionContext: ReactNode;
+  onSettingsDirty: (dirty: boolean) => void;
 }) {
   const route = useParams();
   const path = `projects/${projectId}/tasks/${task.id}`;
@@ -171,6 +175,31 @@ export function TaskConversation({
       : null);
   const showComposer = composerAction !== null;
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const [choice, setChoice] = useState<
+    components["schemas"]["AgentChoice-Output"] | null
+  >(null);
+  const settingsChanged = useCallback(
+    (value: boolean) => {
+      setSettingsDirty(value);
+      onSettingsDirty(value);
+    },
+    [onSettingsDirty],
+  );
+  const settingsControl = (
+    <AgentSettingsControl
+      projectId={projectId}
+      path={`${path}/agent-settings`}
+      refresh={refresh}
+      open={modelOpen}
+      onOpenChange={setModelOpen}
+      onDirty={settingsChanged}
+      onReady={setChoice}
+      label={choice ? `${choice.model} · ${choice.effort}` : "Worker settings"}
+    />
+  );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [olderBusy, setOlderBusy] = useState(false);
@@ -292,7 +321,15 @@ export function TaskConversation({
     });
   }
   async function send() {
-    if (!draft?.body.trim() || !gate.data?.enabled || stale) return;
+    if (
+      busy ||
+      uploading ||
+      settingsDirty ||
+      !draft?.body.trim() ||
+      !gate.data?.enabled ||
+      stale
+    )
+      return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -595,29 +632,57 @@ export function TaskConversation({
             {currentQuestion.error && (
               <p role="alert">{currentQuestion.error}</p>
             )}
-            {showComposer && (
-              <>
-                <Label htmlFor="task-reply">
-                  {draft?.action === "changes"
-                    ? "Feedback for this result"
-                    : draft?.action === "observation"
-                      ? "Testing observations"
-                      : composerAction === "answer"
-                        ? "Your answer"
-                        : "Message the worker"}
-                </Label>
-                <Textarea
-                  id="task-reply"
-                  ref={input}
-                  className="bg-background"
-                  value={draft?.body ?? ""}
-                  rows={3}
-                  maxLength={8000}
-                  disabled={busy || !inputEnabled}
-                  onChange={(e) => updateBody(e.target.value)}
-                />
-              </>
-            )}
+            <Composer
+              draftKey={key}
+              collapsed={!showComposer}
+              projectId={projectId}
+              taskId={task.id}
+              inputRef={input}
+              value={draft?.body ?? ""}
+              onChange={updateBody}
+              maxLength={8000}
+              label={
+                draft?.action === "changes"
+                  ? "Feedback for this result"
+                  : draft?.action === "observation"
+                    ? "Testing observations"
+                    : composerAction === "answer"
+                      ? "Your answer"
+                      : "Message the worker"
+              }
+              disabled={busy || !inputEnabled}
+              onBusy={setUploading}
+              onSend={() => void send()}
+              onModel={() => setModelOpen(true)}
+              controls={settingsControl}
+              action={
+                showComposer && (
+                  <Button
+                    type="submit"
+                    size="icon-sm"
+                    aria-label={
+                      draft?.action === "changes"
+                        ? "Send feedback"
+                        : composerAction === "observation"
+                          ? "Save testing"
+                          : composerAction === "answer"
+                            ? "Send answer"
+                            : "Send message"
+                    }
+                    disabled={
+                      busy ||
+                      uploading ||
+                      settingsDirty ||
+                      !inputEnabled ||
+                      !draft?.body.trim() ||
+                      stale
+                    }
+                  >
+                    <ArrowUp size={16} />
+                  </Button>
+                )
+              }
+            />
             {!gate.data?.enabled &&
               gate.data &&
               (showComposer || !!gate.data.pending_reply_id) && (
@@ -705,22 +770,6 @@ export function TaskConversation({
                   Use current context
                 </Button>
               )}
-              {showComposer && (
-                <Button
-                  size="sm"
-                  disabled={
-                    busy || !inputEnabled || !draft?.body.trim() || stale
-                  }
-                >
-                  {draft?.action === "changes"
-                    ? "Send feedback"
-                    : composerAction === "observation"
-                      ? "Save testing"
-                      : composerAction === "answer"
-                        ? "Send answer"
-                        : "Send message"}
-                </Button>
-              )}
               {!showComposer &&
                 gate.data?.enabled &&
                 gate.data.reason === "idle" && (
@@ -753,7 +802,7 @@ export function TaskConversation({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={busy}
+                  disabled={busy || uploading}
                   onClick={discardDraft}
                 >
                   {composerAction === "answer"
@@ -781,6 +830,7 @@ export function TaskConversation({
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={uploading}
                   onClick={() =>
                     setDrafts((values) => ({
                       ...values,

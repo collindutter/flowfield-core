@@ -1,6 +1,7 @@
 """Codex choices and public activity over ACP; native tools/policies stay in Codex."""
 
 import asyncio
+import base64
 import hashlib
 import json
 import os
@@ -10,8 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from acp.exceptions import RequestError
-from acp.schema import HttpMcpServer
-from pydantic import BaseModel
+from acp.schema import HttpMcpServer, ImageContentBlock, TextContentBlock
+from pydantic import BaseModel, ValidationError
 
 from flowfield.adapters.acp_session import (
     AcpSession,
@@ -26,7 +27,7 @@ from flowfield.adapters.codex_install import command
 from flowfield.agent_models import AgentChoice
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import ModelOption, NativeMode
-from flowfield.run_activity import ActivityUpdate
+from flowfield.run_activity import ActivityUpdate, ContextUsage
 
 
 def choices(config: list[dict[str, Any]], identity: str) -> list[dict[str, Any]]:
@@ -120,6 +121,12 @@ class CodexAgent:
                     ),
                 )
             )
+        elif event.kind == "usage":
+            try:
+                context = ContextUsage.model_validate(event.data)
+            except ValidationError:
+                return
+            self.on_activity(ActivityUpdate(key="context", kind="status", text="", context=context))
         # ACP context occupancy is not billable input/output usage. Keep unsupported
         # token counters unknown rather than presenting context as consumed tokens.
 
@@ -182,11 +189,36 @@ class CodexAgent:
                 409,
             ) from error
 
-    async def prompt(self, text: str, on_permission: PermissionHandler | None) -> dict[str, str]:
+    async def prompt(
+        self,
+        text: str,
+        on_permission: PermissionHandler | None,
+        *,
+        attachments: list[dict[str, str]] | None = None,
+    ) -> dict[str, str]:
         if self.stopping:
             return {"status": "stopped"}
         self.session.on_permission = on_permission
-        outcome = await self.session.prompt(text)
+        content: list[ImageContentBlock | TextContentBlock] = []
+        for item in attachments or []:
+            content.append(TextContentBlock(type="text", text=f"Human attachment: {item['name']}"))
+            if item["mime"].startswith("image/"):
+                if not self.session.capabilities.get("promptCapabilities", {}).get("image"):
+                    raise ApplicationError(
+                        "images_unavailable",
+                        "This harness cannot receive images. Send text/code instead.",
+                        409,
+                    )
+                content.append(
+                    ImageContentBlock(type="image", data=item["data"], mime_type=item["mime"])
+                )
+            else:
+                content.append(
+                    TextContentBlock(
+                        type="text", text=base64.b64decode(item["data"]).decode("utf-8")
+                    )
+                )
+        outcome = await self.session.prompt(text, content=content)
         return {"status": "completed" if outcome == "end_turn" else outcome}
 
     async def stop(self) -> bool:

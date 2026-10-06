@@ -6,6 +6,7 @@ from uuid import uuid4
 from flowfield.activity_text import preview
 from flowfield.agent_settings import AgentSettings
 from flowfield.application import Workspace, now
+from flowfield.attachments import Attachments
 from flowfield.coordinator_models import (
     CoordinatorConversation,
     CoordinatorPage,
@@ -164,6 +165,7 @@ class CoordinatorStore:
                 settings=settings,
                 created_at=now(),
             )
+            Attachments(self.workspace).references(db, project, None, request.text, bind=True)
             result = db.execute(
                 "INSERT INTO coordinator_turns(id,project_id,conversation_id,status,data) "
                 "VALUES (?,?,?,?,?)",

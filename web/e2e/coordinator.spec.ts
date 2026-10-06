@@ -74,6 +74,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
         active: true,
         changed: true,
         omitted: false,
+        context: { used: 12000, size: 100000 },
         items: [
           {
             key: "tool",
@@ -154,15 +155,69 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     page.getByRole("link", { name: /CHT-1.*Plan the chat experience/ }),
   ).toBeVisible();
   const input = page.getByRole("textbox", { name: "Message coordinator" });
+  await input.fill("/mo");
+  const commandInput = page.getByRole("combobox", {
+    name: "Message coordinator",
+  });
+  await expect(page.getByRole("option", { name: /\/model/ })).toBeVisible();
+  await commandInput.press("ArrowDown");
+  await commandInput.press("Enter");
+  await expect(input).toHaveValue("");
+  await expect(
+    page.getByRole("dialog", { name: "Coordinator model settings" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await input.fill("/unknown");
+  await page
+    .getByRole("combobox", { name: "Message coordinator" })
+    .press("Escape");
+  await expect(input).toHaveValue("/unknown");
+  await page.getByLabel("Attach files", { exact: true }).setInputFiles([
+    {
+      name: "notes.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Keep the public API."),
+    },
+    {
+      name: "screen.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    },
+  ]);
+  await expect(
+    page.getByRole("button", { name: "Remove screen.png" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Send", exact: true }),
+  ).toBeEnabled();
   await input.fill("Keep my project draft");
   await page.getByRole("link", { name: "Chat Other", exact: true }).click();
   await page.getByRole("link", { name: "Chat Browser", exact: true }).click();
   await expect(input).toHaveValue("Keep my project draft");
+  await expect(
+    page.getByRole("button", { name: "Remove notes.txt" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("composer-attachments.png"),
+  });
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("Let’s plan the work.")).toBeVisible();
+  expect(turns[0].text).toContain(
+    "[screen.png](/api/projects/chat-browser/attachments/",
+  );
+  await page
+    .locator(".composer-toolbar")
+    .getByLabel("12% context used")
+    .hover();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "12,000 / 100,000 tokens (12%)",
+  );
   await expect(
     page.getByRole("button", { name: "Send", exact: true }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   active!.activity.items.find((item) => item.kind === "agent")!.text +=
     " Open [CHT-1](/projects/chat-browser/tasks/CHT-1).";
   await expect(
@@ -231,7 +286,7 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   page,
   request,
 }, testInfo) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setViewportSize({ width: 390, height: 844 });
   const directory = join(state, "chat-settings");
   mkdirSync(directory, { recursive: true });
   await request.post("/api/projects/initialize", {
@@ -289,6 +344,15 @@ test("single coordinator requires a saved model, labels loading and retains unsa
     },
   );
   await page.goto("/projects/chat-settings");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("dialog", { name: "Coordinator model settings" }),
+  ).toHaveCount(0);
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Coordinator model settings" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
   const model = page.getByRole("combobox", { name: "Model", exact: true });
   const effort = page.getByRole("combobox", {
     name: "Reasoning effort",
@@ -299,11 +363,24 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   await expect(model).toBeDisabled();
   await expect(model.locator("option:checked")).toHaveText("Loading models…");
   await expect(effort.locator("option:checked")).toHaveText("Loading efforts…");
+  await input.click();
+  await expect(model).not.toBeVisible();
   await input.fill("Plan something useful");
+  await page.getByLabel("Attach files", { exact: true }).setInputFiles({
+    name: "requirement.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("Keep this requirement."),
+  });
+  await expect(
+    page.getByRole("button", { name: "Remove requirement.md" }),
+  ).toBeVisible();
   await expect(send).toBeDisabled();
   await input.press("Control+Enter");
   expect(sends).toBe(0);
   release();
+  await page
+    .getByRole("button", { name: "Model settings", exact: true })
+    .click();
   await expect(model).toBeEnabled();
   await expect(model.locator("option:checked")).toHaveText("Choose a model");
   await expect(effort).toBeDisabled();
@@ -317,6 +394,9 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   await page.getByRole("link", { name: "Flowfield", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Keep editing", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Model settings", exact: true })
+    .click();
   await expect(model).toHaveValue("second");
   await page.screenshot({
     path: testInfo.outputPath("coordinator-model-settings.png"),
@@ -337,6 +417,9 @@ test("single coordinator requires a saved model, labels loading and retains unsa
     0,
   );
   await expect(input).toHaveValue("Plan something useful");
+  await expect(
+    page.getByRole("button", { name: "Remove requirement.md" }),
+  ).toBeVisible();
   expect(sends).toBe(1);
   await page.reload();
   await expect(

@@ -4,14 +4,15 @@ import { useResource } from "./useResource";
 import { request } from "./workspace";
 import { Markdown } from "./Markdown";
 import { Timestamp } from "./Timestamp";
-import { AgentSettingsEditor } from "./AgentSettings";
+import { AgentSettingsControl } from "./AgentSettings";
+import { Composer } from "./Composer";
+import { ContextRing } from "./ContextRing";
 import { Disclosure } from "./DetailLayout";
 import { ActivityEntries } from "./RunActivity";
 import { useFeedScroll } from "./useFeedScroll";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings2 } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 type Page = components["schemas"]["CoordinatorPage"];
 type Turn = components["schemas"]["CoordinatorTurn"];
 type Choice = components["schemas"]["AgentChoice-Output"];
@@ -30,11 +31,13 @@ export function CoordinatorChat({
   refresh,
   drafts,
   onSettingsDirty,
+  controlsActive = true,
 }: {
   projectId: string;
   refresh: unknown;
   drafts: ChatDrafts;
   onSettingsDirty: (dirty: boolean) => void;
+  controlsActive?: boolean;
 }) {
   const base = `projects/${projectId}/coordinator`;
   const [history, setHistory] = useState<{ page: Page | null; items: Turn[] }>({
@@ -48,8 +51,9 @@ export function CoordinatorChat({
   const [before, setBefore] = useState<number | null | undefined>(undefined);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState<boolean | undefined>();
   const [choice, setChoice] = useState<Choice | null>(null);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const dirty = useCallback(
@@ -93,6 +97,7 @@ export function CoordinatorChat({
     if (
       !draft.text.trim() ||
       busy ||
+      uploading ||
       active ||
       !page ||
       !choice ||
@@ -254,75 +259,77 @@ export function CoordinatorChat({
             </AlertDescription>
           </Alert>
         )}
-        <div
-          className="coordinator-settings"
-          hidden={!settingsOpen && !!choice}
-        >
-          <AgentSettingsEditor
-            projectId={projectId}
-            path={`projects/${projectId}/coordinator-settings`}
-            refresh={refresh}
-            coordinator
-            onDirty={dirty}
-            onReady={setChoice}
-          />
-        </div>
-        <Textarea
-          aria-label="Message coordinator"
-          placeholder={
-            choice ? "Plan the next step…" : "Choose a model to start planning…"
-          }
-          rows={3}
-          maxLength={16000}
+        <Composer
+          projectId={projectId}
+          active={controlsActive}
           value={draft.text}
+          onChange={update}
+          label="Message coordinator"
+          placeholder="Message coordinator…"
+          maxLength={16000}
           disabled={busy}
-          onChange={(event) => update(event.target.value)}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              (event.metaKey || event.ctrlKey) &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-              void send();
-            }
-          }}
+          onBusy={setUploading}
+          onSend={() => void send()}
+          onModel={() => setSettingsOpen(true)}
+          onStop={running ? () => void action(active, "stop") : undefined}
+          controls={
+            <>
+              <AgentSettingsControl
+                projectId={projectId}
+                path={`projects/${projectId}/coordinator-settings`}
+                refresh={refresh}
+                coordinator
+                open={controlsActive && (settingsOpen ?? !choice)}
+                autoOpened={settingsOpen === undefined && !choice}
+                onOpenChange={setSettingsOpen}
+                onDirty={dirty}
+                onReady={setChoice}
+                label={
+                  choice
+                    ? `${choice.model} · ${choice.effort}`
+                    : "Model settings"
+                }
+              />
+              <ContextRing
+                context={(active ?? turns.at(-1))?.activity.context}
+                active={running}
+              />
+            </>
+          }
+          action={
+            running ? (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="secondary"
+                aria-label={active.status === "stopping" ? "Stopping…" : "Stop"}
+                disabled={busy || active.status === "stopping"}
+                onClick={() => void action(active, "stop")}
+              >
+                <Square size={14} />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="icon-sm"
+                aria-label="Send"
+                title="Send (⌘/Ctrl+Enter)"
+                disabled={
+                  busy ||
+                  uploading ||
+                  !!active ||
+                  !page ||
+                  !choice ||
+                  settingsDirty ||
+                  !draft.text.trim()
+                }
+                onClick={() => void send()}
+              >
+                <ArrowUp size={16} />
+              </Button>
+            )
+          }
         />
-        <div className="actions">
-          <Button
-            size="sm"
-            disabled={
-              busy ||
-              !!active ||
-              !page ||
-              !choice ||
-              settingsDirty ||
-              !draft.text.trim()
-            }
-            onClick={() => void send()}
-          >
-            Send
-          </Button>
-          {running && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy || active.status === "stopping"}
-              onClick={() => void action(active, "stop")}
-            >
-              {active.status === "stopping" ? "Stopping…" : "Stop"}
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-expanded={settingsOpen || !choice}
-            onClick={() => setSettingsOpen((value) => !value)}
-          >
-            <Settings2 size={14} />
-            {choice ? `${choice.model} · ${choice.effort}` : "Model settings"}
-          </Button>
-        </div>
       </div>
     </>
   );

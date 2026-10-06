@@ -1,0 +1,141 @@
+.composer-wrap,
+.composer-command {
+  min-width: 0;
+}
+.composer-input {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+  overflow: hidden;
+}
+.composer-input:focus-within {
+  border-color: var(--ring);
+}
+.composer-input textarea {
+  width: 100%;
+  min-height: 64px;
+  max-height: 180px;
+  resize: none;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 12px 12px 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent;
+}
+.composer-input textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.composer-input textarea[hidden],
+.composer-toolbar button[hidden] {
+  display: none;
+}
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 6px;
+  min-width: 0;
+}
+.composer-spacer {
+  flex: 1;
+  min-width: 2px;
+}
+.composer-model {
+  min-width: 0;
+  max-width: min(65%, 240px);
+  padding-inline: 6px;
+  font-size: 12px;
+}
+.composer-model > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.context-ring {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 4px;
+  color: var(--muted-foreground);
+  border-radius: 4px;
+}
+.context-ring:focus-visible {
+  outline: 2px solid var(--ring);
+}
+.composer-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 8px 0;
+}
+.composer-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding-left: 6px;
+  font-size: 12px;
+}
+.composer-file > a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+.composer-error {
+  font-size: 12px;
+  color: var(--destructive);
+  margin-bottom: 6px;
+}
+.composer-command-menu,
+.composer-settings {
+  z-index: 60;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px #0002;
+  padding: 6px;
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(60dvh, var(--radix-popover-content-available-height));
+  overflow: auto;
+}
+.composer-settings {
+  padding: 12px;
+}
+.composer-settings [data-slot="native-select-wrapper"] {
+  width: 100%;
+}
+.composer-command-menu [cmdk-item] {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.composer-command-menu [cmdk-item][data-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.composer-command-menu [cmdk-item] .detail-metadata {
+  margin-left: auto;
+}
+.activity-context {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.composer-collapsed {
+  border: 0;
+  background: transparent;
+}
+.composer-collapsed .composer-toolbar {
+  padding: 0;
+}

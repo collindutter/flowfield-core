@@ -378,7 +378,9 @@ def test_schema32_upgrade_retains_legacy_runtime_and_live_ownership(tmp_path, mo
     from flowfield.execution import Execution
 
     with monkeypatch.context() as older:
-        older.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:-1])
+        older.setattr(
+            migrations, "MIGRATIONS", [m for m in migrations.MIGRATIONS if m.version <= 32]
+        )
         execution = fixture(tmp_path)
         run = execution.claim("harbor", "a" * 40, {"a" * 40: set()})
         execution.save_local(run.id, {"pid": 1234567, "commands": ["retained-tool"]})

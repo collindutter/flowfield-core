@@ -1,5 +1,6 @@
 @import "./theme.css";
 @import "./detail-layout.css";
+@import "./composer.css";
 
 @layer components {
   .queue-controls {

@@ -26,12 +26,18 @@ CREATE TABLE run_activity (
 """
 
 
+class ContextUsage(BaseModel):
+    used: int = Field(ge=0)
+    size: int = Field(gt=0)
+
+
 class ActivityUpdate(BaseModel):
     key: str = Field(max_length=100)
     kind: Kind
     text: str
     append: bool = False
     omitted: bool = False
+    context: ContextUsage | None = None
 
 
 class RunActivityEntry(BaseModel):
@@ -51,6 +57,7 @@ class RunActivityPage(BaseModel):
     omitted: bool = False
     items: list[RunActivityEntry] = []
     usage: Usage = Field(default_factory=Usage)
+    context: ContextUsage | None = None
 
 
 def clean(text: str) -> str:
@@ -63,6 +70,9 @@ def clean(text: str) -> str:
 def update_activity(page: RunActivityPage, updates: list[ActivityUpdate]) -> None:
     entries = {entry.key: entry for entry in page.items}
     for update in updates:
+        if update.context is not None:
+            page.context = update.context
+            continue
         old = entries.get(update.key)
         text = (old.text if old and update.append else "") + clean(update.text)
         omitted = update.omitted or len(text) > MAX_TEXT or bool(old and old.omitted)
