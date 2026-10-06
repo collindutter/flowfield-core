@@ -82,7 +82,9 @@ def test_capture_refinement_and_queue_are_separate(tmp_path: Path):
         )
     assert w.task("project", task.id).body == task.body
     assert execution.claim("project", "a" * 40, {}) is None
-    w.add_activity("project", ActivityCreate(kind="decision", body="Reconsider the audience."))
+    w.add_activity(
+        "project", ActivityCreate(task_id=task.id, kind="decision", body="Reconsider the audience.")
+    )
     changed = w.task("project", task.id)
     assert changed.publication_status == "needs_reconciliation"
     assert "Decisions changed" in changed.preparation_issue
@@ -107,7 +109,9 @@ def test_failed_preparation_rolls_back_creation_edits_history_and_notifications(
         "project", TaskCreate(title="Report", body="Original agreement", preparation=preparation())
     )
     assert task.key.endswith("-1")
-    w.add_activity("project", ActivityCreate(kind="decision", body="Use recorded evidence."))
+    w.add_activity(
+        "project", ActivityCreate(task_id=task.id, kind="decision", body="Use recorded evidence.")
+    )
     before = w.task("project", task.id)
     notifications.clear()
     with pytest.raises(ApplicationError, match="Decisions changed"):
@@ -122,7 +126,7 @@ def test_failed_preparation_rolls_back_creation_edits_history_and_notifications(
         )
     assert w.task("project", task.id) == before and not notifications
     sequence = before.decision_sequence
-    assert ContextReads(w).overview("project")["decision_sequence"] == sequence
+    assert "decision_sequence" not in ContextReads(w).overview("project")
     with pytest.raises(ApplicationError):
         w.edit_task(
             "project",

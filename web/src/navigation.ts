@@ -5,8 +5,6 @@ const pagePaths = [
   "new-project",
   "projects/:projectId",
   "projects/:projectId/archive",
-  "projects/:projectId/decisions",
-  "projects/:projectId/decisions/:decisionId",
   "projects/:projectId/inbox",
   "projects/:projectId/inbox/:questionId",
   "projects/:projectId/edit/:projectTab?",
@@ -64,7 +62,7 @@ function editorIdentity(path: string) {
     );
 }
 export function entityPage(path: string) {
-  return /^\/projects\/[^/]+\/(?:tasks\/[^/]+|milestones\/[^/]+|decisions\/[^/]+|inbox\/[^/]+|edit)(?:\/.*)?$/.test(
+  return /^\/projects\/[^/]+\/(?:tasks\/[^/]+|milestones\/[^/]+|inbox\/[^/]+|edit)(?:\/.*)?$/.test(
     withoutQuestionOverlay(path),
   );
 }
@@ -72,10 +70,7 @@ export function collectionPath(path: string) {
   const base = withoutQuestionOverlay(path);
   return base
     .replace(/^(\/projects\/[^/]+)\/(tasks\/.*|edit(?:\/.*)?)$/, "$1")
-    .replace(
-      /^(\/projects\/[^/]+)\/(milestones|decisions|inbox)\/.*$/,
-      "$1/$2",
-    );
+    .replace(/^(\/projects\/[^/]+)\/(milestones|inbox)\/.*$/, "$1/$2");
 }
 type EntityNavigationState = {
   backgroundPath?: string;

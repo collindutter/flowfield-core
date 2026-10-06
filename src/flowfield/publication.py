@@ -28,7 +28,7 @@ def decision_sequence(db: sqlite3.Connection, project_id: str, task_id: str) -> 
     return int(
         db.execute(
             "SELECT coalesce(max(sequence), 0) FROM activity WHERE project_id=? "
-            "AND (task_id=? OR task_id IS NULL) AND (kind='decision' OR withdraws IS NOT NULL)",
+            "AND task_id=? AND (kind='decision' OR withdraws IS NOT NULL)",
             (project_id, task_id),
         ).fetchone()[0]
     )

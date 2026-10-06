@@ -251,7 +251,9 @@ def test_upgrade_cancels_only_unassigned_discussions_and_preserves_evidence(tmp_
     from flowfield.reply_models import Reply
 
     with monkeypatch.context() as previous:
-        previous.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:-1])
+        previous.setattr(
+            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 40)
+        )
         execution = fixture(tmp_path)
         request = message(execution.workspace)
         with execution.workspace.connection(write=True) as db:

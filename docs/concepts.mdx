@@ -104,3 +104,19 @@ The service validates and delivers approved code. Done means the agreed outcome 
 completed, including code delivery. A checkout blocker preserves approval for a delivery
 retry; a changed candidate needs its own review. Inspection is optional and never grants
 approval by itself.
+
+## Working with an existing project
+
+Keep architecture, designs, coding conventions and testing philosophy in the repository’s
+existing documents and agent instructions. Flowfield tracks ongoing assignments and their
+execution evidence; it does not require a second inventory of project decisions. Reference
+authoritative files in task definitions instead of copying rules into every task.
+
+During adoption, identify the delivery branch, reproducible setup commands and meaningful
+checks for your project. Preserve its existing workflow. For parallel work, give tests and
+services separate databases, ports and other mutable resources, or serialize that work.
+
+Project Decisions from earlier versions remain available through
+`flowfield project history --project PROJECT`. Prepared tasks affected by their retirement
+ask for reconciliation. Move still-applicable constraints into the task or repository
+guidance before preparing that work again.

@@ -114,10 +114,10 @@ def test_decision_changes_and_stale_checks_are_visible(tmp_path: Path) -> None:
     assert workspace.task("harbor", "export").readiness == "draft"
     publish(workspace)
     workspace.add_activity(
-        "harbor", ActivityCreate(kind="decision", body="All exports must stay offline.")
+        "harbor",
+        ActivityCreate(task_id="export", kind="decision", body="Exports must stay offline."),
     )
-    for identity in ("catalog", "export"):
-        assert workspace.task("harbor", identity).publication_status == "draft"
+    assert workspace.task("harbor", "export").publication_status == "draft"
     assert ContextReads(workspace).overview("harbor")["recommendation"]["action"] == "publish"
 
 

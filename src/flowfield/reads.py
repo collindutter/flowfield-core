@@ -328,7 +328,6 @@ class ContextReads:
                 )
             result = {
                 "project": project,
-                "decision_sequence": decision_sequence(db, project_id, ""),
                 "columns": columns,
                 **Questions(self.workspace).counts(db, project_id),
                 "archived_count": sum(t.archived for t in records.values()),
@@ -523,7 +522,6 @@ class ContextReads:
             "links": {
                 "board": self.url(project_id),
                 "inbox": self.url(project_id, "inbox"),
-                "decisions": self.url(project_id, "decisions"),
             },
             "attention": attention,
             "recent_changes": {
@@ -532,7 +530,6 @@ class ContextReads:
                 "count": change_count,
                 "omitted_count": change_count - len(changes),
             },
-            "current_project_decisions": self._decisions(db, project_id),
             "recommendation": recommendation,
             "repository_guidance": {
                 "paths": guidance,
@@ -540,8 +537,8 @@ class ContextReads:
             },
             "read_more": (
                 "get_task for description, blockers and handoff; get_question for answers; "
-                "list_tasks/list_questions for omitted items; list_activity per task or "
-                "current project decisions; get_text for excerpts."
+                "list_tasks/list_questions for omitted items; list_activity for history; "
+                "get_text for excerpts."
                 " search_context finds current or historical evidence with source references. "
                 "get_results/get_result/get_executions inspect omitted evidence."
             ),

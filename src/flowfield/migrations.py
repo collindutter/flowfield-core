@@ -1,5 +1,6 @@
 """Ordered database-only upgrades from the immutable Flowfield schema-29 baseline."""
 
+import json
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -182,6 +183,56 @@ def retire_worker_discussions(db: sqlite3.Connection) -> None:
     )
 
 
+def retire_project_decisions(db: sqlite3.Connection) -> None:
+    # Retain original activity and frozen attempts. Retired project constraints must
+    # not silently disappear from prepared work; reconcile them into its real sources.
+    active_projects = {
+        row[0]
+        for row in db.execute(
+            "SELECT DISTINCT a.project_id FROM activity a WHERE a.task_id IS NULL "
+            "AND a.kind='decision' AND NOT EXISTS (SELECT 1 FROM activity newer "
+            "WHERE newer.supersedes=a.id OR newer.withdraws=a.id)"
+        )
+    }
+    for row in db.execute("SELECT project_id,id,data FROM tasks").fetchall():
+        project_id, task_id, raw = row
+        task = json.loads(raw)
+        publication = task.get("publication")
+        sequence = db.execute(
+            "SELECT coalesce(max(sequence),0) FROM activity WHERE project_id=? "
+            "AND task_id=? AND (kind='decision' OR withdraws IS NOT NULL)",
+            (project_id, task_id),
+        ).fetchone()[0]
+        changed = bool(publication and publication["decision_sequence"] != sequence)
+        if publication:
+            publication["decision_sequence"] = sequence
+        if (
+            project_id in active_projects
+            and publication
+            and not task.get("archived")
+            and task["status"] != "done"
+        ):
+            reason = (
+                "Project decisions were retired. Review retained project history and move "
+                "applicable constraints into the task definition or repository guidance, "
+                "then reconcile this task."
+            )
+            task["reconciliation_reason"] = "\n\n".join(
+                filter(None, [task.get("reconciliation_reason"), reason])
+            )
+            changed = True
+        if changed:
+            task["revision"] += 1
+            data = json.dumps(task)
+            db.execute(
+                "UPDATE tasks SET data=? WHERE project_id=? AND id=?", (data, project_id, task_id)
+            )
+            db.execute(
+                "INSERT INTO task_revisions VALUES (?,?,?,?)",
+                (project_id, task_id, task["revision"], data),
+            )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
@@ -195,6 +246,7 @@ MIGRATIONS = (
     Migration(39, explicit_fast_mode),
     Migration(40, task_specific_speed),
     Migration(41, retire_worker_discussions),
+    Migration(42, retire_project_decisions),
 )
 
 

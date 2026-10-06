@@ -622,16 +622,6 @@
     line-height: 1.6;
     color: var(--muted-foreground);
   }
-  .decision-cards {
-    grid-template-columns: 1fr;
-  }
-  .decision-excerpt {
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-  }
   .detail-heading {
     display: flex;
     justify-content: space-between;
@@ -678,30 +668,6 @@
   .milestone-panel.editor {
     width: 100%;
     max-width: none;
-  }
-  .decision-detail {
-    overflow-wrap: anywhere;
-  }
-  .decision-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-  }
-  .decision-heading h2 {
-    margin: 0;
-    font-size: 20px;
-    line-height: 1.4;
-  }
-  .decision-meta {
-    margin: 0;
-    color: var(--muted-foreground);
-    font-size: 12px;
-    line-height: 1.6;
-  }
-  .decision-state {
-    font-size: 12px;
-    color: var(--muted-foreground);
   }
   a.milestone-tag {
     text-decoration: none;

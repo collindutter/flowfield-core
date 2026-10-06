@@ -315,12 +315,15 @@ def test_current_decisions_are_frozen_and_partial_concerns_remain_visible(tmp_pa
     execution = fixture(tmp_path)
     workspace = execution.workspace
     old = workspace.add_activity(
-        "harbor", ActivityCreate(kind="decision", body="Old speculative behavior")
+        "harbor", ActivityCreate(task_id="task-0", kind="decision", body="Old speculative behavior")
     )
     current = workspace.add_activity(
         "harbor",
         ActivityCreate(
-            kind="decision", supersedes=old.id, body="Keep Unicode paths and offline support"
+            task_id="task-0",
+            kind="decision",
+            supersedes=old.id,
+            body="Keep Unicode paths and offline support",
         ),
     )
     task = workspace.task("harbor", "task-0")
@@ -337,7 +340,10 @@ def test_current_decisions_are_frozen_and_partial_concerns_remain_visible(tmp_pa
     original = execution.assignment("harbor", run.id)
     assert json.loads(original["decisions"]) == [{"id": current.id, "body": current.body}]
     workspace.add_activity(
-        "harbor", ActivityCreate(kind="decision", supersedes=current.id, body="Later choice")
+        "harbor",
+        ActivityCreate(
+            task_id="task-0", kind="decision", supersedes=current.id, body="Later choice"
+        ),
     )
     assert execution.assignment("harbor", run.id) == original
 

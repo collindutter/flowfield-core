@@ -222,16 +222,8 @@ test("collections open and close entity details through the same routes", async 
     task_id: "retired",
     changes: { expected_revision: 1, archived: true },
   });
-  await request.post(`/api/projects/${project_id}/activity`, {
-    data: {
-      id: "choice",
-      kind: "decision",
-      body: "Work offline",
-      author: "human",
-    },
-  });
 
-  for (const path of ["milestones", "decisions", "archive"]) {
+  for (const path of ["milestones", "archive"]) {
     await page.goto(`/projects/${project_id}/${path}`);
     const row = page.locator(".collection-row").first();
     await expect(row).toBeVisible();
@@ -267,7 +259,7 @@ test("task metadata and internal Markdown links stay inside the router", async (
       id: "export",
       title: "Export books",
       milestone_id: "questions",
-      body: `[Project decisions](/projects/${project_id}/decisions)`,
+      body: `[Project milestones](/projects/${project_id}/milestones)`,
     },
   });
   await page.goto(`/projects/${project_id}/tasks/LNK-1`);
@@ -277,9 +269,9 @@ test("task metadata and internal Markdown links stay inside the router", async (
     exact: true,
   });
   await editor
-    .getByRole("link", { name: "Project decisions", exact: true })
+    .getByRole("link", { name: "Project milestones", exact: true })
     .click();
-  await expect(page).toHaveURL(`/projects/${project_id}/decisions`);
+  await expect(page).toHaveURL(`/projects/${project_id}/milestones`);
   expect(await page.evaluate(() => performance.timeOrigin)).toBe(boot);
   await page.goBack();
   await editor.getByRole("link", { name: "M-1", exact: true }).click();
@@ -398,24 +390,6 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
   await expect(
     page.getByRole("button", { name: "Add project", exact: true }),
   ).toBeVisible();
-  await page.getByRole("tab", { name: "Decisions", exact: true }).click();
-  await page.getByRole("button", { name: "New decision", exact: true }).click();
-  await page
-    .getByLabel("Decision and rationale")
-    .fill("Keep the first delivery local.");
-  await page
-    .getByRole("button", { name: "Save decision", exact: true })
-    .click();
-  await expect(
-    page.getByRole("dialog", { name: "Decision", exact: true }),
-  ).toContainText("Keep the first delivery local.");
-  await page
-    .getByRole("button", { name: "Close decision", exact: true })
-    .click();
-  await expect(page).toHaveURL(`/projects/${id}/decisions`);
-  await expect(
-    page.locator("[data-slot=dialog-content][data-state=open]"),
-  ).toHaveCount(0);
   await page.getByRole("tab", { name: /^Board / }).click();
   await page.getByRole("button", { name: "New task", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -606,22 +580,24 @@ test.describe("relative timestamps", () => {
       "--prefix",
       "TIM",
     ]);
-    const decision = cli([
-      "project",
-      "decide",
+    const task = cli([
+      "task",
+      "create",
+      "--title",
+      "Timestamp evidence",
       "--project",
       project,
       "--body",
       "Keep timestamp evidence accessible.",
     ]);
-    const created = Date.parse(decision.created_at);
+    const created = Date.parse(task.updated_at);
     await page.clock.install({ time: new Date(created) });
     await page.clock.pauseAt(new Date(created + 10000));
-    await page.goto(`/projects/${project}/decisions`);
-    const card = page.locator(".decision-cards .collection-row");
-    const time = card.locator("time");
+    await page.goto(`/projects/${project}/tasks/TIM-1`);
+    const card = page.locator(".conversation-message").first();
+    const time = card.locator("time").first();
     await expect(time).toHaveText("10 seconds ago");
-    await expect(time).toHaveAttribute("datetime", decision.created_at);
+    await expect(time).toHaveAttribute("datetime", task.updated_at);
     const exact = new Intl.DateTimeFormat("en-US", {
       dateStyle: "full",
       timeStyle: "long",
@@ -632,15 +608,17 @@ test.describe("relative timestamps", () => {
     await expect(page.getByRole("tooltip")).toHaveText(exact);
     await page.mouse.move(0, 0);
     await page.clock.runFor(100);
-    await card.focus();
+    await time.focus();
     await expect(page.getByRole("tooltip")).toHaveText(exact);
     // Time advances without a data refresh; the date behind the label stays fixed.
     await page.clock.fastForward(290000);
     await expect(time).toHaveText("5 minutes ago");
     await expect(page.getByRole("tooltip")).toHaveText(exact);
-    await card.click();
-    const detail = page.getByRole("dialog", { name: "Decision", exact: true });
-    const detailTime = detail.locator("time");
+    const detail = page.getByRole("region", {
+      name: "Task details",
+      exact: true,
+    });
+    const detailTime = detail.locator("time").first();
     await expect(detailTime).toHaveText("5 minutes ago");
     await detailTime.focus();
     await expect(page.getByRole("tooltip")).toHaveText(exact);

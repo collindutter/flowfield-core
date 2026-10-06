@@ -392,7 +392,7 @@ def create_mcp(
         """Capture agreed work, default feature in Backlog; first search for an existing task.
 
         For actionable intent include preparation with completion and expected_decision_sequence
-        from get_board. Capture and preparation commit atomically or neither is saved. Check
+        zero for a new task. Capture and preparation commit atomically or neither is saved. Check
         code destination/check settings first; if genuinely missing, save intent without
         preparation and explain the setup blocker. Never label code as report to bypass setup.
         Does not enable the queue. Only choose Up next with human execution authorization.
@@ -437,7 +437,7 @@ def create_mcp(
     async def publish_task(
         project_id: Identifier, task_id: TaskIdentifier, publication: TaskPublish
     ) -> CallToolResult:
-        """Prepare an existing task's assignment after reading its full intent and decisions.
+        """Prepare an existing task's assignment after reading its full intent and task evidence.
         Prefer create_task/edit_task with preparation when also authoring intent. This legacy
         operation name means preparation, not scheduling: it neither moves the task nor enables
         the queue. Use revision and decision_sequence from get_task. Resolve consequential
@@ -492,7 +492,7 @@ def create_mcp(
         before: int | None = None,
         limit: int = 20,
     ) -> CallToolResult:
-        """Read newest-first task activity or project decisions; next_cursor pages older entries.
+        """Read task activity or retained project history; next_cursor pages older entries.
 
         current_only returns only decisions that have not been superseded.
         Omitted task_id means project scope, never all tasks.
@@ -510,7 +510,7 @@ def create_mcp(
 
     @mcp.tool(annotations=write)
     async def add_activity(project_id: Identifier, entry: ActivityCreate) -> CallToolResult:
-        """Append a Markdown note, decision or task handoff. Project scope is decisions only.
+        """Append a Markdown note, decision or handoff to a task.
 
         Notes preserve findings/results, never launch or steer workers. A decision does not
         update requirements automatically. supersedes replaces a current same-scope decision.
@@ -601,7 +601,7 @@ def create_mcp(
         saved answer and fresh question/task revisions. Project questions instead need
         expected_project_revision and task_updates with every affected task/revision, even when
         unchanged; description optionally replaces project intent. Effects are atomic and the
-        decision is project-scoped. If task body is omitted, explain
+        resolution is saved with the project question. If task body is omitted, explain
         why the existing Description already satisfies the answer in decision. Never truncate it.
         Other questions/dependencies still block. No worker is launched or notified.
         """

@@ -652,7 +652,7 @@ class Questions:
             current.project_id,
             None,
             uuid4().hex,
-            "decision",
+            "event",
             request.decision,
             request.author,
             question.updated_at,

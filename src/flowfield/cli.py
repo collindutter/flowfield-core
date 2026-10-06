@@ -1079,17 +1079,16 @@ def task_activity(
     read_activity(ctx, project, task, decisions, current, before, limit, json_output)
 
 
-@project_app.command("decisions")
-def project_decisions(
+@project_app.command("history")
+def project_history(
     ctx: typer.Context,
     project: ProjectOption = None,
-    include_superseded: bool = False,
     before: int | None = None,
     limit: int = 20,
     json_output: Json = False,
 ) -> None:
-    """Read current project-scoped decisions; task decisions remain with their tasks."""
-    read_activity(ctx, project, None, True, not include_superseded, before, limit, json_output)
+    """Read retained project activity, including decisions from earlier releases."""
+    read_activity(ctx, project, None, False, False, before, limit, json_output)
 
 
 def append_activity(
@@ -1183,23 +1182,6 @@ def task_handoff(
             },
         ),
         json_output,
-    )
-
-
-@project_app.command("decide")
-def project_decide(
-    ctx: typer.Context,
-    body: str | None = None,
-    body_file: Path | None = None,
-    supersedes: str | None = None,
-    project: ProjectOption = None,
-    id: str | None = None,
-    author: Author = "human",
-    json_output: Json = False,
-) -> None:
-    """Record a project-wide choice and rationale; optionally replace a prior project decision."""
-    append_activity(
-        ctx, None, project, "decision", body, body_file, supersedes, id, author, json_output
     )
 
 
@@ -1638,7 +1620,6 @@ def inbox_retract_answer(
     )
 
 
-@project_app.command("withdraw-decision")
 @task_app.command("withdraw-decision")
 def decision_withdraw(
     ctx: typer.Context,

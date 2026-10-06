@@ -358,9 +358,14 @@ def test_project_input_applies_once_without_placeholder_task(tmp_path: Path) -> 
     assert result.applied_task_revisions == {}
     assert workspace.project("harbor").description == "Offline UTF-8 exports."
     assert workspace.task("harbor", "HAR-1").revision == 1
-    decisions = workspace.activity("harbor", kind="decision").items
-    assert len(decisions) == 1 and decisions[0].task_id is None
-    assert decisions[0].question_id == question.id
+    history = [
+        e
+        for e in workspace.activity("harbor", kind="event").items
+        if e.body == "Use UTF-8 across exports."
+    ]
+    assert len(history) == 1 and history[0].task_id is None
+    assert history[0].question_id == question.id
+    assert not workspace.activity("harbor", kind="decision").items
 
 
 def test_project_input_targets_and_atomic_stale_protection(tmp_path: Path) -> None:
@@ -412,7 +417,14 @@ def test_project_input_targets_and_atomic_stale_protection(tmp_path: Path) -> No
     assert workspace.task("harbor", "HAR-1").readiness == "draft"
     assert workspace.task("harbor", "HAR-2").readiness == "blocked"
     assert not workspace.task("harbor", "HAR-2").blocking_questions
-    assert len(workspace.activity("harbor", kind="decision").items) == 1
+    assert not workspace.activity("harbor", kind="decision").items
+    assert (
+        sum(
+            e.body == "All outputs use UTF-8."
+            for e in workspace.activity("harbor", kind="event").items
+        )
+        == 1
+    )
     assert not workspace.activity("harbor", task_id="HAR-1", kind="decision").items
 
 

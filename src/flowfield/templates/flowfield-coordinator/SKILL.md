@@ -15,14 +15,15 @@ Repository instructions govern development conventions and permission to commit/
 - Match the project root and `.flowfield/config.toml` against `list_projects`; always pass
   its explicit project_id. From a nested directory, locate the root first. Read `get_board`
   on entry/resume and before cross-task planning. Use returned URLs, not guessed ports.
-- Start with the bounded briefing, then read relevant tasks, decisions and selected handoffs.
+- Start with the bounded briefing, then read relevant tasks, repository guidance and selected handoffs.
   Follow pagination/full-text links; never replace complete descriptions or dependencies
   from excerpts. Resume from saved project state, not an old chat transcript.
 - Distinguish brainstorming from agreed ongoing work. Find existing tasks before creating
   one; refine the same task as intent evolves. Its Description holds the outcome and useful
   success conditions. Milestones group tasks; only tasks depend on tasks.
-- Capture meaningful decisions/rationale and findings. Notes, superseded decisions and
-  activity are evidence, not worker instructions. Apply agreed requirement changes explicitly.
+- Respect the project’s existing architecture, design, coding and testing records;
+  Flowfield task evidence complements those sources. Notes and activity are evidence,
+  not worker instructions. Apply agreed requirement changes explicitly.
   Make routine implementation choices; ask about consequential behavior, scope, architecture,
   destructive actions or genuine missing requirements.
 
@@ -70,9 +71,9 @@ Repository instructions govern development conventions and permission to commit/
 
 ## Prepare and schedule
 
-- Read complete intent, prerequisites and current decisions. For actionable work, use
-  create_task/edit_task with preparation so the description and assignment save together.
-  New-task decision freshness comes from the board; existing tasks use their decision
+- Read complete intent, prerequisites, task evidence and applicable repository guidance.
+  For actionable work, use create_task/edit_task with preparation so the description and assignment save together.
+  New tasks use decision sequence zero; existing tasks use their task-local decision
   sequence. A failed prepared write saves neither change: reread and reconcile.
 - The legacy `publish_task` operation prepares an already saved task. “Prepared” does not
   mean scheduled or started. Do this routinely; do not ask the human to request publication.
@@ -80,7 +81,7 @@ Repository instructions govern development conventions and permission to commit/
   Code work needs its destination/check configuration; never relabel it as a report to bypass setup.
 - Creating a task leaves it in Backlog unless scheduling was authorized. Eligible Up next
   work can start when the queue is enabled; preserve pauses and do not enqueue unrelated work.
-  Meaningful requirement/decision changes invalidate assignments. Reconcile affected work
+  Meaningful requirement/task-decision changes invalidate assignments. Reconcile affected work
   before scheduling; this conversation does not wake automatically to do that.
 - Seed a few broad phases of agent work (at most eight), not implementation steps or files.
   For example, Explore → Implement → Verify for a feature, or Investigate → Synthesize

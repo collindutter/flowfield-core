@@ -1466,7 +1466,10 @@ class Workspace:
                 sql += " AND a.kind=?"
                 args.append(kind)
             if current_only:
-                sql += " AND a.kind='decision' AND replacement.id IS NULL AND withdrawal.id IS NULL"
+                sql += (
+                    " AND a.task_id IS NOT NULL AND a.kind='decision' "
+                    "AND replacement.id IS NULL AND withdrawal.id IS NULL"
+                )
             if before is not None:
                 sql += " AND a.sequence<?"
                 args.append(before)
@@ -1567,8 +1570,12 @@ class Workspace:
     ) -> ActivityEntry:
         with self.connection(write=True, project_id=project_id) as db:
             original = self._activity_entry(db, identity)
-            if original.project_id != project_id or original.kind != "decision":
-                raise ApplicationError("not_found", "Decision not found in this project.", 404)
+            if (
+                original.project_id != project_id
+                or original.kind != "decision"
+                or original.task_id is None
+            ):
+                raise ApplicationError("not_found", "Task decision not found in this project.", 404)
             body = "Decision withdrawn: " + request.reason
             if db.execute("SELECT 1 FROM activity WHERE id=?", (request.id,)).fetchone():
                 existing = self._activity_entry(db, request.id)

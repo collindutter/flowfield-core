@@ -94,7 +94,8 @@ WHEN 'task' THEN EXISTS (SELECT 1 FROM tasks t WHERE t.project_id=d.project_id
     AND NOT json_extract(t.data,'$.archived'))
 WHEN 'question' THEN EXISTS (SELECT 1 FROM questions q WHERE q.project_id=d.project_id
     AND q.id=d.identity AND json_extract(q.data,'$.revision')=d.revision AND q.status!='withdrawn')
-WHEN 'activity' THEN NOT EXISTS (SELECT 1 FROM activity a
+WHEN 'activity' THEN NOT (d.kind='decision' AND d.task_id IS NULL) AND NOT EXISTS
+    (SELECT 1 FROM activity a
     WHERE a.project_id=d.project_id AND (a.supersedes=d.identity OR a.withdraws=d.identity))
 WHEN 'result' THEN EXISTS (SELECT 1 FROM result_versions v WHERE v.id=d.identity
     AND NOT EXISTS (SELECT 1 FROM result_versions n WHERE n.project_id=v.project_id
@@ -208,8 +209,6 @@ class Search:
                     )
                 elif item["entity"] == "question":
                     item["url"] = reads.url(project_id, "inbox", item["identity"])
-                elif item["entity"] == "activity" and item["kind"] == "decision":
-                    item["url"] = reads.url(project_id, "decisions", item["identity"])
                 elif task:
                     item["url"] = reads.url(project_id, "tasks", task[0])
                 else:

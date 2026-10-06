@@ -305,49 +305,9 @@ test("task activity, Markdown and independently retrievable decisions preserve t
     "Export filtered rows.\n\n## Done when\n\n- [ ] Preserve row order\n- [x] Quote commas",
   );
   await closeOverlay(page);
-  // CLI project decisions are visible in a distinct project-scoped view, including on refresh.
-  const projectDecision = cli([
-    "project",
-    "decide",
-    "--project",
-    identity.project_id,
-    "--body",
-    "All exports must work **offline**.",
-  ]);
-  await page.getByRole("tab", { name: "Decisions", exact: true }).click();
-  const projectView = page.getByRole("region", {
-    name: "Project decisions",
-    exact: true,
-    includeHidden: true,
-  });
-  await expect(projectView.locator(".decision-cards")).toContainText(
-    "All exports must work offline.",
-  );
-  await expect(projectView.locator(".decision-cards")).not.toContainText(
-    "Include hidden columns",
-  );
-  await page.getByRole("button", { name: "New decision", exact: true }).click();
-  await page
-    .getByRole("dialog")
-    .getByLabel("Decision and rationale", { exact: true })
-    .fill("Reuse existing UI components to keep the product consistent.");
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Keep editing", exact: true }).click();
   await expect(
-    page
-      .getByRole("dialog")
-      .getByLabel("Decision and rationale", { exact: true }),
-  ).toHaveValue("Reuse existing UI components to keep the product consistent.");
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Save decision", exact: true })
-    .click();
-  await expect(projectView.locator(".decision-cards > li")).toHaveCount(2);
-  await page.reload();
-  await expect(projectView).toBeVisible();
-  expect(
-    cli(["project", "decisions", "--project", identity.project_id]).items[1].id,
-  ).toBe(projectDecision.id);
+    page.getByRole("tab", { name: "Decisions", exact: true }),
+  ).toHaveCount(0);
   const note = cli([
     "task",
     "note",
@@ -821,7 +781,7 @@ test("Needs you preserves conflicting drafts and follows up on the same canonica
   ).toBeVisible();
 });
 
-test("retracting answers reopens questions and withdrawing decisions preserves their rationale", async ({
+test("retracting answers reopens questions and preserves earlier responses", async ({
   page,
   request,
 }) => {
@@ -894,44 +854,6 @@ test("retracting answers reopens questions and withdrawing decisions preserves t
     .getByRole("button", { name: "Close question", exact: true })
     .click();
   await expect(page).toHaveURL(new RegExp(`/projects/${project_id}/inbox$`));
-  const decision = cli([
-    "project",
-    "decide",
-    "--project",
-    project_id,
-    "--body",
-    "Offline exports only",
-  ]);
-  await page.goto(`/projects/${project_id}/decisions/${decision.id}`);
-  const decisionDetail = page.getByRole("dialog", {
-    name: "Decision",
-    exact: true,
-  });
-  await decisionDetail
-    .getByRole("button", { name: "Withdraw", exact: true })
-    .click();
-  await decisionDetail
-    .getByLabel("Reason for withdrawal")
-    .fill("The requirement no longer applies");
-  await decisionDetail
-    .getByRole("button", { name: "Withdraw", exact: true })
-    .click();
-  await expect(
-    decisionDetail.getByText("Withdrawn", { exact: true }),
-  ).toBeVisible();
-  await expect(page.locator(".decision-cards > li")).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "History", exact: true }),
-  ).toHaveCount(0);
-  await decisionDetail.getByText("Withdrawal", { exact: true }).click();
-  await expect(decisionDetail).toContainText(
-    "The requirement no longer applies",
-  );
-  await page.reload();
-  await expect(decisionDetail).toContainText("Offline exports only");
-  await expect(
-    decisionDetail.getByText("Withdrawn", { exact: true }),
-  ).toBeVisible();
 });
 
 test("project questions link affected tasks and reconcile through CLI and MCP", async ({
@@ -1062,10 +984,11 @@ test("project questions link affected tasks and reconcile through CLI and MCP", 
     },
   });
   await closeOverlay(page);
-  await page.getByRole("tab", { name: "Decisions", exact: true }).click();
-  await expect(
-    page.getByText("Target personal use.", { exact: true }),
-  ).toBeVisible();
+  expect(
+    cli(["project", "history", "--project", project_id]).items.some(
+      (item: { body: string }) => item.body === "Target personal use.",
+    ),
+  ).toBe(true);
 });
 
 test("selected handoff survives a fresh MCP connection and shows stale context", async ({

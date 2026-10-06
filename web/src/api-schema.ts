@@ -2039,7 +2039,7 @@ export interface components {
       /** Id */
       id?: string;
       /** Task Id */
-      task_id?: string | null;
+      task_id: string;
       /**
        * Kind
        * @default note

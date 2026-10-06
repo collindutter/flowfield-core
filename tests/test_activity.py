@@ -71,10 +71,7 @@ def test_decision_scope_replacement_conflicts_and_current_reads(tmp_path: Path) 
     old = service.add_activity(
         "harbor", ActivityCreate(task_id="HAR-1", kind="decision", body="Visible columns only.")
     )
-    project = service.add_activity(
-        "harbor", ActivityCreate(kind="decision", body="Exports work offline.")
-    )
-    for scope in [None, "two"]:
+    for scope in ["two"]:
         with pytest.raises(ApplicationError, match="same scope"):
             service.add_activity(
                 "harbor",
@@ -103,7 +100,7 @@ def test_decision_scope_replacement_conflicts_and_current_reads(tmp_path: Path) 
     assert service.activity("harbor", task_id="HAR-1", current_only=True).items == [current]
     decisions = service.activity("harbor", task_id="one", kind="decision").items
     assert len(decisions) == 2 and decisions[1].superseded_by == current.id
-    assert service.activity("harbor", current_only=True).items == [project]
+    assert not service.activity("harbor", current_only=True).items
     assert service.task("harbor", "one").body == ""  # Recording is not applying.
     adopt(service, ProjectSetup(path=str(tmp_path / "other")))
     with pytest.raises(ApplicationError, match="not found"):
@@ -191,7 +188,9 @@ def test_withdrawal_preserves_decision_and_serializes_against_replacement(tmp_pa
     from flowfield.activity import DecisionWithdraw
 
     service = workspace(tmp_path)
-    old = service.add_activity("harbor", ActivityCreate(kind="decision", body="Offline only"))
+    old = service.add_activity(
+        "harbor", ActivityCreate(task_id="one", kind="decision", body="Offline only")
+    )
     request = DecisionWithdraw(id="withdraw-offline", reason="No longer a requirement")
     withdrawn = service.withdraw_decision("harbor", old.id, request)
     assert service.withdraw_decision("harbor", old.id, request) == withdrawn
@@ -202,11 +201,14 @@ def test_withdrawal_preserves_decision_and_serializes_against_replacement(tmp_pa
     assert service.task("harbor", "HAR-1").revision == 1
     with pytest.raises(ApplicationError):
         service.add_activity(
-            "harbor", ActivityCreate(kind="decision", body="Online", supersedes=old.id)
+            "harbor",
+            ActivityCreate(task_id="one", kind="decision", body="Online", supersedes=old.id),
         )
     with pytest.raises(ApplicationError):
         service.withdraw_decision("elsewhere", old.id, DecisionWithdraw(reason="Wrong project"))
-    raced = service.add_activity("harbor", ActivityCreate(kind="decision", body="Limit exports"))
+    raced = service.add_activity(
+        "harbor", ActivityCreate(task_id="one", kind="decision", body="Limit exports")
+    )
 
     def change(withdraw: bool):
         try:
@@ -215,7 +217,9 @@ def test_withdrawal_preserves_decision_and_serializes_against_replacement(tmp_pa
             else:
                 service.add_activity(
                     "harbor",
-                    ActivityCreate(kind="decision", body="Higher limit", supersedes=raced.id),
+                    ActivityCreate(
+                        task_id="one", kind="decision", body="Higher limit", supersedes=raced.id
+                    ),
                 )
             return True
         except ApplicationError:

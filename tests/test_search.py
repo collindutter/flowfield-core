@@ -28,26 +28,34 @@ def test_current_decision_wins_over_similar_old_text_and_filters_scope(tmp_path)
     workspace = Workspace(tmp_path / "state")
     for project in ("harbor", "other"):
         adopt(workspace, ProjectSetup(path=str(tmp_path / project)))
+        workspace.create_task(project, TaskCreate(id="export", title="Export"))
     old = workspace.add_activity(
         "harbor",
         ActivityCreate(
-            kind="decision", body="CSV export preserves insertion ordering. This is obsolete."
+            task_id="export",
+            kind="decision",
+            body="CSV export preserves insertion ordering. This is obsolete.",
         ),
     )
     latest = workspace.add_activity(
         "harbor",
         ActivityCreate(
-            kind="decision", supersedes=old.id, body="CSV export uses stable alphabetical ordering."
+            task_id="export",
+            kind="decision",
+            supersedes=old.id,
+            body="CSV export uses stable alphabetical ordering.",
         ),
     )
     workspace.add_activity(
-        "other", ActivityCreate(kind="decision", body="CSV export private choice.")
+        "other",
+        ActivityCreate(task_id="export", kind="decision", body="CSV export private choice."),
     )
     search = Search(workspace, "http://localhost:1234")
     current_hits = search.page("harbor", "CSV export", kind="decision")
     assert [hit["identity"] for hit in current_hits["items"]] == [latest.id]
     assert current_hits["items"][0]["current"]
-    assert latest.id in current_hits["items"][0]["url"]
+    assert current_hits["items"][0]["url"].endswith("/tasks/HAR-1")
+    assert current_hits["items"][0]["source"]["identity"] == latest.id
     old_hits = search.page("harbor", "CSV export", history="history")
     assert [hit["identity"] for hit in old_hits["items"]] == [old.id]
     assert not old_hits["items"][0]["current"]

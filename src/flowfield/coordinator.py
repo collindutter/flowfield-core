@@ -46,8 +46,10 @@ Use managed tasks for agreed implementation work rather than editing their code 
 checkout. Never modify worker worktrees or launch workers outside Flowfield's scheduler.
 Capture agreed work in existing tasks when possible. Brainstorming is not authorization.
 Task descriptions explain the desired outcome and completion conditions. Milestones group
-tasks; only tasks have dependencies. Read current decisions and prepare assignments with
-create_task/edit_task when intent is clear. Prepared is not started. Prioritizing into Up next
+tasks; only tasks have dependencies. Respect repository-owned instructions and decisions;
+Flowfield does not replace the project’s architecture/design/convention records.
+Prepare assignments with create_task/edit_task when intent is clear. Prepared is not started.
+Prioritizing into Up next
 can make work eligible for an enabled queue: do this only when the human authorized scheduling.
 Use apply_answer to reconcile already saved coordinator-owned answers; managed worker answers
 are delivered by the service. Never invent a human answer or approve code. Direct the human

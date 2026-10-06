@@ -55,7 +55,9 @@ test("board failures retain readable context and recover through their alert", a
   const card = page.getByRole("link", { name: /Preserved board work/ });
   await expect(card).toBeVisible();
   await expect(alert).toHaveCount(0);
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("status", { name: "Connected", exact: true }),
+  ).toBeVisible();
   fail = true;
   expect(
     (
@@ -738,118 +740,6 @@ test("readable conversation preserves message drafts, revision links and legacy 
   await expect(editor.getByRole("tab")).toHaveCount(0);
 });
 
-test("project decision cards preserve deep links, drafts and replacement history", async ({
-  page,
-  request,
-}) => {
-  const call = await connectMcp(request);
-  const project_id = "decision-cards";
-  await call("initialize_project", {
-    project_id,
-    path: existingDirectory(join(state, project_id)),
-    task_prefix: "DEC",
-  });
-  const original = cli([
-    "project",
-    "decide",
-    "--project",
-    project_id,
-    "--body",
-    "Keep exports offline. [Guide](https://example.test/guide)\n\n" +
-      "Supporting rationale. ".repeat(100),
-  ]);
-  await page.goto(`/projects/${project_id}/decisions/${original.id}`);
-  const detail = page.getByRole("dialog", { name: "Decision", exact: true });
-  await expect(detail).toContainText("Supporting rationale.");
-  await expect(detail.getByText("Current", { exact: true })).toHaveCount(0);
-  await expect(
-    detail.getByRole("link", { name: "Guide", exact: true }),
-  ).toHaveAttribute("href", "https://example.test/guide");
-  await expect(page.locator(".decision-cards a a")).toHaveCount(0);
-  await expect(page.getByLabel("Decision filter")).toHaveCount(0);
-  await page.reload();
-  await detail
-    .getByRole("button", { name: "Replace decision", exact: true })
-    .click();
-  const draft = detail.getByLabel("Decision and rationale");
-  await draft.fill("Allow online exports when the user opts in.");
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Keep editing", exact: true }).click();
-  await expect(draft).toHaveValue(
-    "Allow online exports when the user opts in.",
-  );
-  const competing = cli([
-    "project",
-    "decide",
-    "--project",
-    project_id,
-    "--body",
-    "Keep exports offline for the MVP.",
-    "--supersedes",
-    original.id,
-  ]);
-  await expect(detail.getByText("Superseded", { exact: true })).toHaveCount(0);
-  await expect(
-    detail.getByRole("button", { name: "Save replacement", exact: true }),
-  ).toBeDisabled();
-  await expect(draft).toHaveValue(
-    "Allow online exports when the user opts in.",
-  );
-  page.once("dialog", (d) => d.accept());
-  await detail.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(detail.getByText("Superseded", { exact: true })).toBeVisible();
-  await detail.getByText("Replacement decision", { exact: true }).click();
-  await expect(detail).toContainText("Keep exports offline for the MVP.");
-  await expect(
-    page.getByRole("link", { name: "History", exact: true }),
-  ).toHaveCount(0);
-  await expect(page.locator(".decision-cards > li")).toHaveCount(1);
-  await page.goto(`/projects/${project_id}/decisions/${competing.id}`);
-  await detail
-    .getByRole("button", { name: "Replace decision", exact: true })
-    .click();
-  await draft.fill("Allow exports with an explicit online opt-in.");
-  await detail
-    .getByRole("button", { name: "Save replacement", exact: true })
-    .click();
-  await expect(page).not.toHaveURL(new RegExp(`${competing.id}$`));
-  await expect(detail).toContainText(
-    "Allow exports with an explicit online opt-in.",
-  );
-  await expect(page.locator(".decision-cards > li")).toHaveCount(1);
-  await detail.getByText("Earlier decision", { exact: true }).click();
-  await expect(detail).toContainText("Keep exports offline for the MVP.");
-  await page.reload();
-  await expect(detail).toContainText(
-    "Allow exports with an explicit online opt-in.",
-  );
-  await page.setViewportSize({ width: 390, height: 844 });
-
-  for (let i = 0; i < 22; i++) {
-    const result = await request.post(`/api/projects/${project_id}/activity`, {
-      data: {
-        id: `additional-${i}`,
-        kind: "decision",
-        body: `Independent decision ${i}`,
-        author: "agent",
-      },
-    });
-    expect(result.ok()).toBe(true);
-  }
-  await page.reload();
-  await expect(page.locator(".decision-cards > li")).toHaveCount(20);
-  await closeOverlay(page);
-  await page.getByRole("button", { name: "Load older", exact: true }).click();
-  await expect(page.locator(".decision-cards > li")).toHaveCount(23);
-  await page
-    .locator(".decision-cards")
-    .getByText("Allow exports with an explicit online opt-in.", { exact: true })
-    .click();
-  await expect(detail).toContainText(
-    "Allow exports with an explicit online opt-in.",
-  );
-});
-
 test("task changes refresh only their project, without reloading the project catalog", async ({
   page,
   request,
@@ -876,7 +766,9 @@ test("task changes refresh only their project, without reloading the project cat
   }
   await page.goto("/projects/scope-one");
   await expect(page.getByRole("link", { name: /Original/ })).toBeVisible();
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("status", { name: "Connected", exact: true }),
+  ).toBeVisible();
   // Register a second listener before writing so the test knows the event arrived.
   await page.evaluate(
     () =>
@@ -1010,7 +902,11 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
   await expect(draft).toHaveCount(0);
   await call("add_activity", {
     project_id: "publication",
-    entry: { kind: "decision", body: "Use UTF-8 for all exports." },
+    entry: {
+      task_id: "PRE-1",
+      kind: "decision",
+      body: "Use UTF-8 for all exports.",
+    },
   });
   await expect(draft).toBeVisible();
   const current = await call("get_task", {
@@ -1047,7 +943,7 @@ test("conversation capture prepares atomically while task defaults show only use
     page.getByRole("link", { name: "Set up your coordinator" }),
   ).toHaveCount(0);
   const call = await connectMcp(request);
-  const board = await call("get_board", { project_id });
+  await call("get_board", { project_id });
   const task = await call("create_task", {
     project_id,
     task: {
@@ -1056,7 +952,7 @@ test("conversation capture prepares atomically while task defaults show only use
       task_type: "investigation",
       preparation: {
         completion: "report",
-        expected_decision_sequence: board.decision_sequence,
+        expected_decision_sequence: 0,
       },
     },
   });

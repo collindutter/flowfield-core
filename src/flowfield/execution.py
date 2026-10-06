@@ -460,7 +460,7 @@ class Execution:
                     for row in db.execute(
                         (
                             "SELECT id, body FROM activity a WHERE project_id=? AND "
-                            "kind='decision' AND (task_id=? OR task_id IS NULL) AND NOT EXISTS"
+                            "kind='decision' AND task_id=? AND NOT EXISTS"
                             " (SELECT 1 FROM activity newer WHERE newer.supersedes=a.id OR "
                             "newer.withdraws=a.id) ORDER BY sequence"
                         ),

@@ -21,7 +21,6 @@ import {
   Columns3,
   Inbox,
   Flag,
-  ListChecks,
   Archive,
   CircleAlert,
 } from "lucide-react";
@@ -29,7 +28,6 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 import { EntityOverlay, EntityPane } from "./EntityOverlay";
-import { DecisionDetail } from "./Decisions";
 import { DetailHeader } from "./Presentation";
 import { useResource } from "./useResource";
 import { NewTask } from "./NewTask";
@@ -63,7 +61,6 @@ import {
   WorkStatus,
 } from "./workspace";
 import { QuestionOverlay } from "./Inbox";
-import { Decisions } from "./Decisions";
 import { DiscardChangesDialog } from "./DiscardChangesDialog";
 import {
   followLink,
@@ -391,7 +388,6 @@ function ProjectBoard({
   const inView = (view: string) =>
     background === `${projectHref(projectId)}/${view}` ||
     background.startsWith(`${projectHref(projectId)}/${view}/`);
-  const decisionsView = inView("decisions");
   const milestonesView = inView("milestones");
   const showInbox = inView("inbox");
   const [filter, setFilter] = useState("");
@@ -538,13 +534,11 @@ function ProjectBoard({
           );
   const view = showInbox
     ? "inbox"
-    : decisionsView
-      ? "decisions"
-      : milestonesView
-        ? "milestones"
-        : archive
-          ? "archive"
-          : "board";
+    : milestonesView
+      ? "milestones"
+      : archive
+        ? "archive"
+        : "board";
   function openView(value: string) {
     navigate(() =>
       changeLocation(
@@ -687,9 +681,6 @@ function ProjectBoard({
                 <span className="nav-count">{board.milestones.length}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger {...viewTrigger("decisions")}>
-              <ListChecks /> Decisions
-            </TabsTrigger>
             <TabsTrigger {...viewTrigger("archive")}>
               <Archive /> Archive
               {board.tasks.length > activeTasks.length && (
@@ -706,19 +697,6 @@ function ProjectBoard({
           hidden={!!taskRef}
         >
           <div className="board-toolbar">
-            {decisionsView && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  navigate(() =>
-                    changeLocation(projectHref(projectId) + "/decisions/new"),
-                  )
-                }
-              >
-                New decision
-              </Button>
-            )}
             {milestonesView && (
               <Button
                 size="sm"
@@ -728,7 +706,7 @@ function ProjectBoard({
                 New milestone
               </Button>
             )}
-            {!decisionsView && !showInbox && !milestonesView && (
+            {!showInbox && !milestonesView && (
               <div className="actions">
                 <Label className="field filter-label">
                   <span className="sr-only">Filter by milestone</span>
@@ -788,13 +766,6 @@ function ProjectBoard({
               projectId={projectId}
               identity={params.questionId}
               refresh={refresh}
-            />
-          ) : decisionsView ? (
-            <Decisions
-              projectId={projectId}
-              identity={params.decisionId}
-              refresh={refresh}
-              open={(url) => navigate(() => changeLocation(url))}
             />
           ) : (
             <ContentStack space="section">
@@ -1046,22 +1017,6 @@ function ProjectBoard({
           )
         )}
       </Tabs>
-      {params.decisionId && (
-        <EntityOverlay
-          title={params.decisionId === "new" ? "New decision" : "Decision"}
-          suspended={!!params.overlayQuestionId}
-          close={() => closeEntity(projectHref(projectId) + "/decisions")}
-        >
-          <DecisionDetail
-            key={params.decisionId}
-            projectId={projectId}
-            identity={params.decisionId}
-            refresh={refresh}
-            onDirty={setUnsaved}
-            open={changeLocation}
-          />
-        </EntityOverlay>
-      )}
       {params.questionId && (
         <QuestionOverlay
           projectId={projectId}

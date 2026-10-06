@@ -16,7 +16,7 @@ TaskKey = Annotated[
 class ActivityCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: Identifier = Field(default_factory=lambda: uuid4().hex)
-    task_id: TaskKey | None = None
+    task_id: TaskKey
     kind: Literal["note", "decision", "handoff"] = "note"
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200_000)]
     author: Title = "human"
@@ -25,8 +25,6 @@ class ActivityCreate(BaseModel):
 
     @model_validator(mode="after")
     def scope_and_kind(self) -> Self:
-        if self.task_id is None and self.kind != "decision":
-            raise ValueError("Project scope supports decisions; notes belong to a task.")
         if self.supersedes is not None and self.kind == "note":
             raise ValueError("Notes cannot supersede entries.")
         if self.kind == "handoff":
