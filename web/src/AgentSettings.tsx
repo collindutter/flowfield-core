@@ -129,29 +129,6 @@ export function AgentModelFields({
           </span>
         </Label>
       )}
-      {!compact && (selected?.fast || fast) && (
-        <div>
-          <Button
-            type="button"
-            size="sm"
-            variant={fast ? "secondary" : "outline"}
-            aria-label="Fast mode"
-            aria-pressed={fast}
-            disabled={loading || !selected?.fast}
-            onClick={() => change(model, effort, mode, !fast)}
-          >
-            <Zap size={14} /> Fast
-          </Button>
-          <p className="detail-metadata">
-            {loading
-              ? "Loading fast mode…"
-              : selected?.fast
-                ? selected.fast_description ||
-                  "Faster responses, increased usage."
-                : "Fast mode is unavailable. Choose a supported model."}
-          </p>
-        </div>
-      )}
     </>
   );
 }

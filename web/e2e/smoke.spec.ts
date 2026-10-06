@@ -674,7 +674,9 @@ test("Conversation permalinks preserve message drafts while coordinator revision
   });
   await expect(history).toContainText("Task definition updated");
   expect(revisionReads).toHaveLength(0);
-  await history.locator(".task-changes").first().locator("summary").click();
+  await history
+    .locator('[data-message-id="definition:2"] .task-changes summary')
+    .click();
   await expect(
     history
       .locator(".change-after")
@@ -1401,7 +1403,9 @@ test("readable conversation preserves message drafts, revision links and legacy 
     })
     .click();
   await expect(page).toHaveURL(/conversation\/definition%3A2$/);
-  await thread.locator(".task-changes summary").click();
+  await thread
+    .locator('[data-message-id="definition:2"] .task-changes summary')
+    .click();
   await expect(thread.locator(".change-before")).toContainText("all columns");
   await expect(thread.locator(".change-after")).toContainText(
     "selected columns",

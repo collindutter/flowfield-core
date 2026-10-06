@@ -146,14 +146,12 @@ export function WorkerSettings({
     model: string;
     effort: string;
     mode: string;
-    fast: boolean;
     cap: number;
     revision: number;
   } | null>(null);
   const model = draft?.model ?? resource.data?.model ?? "";
   const effort = draft?.effort ?? resource.data?.effort ?? "";
   const mode = draft?.mode ?? resource.data?.mode ?? "";
-  const fast = draft?.fast ?? resource.data?.fast ?? false;
   const cap = draft?.cap ?? resource.data?.max_parallel ?? 1;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -162,7 +160,6 @@ export function WorkerSettings({
     (model !== (resource.data.model ?? "") ||
       effort !== (resource.data.effort ?? "") ||
       mode !== (resource.data.mode ?? "") ||
-      fast !== resource.data.fast ||
       cap !== resource.data.max_parallel);
   useEffect(() => {
     onDirty(dirty);
@@ -218,7 +215,6 @@ export function WorkerSettings({
                 model,
                 effort,
                 mode: mode || null,
-                fast,
                 max_parallel: cap,
               },
               undefined,
@@ -243,15 +239,14 @@ export function WorkerSettings({
             model={model}
             effort={effort}
             mode={mode}
-            fast={fast}
+            fast={false}
             models={models}
             loading={catalog.loading || resource.loading}
-            change={(model, effort, mode, fast) =>
+            change={(model, effort, mode) =>
               setDraft({
                 model,
                 effort,
                 mode,
-                fast,
                 cap,
                 revision: draft?.revision ?? resource.data!.revision,
               })
@@ -269,7 +264,6 @@ export function WorkerSettings({
                   model,
                   effort,
                   mode,
-                  fast,
                   cap: Number(event.target.value),
                   revision: draft?.revision ?? resource.data!.revision,
                 })
@@ -283,10 +277,7 @@ export function WorkerSettings({
                 !dirty ||
                 stale ||
                 !models.some(
-                  (item) =>
-                    item.id === model &&
-                    item.efforts.includes(effort) &&
-                    (!fast || item.fast),
+                  (item) => item.id === model && item.efforts.includes(effort),
                 )
               }
             >

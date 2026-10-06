@@ -1,4 +1,11 @@
 @layer components {
+  .definition-preview[data-collapsed="true"] {
+    overflow: clip;
+    mask-image: linear-gradient(to bottom, black 65%, transparent);
+  }
+  .definition-toggle {
+    align-self: flex-start;
+  }
   .content-stack {
     display: flex;
     flex-direction: column;

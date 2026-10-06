@@ -163,6 +163,16 @@ def explicit_fast_mode(db: sqlite3.Connection) -> None:
     )
 
 
+def task_specific_speed(db: sqlite3.Connection) -> None:
+    # Drop the mutable project preference. Task overrides and frozen attempts keep
+    # their explicit speed; tasks without an override now start at normal speed.
+    db.execute(
+        "UPDATE worker_settings SET data=json_set(json_remove(data,'$.fast'), "
+        "'$.revision',json_extract(data,'$.revision')+1) "
+        "WHERE json_type(data,'$.fast') IS NOT NULL"
+    )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
@@ -174,6 +184,7 @@ MIGRATIONS = (
     Migration(37, coordinator_sessions),
     Migration(38, coordinator_access_modes),
     Migration(39, explicit_fast_mode),
+    Migration(40, task_specific_speed),
 )
 
 

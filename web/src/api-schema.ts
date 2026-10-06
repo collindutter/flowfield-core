@@ -3982,11 +3982,6 @@ export interface components {
       /** Mode */
       mode?: string | null;
       /**
-       * Fast
-       * @default false
-       */
-      fast: boolean;
-      /**
        * Max Parallel
        * @default 1
        */
@@ -4794,11 +4789,6 @@ export interface components {
       effort: string | null;
       /** Mode */
       mode: string | null;
-      /**
-       * Fast
-       * @default false
-       */
-      fast: boolean;
       /**
        * Max Parallel
        * @default 1

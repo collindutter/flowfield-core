@@ -461,7 +461,7 @@ export function TaskConversation({
                       </>
                     }
                   />
-                  {hasBody(message, task.revision) && (
+                  {hasBody(message) && (
                     <div className="conversation-message-body content-stack">
                       {message.kind === "result" &&
                       (message.source_id === gate.data?.result_id ||
@@ -480,8 +480,7 @@ export function TaskConversation({
                         />
                       ) : (
                         <>
-                          {(message.kind !== "definition" ||
-                            message.revision !== task.revision) && (
+                          {message.kind !== "definition" && (
                             <MessageBody message={message} path={path} />
                           )}
                           {message.kind === "result" && (
@@ -562,15 +561,14 @@ export function TaskConversation({
                             refresh={tick}
                           />
                         )}
-                      {message.kind === "definition" &&
-                        (message.revision ?? 0) > 1 && (
-                          <TaskChanges
-                            revision={message.revision!}
-                            path={`projects/${projectId}/view/tasks/${task.id}`}
-                            milestones={board.milestones}
-                            tasks={board.tasks}
-                          />
-                        )}
+                      {message.kind === "definition" && (
+                        <TaskChanges
+                          revision={message.revision!}
+                          path={`projects/${projectId}/view/tasks/${task.id}`}
+                          milestones={board.milestones}
+                          tasks={board.tasks}
+                        />
+                      )}
                     </div>
                   )}
                 </li>
@@ -917,15 +915,13 @@ function MessageBody({ message, path }: { message: Message; path: string }) {
   );
 }
 
-function hasBody(message: Message, revision: number) {
+function hasBody(message: Message) {
   return !!(
-    (message.body &&
-      (message.kind !== "definition" || message.revision !== revision)) ||
+    message.body ||
     message.stages.length ||
     message.question_id ||
     message.earlier_id ||
     message.successor_id ||
-    ["attempt", "result", "question"].includes(message.kind) ||
-    (message.kind === "definition" && (message.revision ?? 0) > 1)
+    ["attempt", "result", "question", "definition"].includes(message.kind)
   );
 }

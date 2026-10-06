@@ -79,7 +79,6 @@ class Execution:
             self.workspace._current(settings.revision, request.expected_revision)
             settings.model, settings.effort = request.model, request.effort
             settings.mode = request.mode
-            settings.fast = request.fast
             settings.max_parallel, settings.problem = request.max_parallel, None
             self._save_settings(db, settings)
             return settings

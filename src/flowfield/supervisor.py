@@ -118,9 +118,7 @@ class Supervisor:
 
     async def configure(self, project_id: str, request: SettingsEdit) -> WorkerSettings:
         await self.validate_agent_choice(
-            AgentChoice(
-                model=request.model, effort=request.effort, mode=request.mode, fast=request.fast
-            ),
+            AgentChoice(model=request.model, effort=request.effort, mode=request.mode, fast=False),
             project_id,
         )
         return self.execution.configure(project_id, request)

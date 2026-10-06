@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, type ReactNode } from "react";
 import { ContentStack, DetailSection, Disclosure } from "./DetailLayout";
 import { DetailHeader, DraftBadge, TaskTypeBadge } from "./Presentation";
 import { MilestoneBadge } from "./MilestoneBadge";
-import { Markdown } from "./Markdown";
+import { ExpandableMarkdown } from "./ExpandableMarkdown";
 import { BlockedBy } from "./TaskLinks";
 import { TaskNeeds, TaskState, hasTaskNeeds } from "./TaskNeeds";
 import { TaskConversation, StageHeader } from "./TaskConversation";
@@ -111,8 +111,9 @@ export function TaskDetail({
           className="task-definition content-stack"
           aria-label="Current task definition"
         >
-          <strong>Definition</strong>
-          <Markdown>{task.body}</Markdown>
+          <ExpandableMarkdown key={task.id} title="Definition">
+            {task.body}
+          </ExpandableMarkdown>
         </div>
         {hasTaskNeeds(task, board.pending_code[task.id], false) && (
           <DetailSection title="Waiting on">

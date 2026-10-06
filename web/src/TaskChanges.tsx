@@ -32,18 +32,16 @@ export function TaskChanges({
 }) {
   const [open, setOpen] = useState(false);
   const [retry, setRetry] = useState(0);
-  const enabled = open && revision > 1;
   const beforeRead = useResource<TaskRevision>(
-    enabled ? `${path}/revisions/${revision - 1}` : null,
+    open && revision > 1 ? `${path}/revisions/${revision - 1}` : null,
     retry,
   );
   const afterRead = useResource<TaskRevision>(
-    enabled ? `${path}/revisions/${revision}` : null,
+    open ? `${path}/revisions/${revision}` : null,
     retry,
   );
   const before = beforeRead.data,
     after = afterRead.data;
-  if (revision <= 1) return null;
   const changed =
     before && after
       ? fields.filter(
@@ -67,7 +65,9 @@ export function TaskChanges({
   }
   return (
     <Disclosure
-      summary={<>View definition changes</>}
+      summary={
+        <>{revision === 1 ? "View definition" : "View definition changes"}</>
+      }
       className="task-changes history-disclosure"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
@@ -81,8 +81,14 @@ export function TaskChanges({
           </AlertDescription>
         </Alert>
       )}
-      {open && (!before || !after) && !beforeRead.error && !afterRead.error && (
-        <p>Loading changes…</p>
+      {open &&
+        (!after || (revision > 1 && !before)) &&
+        !beforeRead.error &&
+        !afterRead.error && <p>Loading changes…</p>}
+      {open && revision === 1 && after && (
+        <DetailSection title={after.title}>
+          <Markdown>{after.body || "No description."}</Markdown>
+        </DetailSection>
       )}
       {open &&
         before &&

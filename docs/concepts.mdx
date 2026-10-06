@@ -60,9 +60,10 @@ Each attempt saves the choice it used. Changing defaults does not alter running 
 or explicit task overrides. Unavailable choices fail explicitly instead of selecting
 another model.
 
-Fast mode is available only for models that support it. Worker defaults, task overrides and
-Coordinator Chat save it alongside the other settings; it affects subsequent attempts and
-can increase usage. Historical attempts keep their original choices.
+Fast mode is available only for models that support it. Workers start with Fast off; enable it
+per task using the lightning button. There is no project-wide speed default. Coordinator Chat
+has its own Fast choice. Changes affect subsequent attempts and can increase usage;
+historical attempts keep their original choices.
 
 Each project has one built-in [Coordinator Chat](/coordinator), with its model, effort and access mode
 selected beside the chat input. Changes apply to subsequent messages and do not configure
