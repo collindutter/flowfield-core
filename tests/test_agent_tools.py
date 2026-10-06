@@ -15,6 +15,45 @@ from flowfield.agent_tools import COORDINATOR_TOOLS, coordinator_scope, worker_s
 from flowfield.supervisor import WorkerBridge
 
 
+def test_coordinator_reads_overlap_with_bounded_revocable_access(tmp_path):
+    service = fixture(tmp_path)
+
+    async def exercise():
+        grant = await coordinator_scope(service.workspace, "harbor")
+        original = grant._call
+        entered = asyncio.Queue()
+        release = asyncio.Event()
+
+        async def delayed(name, arguments):
+            entered.put_nowait(name)
+            await release.wait()
+            return await original(name, arguments)
+
+        grant._call = delayed
+        calls = []
+        for name in ["get_project", "get_board"] * 4:
+            calls.append(asyncio.create_task(grant.call(name, {})))
+            assert await asyncio.wait_for(entered.get(), 2) == name
+        excess = await grant.call("get_board", {})
+        assert excess.structuredContent["error"]["code"] == "tool_busy"
+        # Cancellation releases capacity; revocation rejects new work without
+        # falsely claiming to cancel operations already accepted.
+        calls.pop().cancel()
+        await asyncio.sleep(0)
+        replacement = asyncio.create_task(grant.call("get_board", {}))
+        assert await asyncio.wait_for(entered.get(), 2) == "get_board"
+        calls.append(replacement)
+        grant.revoke()
+        closed = await grant.call("get_board", {})
+        assert closed.structuredContent["error"]["code"] == "scope_closed"
+        release.set()
+        results = await asyncio.gather(*calls)
+        assert all(not result.isError for result in results)
+        assert grant._reading == 0
+
+    asyncio.run(exercise())
+
+
 async def journey(tmp_path, grant, calls):
     events = []
     client = AcpSession(events.append, request_timeout=5, turn_timeout=10)

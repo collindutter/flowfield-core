@@ -60,11 +60,15 @@ class ScopedTools:
         self,
         tools: list[Tool],
         call: Callable[[str, dict[str, Any]], Awaitable[CallToolResult]],
+        *,
+        parallel_reads: bool = False,
     ):
         self.tools = {tool.name: tool for tool in tools}
         self._call = call
         self.revoked = False
         self._lock = asyncio.Lock()
+        self._parallel_reads = parallel_reads
+        self._reading = 0
         self.server: Server[Any] = Server("flowfield-scoped")
 
         @self.server.list_tools()  # type: ignore[no-untyped-call, untyped-decorator]
@@ -83,6 +87,20 @@ class ScopedTools:
                 raise ApplicationError(
                     "operation_denied", "Operation is outside this role's scope.", 403
                 )
+            # Coordinator reads use canonical snapshots and may overlap. Native
+            # agents routinely batch independent reads; do not turn that into a
+            # spurious tool failure. Bound in-flight work without a waiting queue.
+            annotation = self.tools[name].annotations
+            if self._parallel_reads and annotation and annotation.readOnlyHint:
+                if self._reading >= 8:
+                    raise ApplicationError(
+                        "tool_busy", "Too many concurrent reads. Retry after one finishes.", 409
+                    )
+                self._reading += 1
+                try:
+                    return await self._call(name, arguments)
+                finally:
+                    self._reading -= 1
             # No unbounded waiting tool queue; a result cannot overtake an active command.
             if self._lock.locked():
                 raise ApplicationError(
@@ -171,4 +189,4 @@ async def coordinator_scope(workspace: Workspace, project_id: str) -> ScopedTool
             )
         return CallToolResult(content=list(result))
 
-    return ScopedTools(scoped, call)
+    return ScopedTools(scoped, call, parallel_reads=True)

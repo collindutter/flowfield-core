@@ -283,12 +283,28 @@ export function Composer({
                         event.stopPropagation();
                         setDismissed(true);
                       } else if (
-                        !menu &&
                         event.key === "Enter" &&
-                        (event.metaKey || event.ctrlKey)
+                        (!menu ||
+                          event.metaKey ||
+                          event.ctrlKey ||
+                          event.shiftKey)
                       ) {
                         event.preventDefault();
-                        if (!uploading) onSend?.();
+                        event.stopPropagation();
+                        if (event.metaKey || event.ctrlKey || event.shiftKey) {
+                          const input = event.currentTarget;
+                          const start = input.selectionStart;
+                          const next = `${text.slice(0, start)}\n${text.slice(input.selectionEnd)}`;
+                          if (
+                            next.length <=
+                            maxLength - (value.length - text.length)
+                          ) {
+                            change(next);
+                            requestAnimationFrame(() =>
+                              input.setSelectionRange(start + 1, start + 1),
+                            );
+                          }
+                        } else if (!uploading) onSend?.();
                       }
                     }}
                   />

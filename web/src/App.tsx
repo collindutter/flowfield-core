@@ -188,7 +188,7 @@ export function App() {
             <ThemeMenu />
             <NotificationButton />
             <p
-              className="connection"
+              className="connection group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
               role="status"
               title={
                 connected ? (live ? "Connected" : "Disconnected") : "Connecting"

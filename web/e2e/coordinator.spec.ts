@@ -77,6 +77,14 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
         context: { used: 12000, size: 100000 },
         items: [
           {
+            key: "opening",
+            kind: "agent",
+            text: "I’ll read the project first.",
+            preview: "",
+            omitted: false,
+            abridged: false,
+          },
+          {
             key: "tool",
             kind: "tool",
             text: "Read project · completed\n/project/README.md",
@@ -203,7 +211,14 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   await page.screenshot({
     path: testInfo.outputPath("composer-attachments.png"),
   });
-  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await input.press("End");
+  await input.press("Meta+Enter");
+  await expect(input).toHaveValue("Keep my project draft\n");
+  await input.press("Control+Enter");
+  await input.press("Shift+Enter");
+  await expect(input).toHaveValue("Keep my project draft\n\n\n");
+  expect(sends).toBe(0);
+  await input.press("Enter");
   await expect(page.getByText("Let’s plan the work.")).toBeVisible();
   expect(turns[0].text).toContain(
     "[screen.png](/api/projects/chat-browser/attachments/",
@@ -218,7 +233,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   await expect(
     page.getByRole("button", { name: "Send", exact: true }),
   ).toHaveCount(0);
-  active!.activity.items.find((item) => item.kind === "agent")!.text +=
+  active!.activity.items.find((item) => item.key === "reply")!.text +=
     " Open [CHT-1](/projects/chat-browser/tasks/CHT-1).";
   await expect(
     page
@@ -233,8 +248,34 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     ),
   ).toBeVisible();
   await expect(input).toHaveValue("A draft for the next turn");
-  await page.getByText("Activity", { exact: true }).click();
   await expect(page.getByLabel("Tool", { exact: true })).toBeVisible();
+  const timeline = page.locator(
+    ".coordinator-message:not(.coordinator-human) > [data-kind]",
+  );
+  await expect(timeline).toHaveText([
+    "I’ll read the project first.",
+    "Read project · completed\n/project/README.md",
+    "Let’s plan the work. Open CHT-1.",
+  ]);
+  await expect(timeline.nth(1)).not.toHaveCSS(
+    "color",
+    await timeline.nth(0).evaluate((el) => getComputedStyle(el).color),
+  );
+  await page.getByRole("button", { name: "Collapse projects" }).click();
+  const connection = page.locator(".connection");
+  await expect(connection.locator(".live-dot")).toBeVisible();
+  await expect
+    .poll(async () =>
+      connection.evaluate((el) => {
+        const frame = el.getBoundingClientRect();
+        const dot = el.querySelector(".live-dot")!.getBoundingClientRect();
+        return Math.abs(
+          (frame.left + frame.right) / 2 - (dot.left + dot.right) / 2,
+        );
+      }),
+    )
+    .toBeLessThan(1);
+  await page.getByRole("button", { name: "Expand projects" }).click();
   await expect(
     page.getByText("Read project · completed", { exact: false }),
   ).toContainText("/project/README.md");
@@ -375,7 +416,7 @@ test("single coordinator requires a saved model, labels loading and retains unsa
     page.getByRole("button", { name: "Remove requirement.md" }),
   ).toBeVisible();
   await expect(send).toBeDisabled();
-  await input.press("Control+Enter");
+  await input.press("Enter");
   expect(sends).toBe(0);
   release();
   await page

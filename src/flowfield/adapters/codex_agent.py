@@ -59,6 +59,20 @@ def codex_activity_details(tool: BaseModel) -> str:
         for key in ("command", "cwd", "path"):
             if isinstance(raw.get(key), str):
                 parts.append(f"{key}: {raw[key]}")
+    # MCP failures are reported in rawOutput by the bridge, without ACP text
+    # content. Retain only the public error message, not arbitrary tool results.
+    output = data.get("rawOutput")
+    if data.get("status") == "failed" and isinstance(output, dict):
+        error = output.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str):
+            parts.append(error["message"])
+        result = output.get("result")
+        if isinstance(result, dict):
+            structured = result.get("structuredContent")
+            if isinstance(structured, dict):
+                error = structured.get("error")
+                if isinstance(error, dict) and isinstance(error.get("message"), str):
+                    parts.append(error["message"])
     return bounded_details("\n".join(filter(None, parts)))
 
 
@@ -109,7 +123,11 @@ class CodexAgent:
             self.on_activity(
                 ActivityUpdate(
                     key=key,
-                    kind="command" if data.get("kind") == "execute" else "tool",
+                    kind=(
+                        "command"
+                        if data.get("kind") == "execute" and not title.startswith("mcp.")
+                        else "tool"
+                    ),
                     text="\n".join(
                         filter(
                             None,

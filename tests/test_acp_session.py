@@ -294,6 +294,31 @@ def test_partial_tool_updates_keep_public_facts_and_bound_cache():
         assert "pnpm test" in final["details"] and "/project/test.py" in final["details"]
         assert "PRIVATE" not in str(events)
         assert events[0].data["status"] == "in_progress"
+        await client.session_update(
+            "session",
+            ToolCallProgress.model_validate(
+                {
+                    "sessionUpdate": "tool_call_update",
+                    "toolCallId": "check",
+                    "status": "failed",
+                    "rawOutput": {
+                        "error": {"message": "Connection closed", "secret": "PRIVATE"},
+                        "result": {
+                            "structuredContent": {
+                                "error": {
+                                    "code": "tool_busy",
+                                    "message": "Wait for the current operation.",
+                                },
+                                "private": "PRIVATE",
+                            },
+                        },
+                    },
+                }
+            ),
+        )
+        assert "Connection closed" in events[-1].data["details"]
+        assert "Wait for the current operation." in events[-1].data["details"]
+        assert "PRIVATE" not in str(events)
         for index in range(110):
             await client.session_update(
                 "session",

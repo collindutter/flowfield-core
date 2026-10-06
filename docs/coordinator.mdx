@@ -16,7 +16,8 @@ Local uses the service host’s tools, credentials and native harness configurat
 Worker delivery branches, setup and checks can be configured later. Built-in chat supplies
 its own MCP connection; `flowfield integration connect codex` is only for standalone sessions.
 
-Write your message and select **Send** (or press Command/Ctrl+Enter). Opening a project
+Write your message and select **Send** (or press Enter). Use Command/Ctrl+Enter or
+Shift+Enter for a new line. Opening a project
 starts no model turn. Send is available once you have saved a model and effort.
 The coordinator reads project files using Codex's read-only mode and changes work through
 project-scoped Flowfield tools. Code changes belong to task workers. Answer worker questions
@@ -47,7 +48,7 @@ the agent reports usage. Context occupancy is separate from billable token usage
 
 ## Follow and stop
 
-Replies stream into the conversation. Expand **Activity** for public tool activity;
+Replies and public tool activity stream in order, with tool activity shown in grey;
 private reasoning is never displayed. One coordinator turn can run per project, independently
 of worker slots. You can write your next draft while it runs, then send when it finishes.
 

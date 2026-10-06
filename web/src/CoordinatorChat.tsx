@@ -7,7 +7,6 @@ import { Timestamp } from "./Timestamp";
 import { AgentSettingsControl } from "./AgentSettings";
 import { Composer } from "./Composer";
 import { ContextRing } from "./ContextRing";
-import { Disclosure } from "./DetailLayout";
 import { ActivityEntries } from "./RunActivity";
 import { useFeedScroll } from "./useFeedScroll";
 import { Button } from "@/components/ui/button";
@@ -196,26 +195,17 @@ export function CoordinatorChat({
                 <div className="detail-metadata">
                   Coordinator · {turn.status}
                 </div>
-                {turn.activity.items
-                  .filter((entry) => entry.kind === "agent")
-                  .map((entry) => (
-                    <div key={entry.key}>
+                {turn.activity.items.map((entry) =>
+                  entry.kind === "agent" ? (
+                    <div key={entry.key} data-kind="agent">
                       <Markdown>{entry.text}</Markdown>
                       {entry.omitted && (
                         <p className="muted">Some output was omitted.</p>
                       )}
                     </div>
-                  ))}
-                {turn.activity.items.some(
-                  (entry) => entry.kind !== "agent",
-                ) && (
-                  <Disclosure summary="Activity">
-                    <ActivityEntries
-                      items={turn.activity.items.filter(
-                        (entry) => entry.kind !== "agent",
-                      )}
-                    />
-                  </Disclosure>
+                  ) : (
+                    <ActivityEntries key={entry.key} items={[entry]} />
+                  ),
                 )}
                 {turn.activity.omitted && (
                   <p className="muted">
@@ -313,7 +303,7 @@ export function CoordinatorChat({
                 type="button"
                 size="icon-sm"
                 aria-label="Send"
-                title="Send (⌘/Ctrl+Enter)"
+                title="Send (Enter)"
                 disabled={
                   busy ||
                   uploading ||

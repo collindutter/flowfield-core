@@ -336,6 +336,9 @@
     gap: 8px;
     align-items: start;
   }
+  .run-activity-entry:not([data-kind="agent"]) {
+    color: var(--muted-foreground);
+  }
   .run-activity-icon {
     display: inline-flex;
     margin-top: 3px;
