@@ -11,7 +11,7 @@ the same feeds you use for questions and review.
 
 Install and authenticate [Codex](/integrations/codex), including the managed ACP runtime.
 Add an existing project using **Add project → Choose directory** or `flowfield project init`.
-In Coordinator Chat, choose a model, reasoning effort and native access mode beside the input, then save.
+In Coordinator Chat, choose a model, reasoning effort and access mode beside the input, then save.
 Local uses the service host’s tools, credentials and native harness configuration automatically.
 Worker delivery branches, setup and checks can be configured later. Built-in chat supplies
 its own MCP connection; `flowfield integration connect codex` is only for standalone sessions.
@@ -50,27 +50,27 @@ remain available to download. Worker replies use separate task attempts; reattac
 when a later reply needs their contents.
 Each project has 128 MiB of attachment storage. Unsent uploads expire after 24 hours.
 
-Type `/` for commands, separated into **Flowfield** and **Codex** groups. Flowfield actions
-control the composer: `/attach` adds files, `/model` opens settings, and `/stop` stops a turn.
-Use arrow keys and Enter to choose, or Escape to continue writing.
-
-Codex commands are discovered from the installed harness without starting a model turn.
-Select a command to insert `/codex <command>`, then send it. The prefix distinguishes
-harness commands from Flowfield actions. **Reload Codex commands** refreshes the menu;
-execution always checks what the current session supports.
+Type `/` to see the available coordinator commands. Use arrow keys and Enter to select,
+then send the command. Escape returns to ordinary writing. The list contains only commands
+supported by both Flowfield and the connected Codex session; discovery starts no model turn.
 
 | Command | Effect |
 | --- | --- |
-| `/codex compact` | Ask Codex to compact the ongoing native conversation. |
-| `/codex status` | Show available native session information. Usage may be unavailable immediately after resuming. |
-| `/codex mcp` | List the session's MCP connections. |
-| `/codex skills` | List skills discovered by Codex. |
-| `/codex rename <name>` | Rename the native Codex session; the Flowfield project name stays the same. |
+| `/status` | Show available session information. Usage may be unavailable immediately after resuming. |
+| `/compact` | Ask Codex to compact the ongoing conversation. Requires an existing conversation. |
+| `/mcp` | List the session's MCP connections. |
+| `/skills` | List skills discovered by Codex. |
 
-Compaction and renaming require an existing conversation. Native commands do not accept
-attachments. Other discovered commands stay disabled with a reason: Plan, autonomous goals,
-review commands and skill invocation need additional integration; signing out affects the
-host account. Worker replies currently offer only Flowfield composer actions.
+Commands do not accept attachments or arguments. Use the paperclip, model settings and Stop
+buttons for those actions. Worker replies use the same composer controls but do not expose
+session commands.
+
+**Fast mode** appears as a lightning button beside model settings when the selected model
+supports it. Select it to save Fast on or off for subsequent messages. It provides faster
+responses with increased usage; the settings show the harness's description. You can also
+change Fast alongside model, effort and Access mode in the settings popup before saving.
+Changing models starts at normal speed. Running turns keep their captured settings.
+Worker defaults and task overrides offer the same Fast control, applied to subsequent attempts.
 
 Hover or focus the context ring for the agent's reported context usage. During a turn it
 shows that turn's latest report; afterward it shows the last turn. It stays empty until

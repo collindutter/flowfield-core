@@ -203,11 +203,10 @@ class CodexAgent:
             raise ApplicationError("agent_stopping", "The agent is stopping.", 409)
         if not choice.mode and not read_only:
             raise ApplicationError(
-                "agent_mode_required", "Choose a native Codex access mode in agent settings.", 409
+                "agent_mode_required", "Choose an Access mode in agent settings.", 409
             )
         try:
-            # Coordination and discussion use the harness's read-only mode.
-            # Their callers cannot grant native escalation.
+            # Task discussion applies read-only access; coordinator uses its saved mode.
             await self.session.select("mode", "read-only" if read_only else choice.mode or "")
             await self.session.select("model", choice.model)
             await self.session.select("reasoning_effort", choice.effort)
@@ -216,6 +215,14 @@ class CodexAgent:
                 "reasoning_effort": choice.effort,
                 "mode": "read-only" if read_only else choice.mode,
             }
+            if choice.fast is not None:
+                available = {item["value"] for item in choices(self.session.config, "fast-mode")}
+                if {"on", "off"} <= available:
+                    fast_value = "on" if choice.fast else "off"
+                    expected["fast-mode"] = fast_value
+                    await self.session.select("fast-mode", fast_value)
+                elif choice.fast:
+                    raise ValueError("Fast mode is unavailable for this model")
             current = {item["id"]: item.get("currentValue") for item in self.session.config}
             if any(current.get(key) != value for key, value in expected.items()):
                 raise RuntimeError("Native settings changed while configuring")
@@ -223,7 +230,7 @@ class CodexAgent:
         except (ValueError, RuntimeError, RequestError) as error:
             raise ApplicationError(
                 "agent_choice_unavailable",
-                "Codex could not apply the saved model, effort and mode. "
+                "Codex could not apply the saved model, effort, access or fast mode. "
                 "Reload available choices and save settings.",
                 409,
             ) from error
@@ -247,50 +254,32 @@ class CodexAgent:
                 "Codex did not return its commands. Try reloading them.",
                 409,
             ) from error
-        reasons = {
-            "plan": "Default/Plan modes are not enabled in Flowfield.",
-            "goal": "Background goals need a persistent execution lifecycle.",
-            "logout": "Sign out through Codex on the host; this affects other sessions.",
-        }
-        supported = {"compact", "status", "mcp", "skills", "rename"}
-        return [
-            item.model_copy(
-                update={
-                    "unavailable_reason": None
-                    if item.name in supported
-                    else (reasons.get(item.name, "This command's execution is not integrated yet."))
-                }
-            )
-            for item in self.session.commands
-        ]
+        supported = {"compact", "status", "mcp", "skills"}
+        return [item for item in self.session.commands if item.name in supported]
 
     async def command_prompt(
         self, text: str, *, has_history: bool, attachments: list[dict[str, str]]
     ) -> str | None:
         words = text.strip().split(maxsplit=1)
-        if not words or words[0] != "/codex":
+        if not words or not words[0].startswith("/"):
             return None
-        if len(words) != 2:
-            raise ApplicationError("command_unknown", "Choose a Codex command.", 409)
-        command = words[1]
-        name, *arguments = command.split(maxsplit=1)
+        name = words[0][1:]
         offered = next((item for item in await self.command_options() if item.name == name), None)
-        if offered is None or offered.unavailable_reason:
+        if offered is None:
             raise ApplicationError(
                 "command_unavailable",
-                (offered.unavailable_reason if offered else None)
-                or "Codex no longer advertises this command. Reload commands.",
+                "This command is not available. Choose a command from the menu.",
                 409,
             )
-        if attachments or (arguments and not offered.input_hint):
+        if attachments or len(words) != 1:
             raise ApplicationError(
-                "command_input", "This command does not accept attachments or these arguments.", 409
+                "command_input", "This command does not accept attachments or arguments.", 409
             )
-        if not has_history and name in {"compact", "rename"}:
+        if not has_history and name == "compact":
             raise ApplicationError(
-                "command_session", "Send a message before changing its native session.", 409
+                "command_session", "Send a message before compacting its conversation.", 409
             )
-        return "/" + command
+        return "/" + name
 
     async def prompt(
         self,
@@ -365,6 +354,16 @@ async def model_options(directory: Path) -> list[ModelOption]:
                                 for c in choices(agent.session.config, "reasoning_effort")
                             ],
                             modes=modes,
+                            fast={"on", "off"}
+                            <= {c["value"] for c in choices(agent.session.config, "fast-mode")},
+                            fast_description=next(
+                                (
+                                    c.get("description") or ""
+                                    for c in agent.session.config
+                                    if c["id"] == "fast-mode"
+                                ),
+                                "",
+                            )[:1000],
                         )
                     )
                 return result

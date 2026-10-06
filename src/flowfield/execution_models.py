@@ -32,6 +32,7 @@ class WorkerSettings(Record):
     model: str | None = None
     effort: str | None = None
     mode: str | None = None
+    fast: bool = False
     max_parallel: int = 1
     enabled: bool = False
     problem: str | None = None
@@ -47,6 +48,7 @@ class SettingsEdit(Record):
     model: str = Field(min_length=1, max_length=200)
     effort: str = Field(min_length=1, max_length=40)
     mode: str | None = Field(default=None, min_length=1, max_length=200)
+    fast: bool = False
     max_parallel: int = Field(default=1, ge=1, le=16)
 
 
@@ -104,6 +106,8 @@ class ModelOption(Record):
     name: str
     efforts: list[str]
     modes: list[NativeMode] = Field(default_factory=list)
+    fast: bool = False
+    fast_description: str = ""
 
 
 class Usage(Record):

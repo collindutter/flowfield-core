@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Popover } from "radix-ui";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Zap } from "lucide-react";
 import { ContentStack } from "./DetailLayout";
 
 type Settings = components["schemas"]["AgentSettingsView"];
@@ -18,7 +18,7 @@ export function AgentModelFields({
   model,
   effort,
   mode,
-  modesEnabled = true,
+  fast,
   models,
   loading,
   change,
@@ -26,10 +26,10 @@ export function AgentModelFields({
   model: string;
   effort: string;
   mode: string;
-  modesEnabled?: boolean;
+  fast: boolean;
   models: Model[];
   loading: boolean;
-  change: (model: string, effort: string, mode: string) => void;
+  change: (model: string, effort: string, mode: string, fast: boolean) => void;
 }) {
   const selected = models.find((item) => item.id === model);
   return (
@@ -41,7 +41,7 @@ export function AgentModelFields({
           value={loading ? "" : model}
           required
           disabled={loading || !models.length}
-          onChange={(event) => change(event.target.value, "", mode)}
+          onChange={(event) => change(event.target.value, "", mode, false)}
         >
           <option value="">
             {loading
@@ -67,7 +67,7 @@ export function AgentModelFields({
           value={loading ? "" : effort}
           required
           disabled={loading || !model || !selected?.efforts.length}
-          onChange={(event) => change(model, event.target.value, mode)}
+          onChange={(event) => change(model, event.target.value, mode, fast)}
         >
           <option value="">
             {loading
@@ -88,15 +88,17 @@ export function AgentModelFields({
           ))}
         </NativeSelect>
       </Label>
-      {modesEnabled && !!selected?.modes?.length && (
+      {!!selected?.modes?.length && (
         <Label className="field block">
-          Native access mode
+          Access mode
           <NativeSelect
-            aria-label="Native access mode"
+            aria-label="Access mode"
             value={loading ? "" : mode}
             required
             disabled={loading}
-            onChange={(event) => change(model, effort, event.target.value)}
+            onChange={(event) =>
+              change(model, effort, event.target.value, fast)
+            }
           >
             <option value="">
               {loading ? "Loading modes…" : "Choose a mode"}
@@ -117,6 +119,29 @@ export function AgentModelFields({
           </span>
         </Label>
       )}
+      {(selected?.fast || fast) && (
+        <div>
+          <Button
+            type="button"
+            size="sm"
+            variant={fast ? "secondary" : "outline"}
+            aria-label="Fast mode"
+            aria-pressed={fast}
+            disabled={loading || !selected?.fast}
+            onClick={() => change(model, effort, mode, !fast)}
+          >
+            <Zap size={14} /> Fast
+          </Button>
+          <p className="detail-metadata">
+            {loading
+              ? "Loading fast mode…"
+              : selected?.fast
+                ? selected.fast_description ||
+                  "Faster responses, increased usage."
+                : "Fast mode is unavailable. Choose a supported model."}
+          </p>
+        </div>
+      )}
     </>
   );
 }
@@ -129,25 +154,24 @@ type AgentSettingsProps = {
   coordinator?: boolean;
   onReady?: (choice: Choice | null) => void;
   onSaved?: () => void;
+  onSaveError?: () => void;
   compact?: boolean;
 };
 
-function useAgentSettingsContent(
-  {
-    path,
-    refresh,
-    onDirty,
-    coordinator = false,
-    onReady,
-    onSaved,
-    compact = false,
-  }: AgentSettingsProps,
-  enabled = true,
-) {
-  const resource = useResource<Settings>(enabled ? path : null, refresh);
+function useAgentSettingsContent({
+  path,
+  refresh,
+  onDirty,
+  coordinator = false,
+  onReady,
+  onSaved,
+  onSaveError,
+  compact = false,
+}: AgentSettingsProps) {
+  const resource = useResource<Settings>(path, refresh);
   const [retry, setRetry] = useState(0);
   const catalog = useResource<Model[]>(
-    enabled ? (retry ? "worker-models?refresh=true" : "worker-models") : null,
+    retry ? "worker-models?refresh=true" : "worker-models",
     retry,
     180000,
   );
@@ -164,6 +188,7 @@ function useAgentSettingsContent(
   const model = choice?.model ?? "";
   const effort = choice?.effort ?? "";
   const mode = choice?.mode ?? "";
+  const fast = choice?.fast ?? false;
   const stale = !!(draft && data && draft.revision !== data.revision);
   useEffect(() => {
     onDirty(!!draft || busy);
@@ -177,11 +202,12 @@ function useAgentSettingsContent(
         (item) =>
           item.id === saved?.model &&
           item.efforts.includes(saved.effort) &&
-          !!item.modes?.some((mode) => mode.id === saved.mode),
+          !!item.modes?.some((mode) => mode.id === saved.mode) &&
+          (!saved.fast || item.fast),
       );
     onReady?.(!resource.error && available ? (saved ?? null) : null);
   }, [data, resource.error, catalog.data, onReady]);
-  function change(model: string, effort: string, mode: string) {
+  function change(model: string, effort: string, mode: string, fast: boolean) {
     if (data)
       setDraft({
         revision: draft?.revision ?? data.revision,
@@ -190,10 +216,11 @@ function useAgentSettingsContent(
           model,
           effort,
           mode: mode || null,
+          fast,
         },
       });
   }
-  async function save(reset = false) {
+  async function save(reset = false, next = selection) {
     if (!data) return;
     setBusy(true);
     setError("");
@@ -204,7 +231,7 @@ function useAgentSettingsContent(
         "PUT",
         {
           expected_revision: draft?.revision ?? data.revision,
-          selection: reset ? null : selection,
+          selection: reset ? null : next,
         },
         undefined,
         180000,
@@ -216,11 +243,12 @@ function useAgentSettingsContent(
       onSaved?.();
     } catch (error) {
       setError((error as Error).message);
+      onSaveError?.();
     } finally {
       setBusy(false);
     }
   }
-  return (
+  const fields = (
     <ContentStack space="section">
       {!compact && (
         <p>
@@ -264,7 +292,7 @@ function useAgentSettingsContent(
             model={model}
             effort={effort}
             mode={mode}
-            modesEnabled
+            fast={fast}
             models={catalog.data ?? []}
             loading={catalog.loading || resource.loading}
             change={change}
@@ -285,7 +313,8 @@ function useAgentSettingsContent(
                   (item) =>
                     item.id === model &&
                     item.efforts.includes(effort) &&
-                    !!item.modes?.some((choice) => choice.id === mode),
+                    !!item.modes?.some((choice) => choice.id === mode) &&
+                    (!fast || item.fast),
                 )
               }
             >
@@ -349,6 +378,33 @@ function useAgentSettingsContent(
       {notice && <p role="status">{notice}</p>}
     </ContentStack>
   );
+  const saved = data?.effective?.choice;
+  const selected = catalog.data?.find((item) => item.id === saved?.model);
+  const fastControl =
+    selected?.fast && saved ? (
+      <Button
+        type="button"
+        size="icon-sm"
+        variant={saved.fast ? "secondary" : "ghost"}
+        aria-label="Fast mode"
+        aria-pressed={saved.fast ?? false}
+        title={
+          selected.fast_description ||
+          "Fast mode: faster responses, increased usage"
+        }
+        disabled={
+          !!draft ||
+          busy ||
+          catalog.loading ||
+          resource.loading ||
+          !!resource.error
+        }
+        onClick={() => void save(false, { ...saved, fast: !saved.fast })}
+      >
+        <Zap size={14} />
+      </Button>
+    ) : null;
+  return { fields, fastControl };
 }
 
 export function AgentSettingsControl({
@@ -363,45 +419,48 @@ export function AgentSettingsControl({
   label: string;
   autoOpened?: boolean;
 }) {
-  const [mounted, setMounted] = useState(!!props.coordinator || open);
-  if (open && !mounted) setMounted(true);
-  const fields = useAgentSettingsContent(
-    { ...props, compact: true, onSaved: () => onOpenChange(false) },
-    mounted,
-  );
+  const { fields, fastControl } = useAgentSettingsContent({
+    ...props,
+    compact: true,
+    onSaved: () => onOpenChange(false),
+    onSaveError: () => onOpenChange(true),
+  });
   return (
-    <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Trigger asChild>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="composer-model"
-          title={label}
-        >
-          <span>{label}</span>
-          <ChevronDown size={12} />
-        </Button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side="top"
-          align="start"
-          sideOffset={8}
-          className="composer-settings"
-          onFocusOutside={(event) => {
-            // A newly activated workspace tab can receive focus after its popup mounts.
-            if (autoOpened) event.preventDefault();
-          }}
-          aria-label={
-            props.coordinator
-              ? "Coordinator model settings"
-              : "Worker model settings"
-          }
-        >
-          {fields}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <>
+      <Popover.Root open={open} onOpenChange={onOpenChange}>
+        <Popover.Trigger asChild>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="composer-model"
+            title={label}
+          >
+            <span>{label}</span>
+            <ChevronDown size={12} />
+          </Button>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content
+            side="top"
+            align="start"
+            sideOffset={8}
+            className="composer-settings"
+            onFocusOutside={(event) => {
+              // A newly activated workspace tab can receive focus after its popup mounts.
+              if (autoOpened) event.preventDefault();
+            }}
+            aria-label={
+              props.coordinator
+                ? "Coordinator model settings"
+                : "Worker model settings"
+            }
+          >
+            {fields}
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+      {fastControl}
+    </>
   );
 }

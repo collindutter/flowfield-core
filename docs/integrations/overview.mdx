@@ -10,6 +10,10 @@ in your coding harness. Both work with the same board, task feeds and review.
 Built-in chat supplies its own scoped MCP connection. Standalone coding conversations use
 the project skill and an explicitly registered MCP connection.
 
+Built-in coordinator and worker conversations use ACP to communicate with their harness.
+See [ACP and MCP](/protocols) for how the two protocols fit together and which capabilities
+Flowfield supports.
+
 **The project skill** explains how a coordinator captures agreed work, reads the board,
 prepares tasks, answers project-level questions and helps you review results. Installation
 adds `.agents/skills/flowfield-coordinator/SKILL.md` and a short reference in your project's

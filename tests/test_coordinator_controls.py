@@ -26,9 +26,7 @@ def test_discovery_is_shared_model_free_and_dispatch_rechecks_current_commands(
         assert results[0] == results[1] == results[2]
         assert len(service.coordinator.command_jobs) == 1
         commands = {item.name: item for item in results[0]}
-        assert not commands["compact"].unavailable_reason
-        assert commands["goal"].unavailable_reason
-        assert commands["plan"].unavailable_reason
+        assert set(commands) == {"compact", "status", "mcp", "skills"}
         assert not service.coordinator.store.page("harbor").items
         assert (
             service.coordinator.store.session(
@@ -36,7 +34,7 @@ def test_discovery_is_shared_model_free_and_dispatch_rechecks_current_commands(
             )
             is None
         )
-        status = service.coordinator.send("harbor", conversation.id, message("/codex status"))
+        status = service.coordinator.send("harbor", conversation.id, message("/status"))
         assert (await settled(service, status)).status == "completed"
         assert (
             service.coordinator.store.session(
@@ -46,24 +44,26 @@ def test_discovery_is_shared_model_free_and_dispatch_rechecks_current_commands(
         )
         first = service.coordinator.send("harbor", conversation.id, message())
         assert (await settled(service, first)).session == "new"
-        command = service.coordinator.send("harbor", conversation.id, message("/codex compact"))
+        command = service.coordinator.send("harbor", conversation.id, message("/compact"))
         done = await settled(service, command)
         assert done.status == "completed" and done.session == "resumed"
         assert any(item.text == "Native command: /compact" for item in done.activity.items)
         for text in (
-            "/codex plan",
-            "/codex logout",
-            "/codex goal continue",
-            "/codex absent",
-            "/codex status extra",
+            "/plan",
+            "/logout",
+            "/goal continue",
+            "/absent",
+            "/rename New name",
+            "/codex status",
+            "/status extra",
         ):
             rejected = await settled(
                 service, service.coordinator.send("harbor", conversation.id, message(text))
             )
             assert rejected.status == "failed" and not rejected.activity.items
         flags.append("no-compact")
-        stale = service.coordinator.send("harbor", conversation.id, message("/codex compact"))
-        assert "no longer advertises" in (await settled(service, stale)).notice
+        stale = service.coordinator.send("harbor", conversation.id, message("/compact"))
+        assert "not available" in (await settled(service, stale)).notice
         await service.close()
 
     asyncio.run(exercise())

@@ -27,7 +27,7 @@ def main():
         "inputModalities": ["text"],
         "isDefault": True,
         "serviceTiers": [],
-        "additionalSpeedTiers": [],
+        "additionalSpeedTiers": ["fast"],
         "hidden": False,
     }
     for line in sys.stdin:

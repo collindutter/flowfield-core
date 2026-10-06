@@ -6,7 +6,7 @@
   "navigation": {
     "groups": [
       { "group": "Start here", "pages": ["getting-started", "concepts", "coordinator"] },
-      { "group": "Reference", "pages": ["cli", "installation", "storage"] },
+      { "group": "Reference", "pages": ["cli", "protocols", "installation", "storage"] },
       { "group": "Integrations", "pages": ["integrations/overview", "integrations/codex"] }
     ]
   },

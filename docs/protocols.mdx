@@ -1,0 +1,51 @@
+---
+title: ACP and MCP
+description: How Flowfield communicates with coding agents and exposes project tools.
+---
+
+Flowfield uses two complementary protocols:
+
+| Protocol | Connection | Purpose |
+| --- | --- | --- |
+| Agent Client Protocol (ACP) | Flowfield → coding harness | Send messages, receive activity, select settings and handle tool permission requests. |
+| Model Context Protocol (MCP) | Coding harness → Flowfield | Read project context, maintain tasks and report work through scoped tools. |
+
+## ACP: running the conversation
+
+[ACP](https://agentclientprotocol.com/get-started/introduction) standardizes communication
+between coding agents and their client applications. Flowfield acts as the client for
+Coordinator Chat and managed task workers, using a local subprocess connection.
+
+The Codex adapter connects through an installed ACP bridge. It discovers model capabilities,
+applies model, effort, Access mode and supported Fast settings, streams public text/tool
+activity, and handles native permission requests. Coordinator messages resume their saved
+Codex session; workers run scoped task attempts in their own workspaces.
+
+Flowfield provides the coordinator commands `/status`, `/compact`, `/mcp` and `/skills` when
+the harness advertises them. Other advertised commands are not exposed. See
+[Coordinator Chat](/coordinator) for the controls and session behavior.
+
+Codex is the first supported harness. An ACP-compatible agent is not automatically a supported
+Flowfield integration: session continuity, capabilities, cancellation and native cleanup must
+be integrated and verified. The packaged Codex bridge includes the cleanup support Flowfield
+uses to confirm that an attempt's native work has stopped. Install it with
+`flowfield harness install codex`; authenticate Codex separately.
+
+## MCP: working with Flowfield
+
+[MCP](https://modelcontextprotocol.io/docs/getting-started/intro) connects AI applications
+to tools and context. Flowfield exposes project and task operations through its local service.
+The tools use the same revisions, saved answers and exact-result approval rules as the GUI
+and CLI. MCP discovery supplies their names, descriptions and input schemas.
+
+For a standalone coding conversation, connect the harness to
+`http://127.0.0.1:8765/mcp/` and install the project guidance. Follow the
+[Codex setup instructions](/integrations/codex#connect-a-standalone-coordinator).
+Use your configured service port if it differs from the default.
+
+Built-in coordinator and worker sessions receive service-managed, scoped connections
+automatically. Their tools are limited to the relevant project or task, and their grants
+end with the attempt. No separate standalone connection is needed for built-in chat.
+
+The project skill explains the workflow; MCP supplies the operations. Neither a tool call
+nor a harness permission decision grants approval to deliver a worker's code result.

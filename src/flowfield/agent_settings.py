@@ -35,7 +35,9 @@ class AgentSettings:
             )
             return AgentSettingsView(
                 revision=current.revision,
-                selection=AgentChoice(model=current.model, effort=current.effort, mode=current.mode)
+                selection=AgentChoice(
+                    model=current.model, effort=current.effort, mode=current.mode, fast=current.fast
+                )
                 if current.model and current.effort
                 else None,
             )
@@ -80,6 +82,10 @@ class AgentSettings:
     def edit(
         self, project: str, role: AgentRole, request: AgentSettingsEdit, scope: str = ""
     ) -> AgentSettingsView:
+        if request.selection and request.selection.fast is None:
+            request = request.model_copy(
+                update={"selection": request.selection.model_copy(update={"fast": False})}
+            )
         if role == "coordinator" and request.selection and request.selection.mode is None:
             # Old clients selected only model/effort. Preserve their existing access.
             request = request.model_copy(

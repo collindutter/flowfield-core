@@ -46,6 +46,19 @@ if "managed" in sys.argv:
     )
 
 
+if "fast" in sys.argv:
+    CONFIG.append(
+        {
+            "id": "fast-mode",
+            "name": "Fast mode",
+            "type": "select",
+            "currentValue": "on",
+            "description": "Faster responses, increased usage",
+            "options": [{"value": "on", "name": "On"}, {"value": "off", "name": "Off"}],
+        }
+    )
+
+
 def send(message):
     print(json.dumps({"jsonrpc": "2.0", **message}), flush=True)
 
@@ -75,6 +88,8 @@ async def main():
     resumed = False
 
     async def prompt(request):
+        if expected := os.environ.get("FLOWFIELD_TEST_FAST"):
+            assert next(c for c in CONFIG if c["id"] == "fast-mode")["currentValue"] == expected
         text = request["params"]["prompt"][0]["text"]
         if text.startswith("/"):
             assert text in {"/status", "/compact", "/skills", "/mcp"}

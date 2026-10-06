@@ -13,6 +13,10 @@ The coordinator can continue planning while workers run. Closing its conversatio
 does not stop the service's enabled queue. The browser gives you direct control of
 priorities, answers, pause, stop and approval.
 
+Flowfield uses **ACP** to communicate with its built-in coding harnesses and **MCP** to
+give agents project/task tools. See [ACP and MCP](/protocols) for the connections and
+supported capabilities; [Integrations](/integrations/overview) covers setup.
+
 ## Projects, tasks and milestones
 
 A **project** is an existing directory registered through the browser's directory chooser
@@ -51,10 +55,14 @@ indicator describes its live update stream.
 
 ## Agent settings and permissions
 
-Project worker defaults and task overrides select a model, reasoning effort and native access mode together.
+Project worker defaults and task overrides select a model, reasoning effort and access mode together.
 Each attempt saves the choice it used. Changing defaults does not alter running attempts
 or explicit task overrides. Unavailable choices fail explicitly instead of selecting
 another model.
+
+Fast mode is available only for models that support it. Worker defaults, task overrides and
+Coordinator Chat save it alongside the other settings; it affects subsequent attempts and
+can increase usage. Historical attempts keep their original choices.
 
 Each project has one built-in [Coordinator Chat](/coordinator), with its model, effort and access mode
 selected beside the chat input. Changes apply to subsequent messages and do not configure

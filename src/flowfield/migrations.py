@@ -154,6 +154,15 @@ def coordinator_access_modes(db: sqlite3.Connection) -> None:
     )
 
 
+def explicit_fast_mode(db: sqlite3.Connection) -> None:
+    # Current preferences start at normal speed; frozen attempts retain unknown old values.
+    db.execute(
+        "UPDATE agent_settings SET selection=json_set(selection,'$.fast',json('false')), "
+        "revision=revision+1 WHERE selection IS NOT NULL "
+        "AND (json_type(selection,'$.fast') IS NULL OR json_type(selection,'$.fast')='null')"
+    )
+
+
 MIGRATIONS = (
     Migration(30, storage_identity),
     Migration(31, persistent_notifications),
@@ -164,6 +173,7 @@ MIGRATIONS = (
     Migration(36, message_attachments),
     Migration(37, coordinator_sessions),
     Migration(38, coordinator_access_modes),
+    Migration(39, explicit_fast_mode),
 )
 
 

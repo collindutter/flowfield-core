@@ -14,6 +14,7 @@ class AgentChoice(AgentRecord):
     model: str = Field(min_length=1, max_length=200)
     effort: str = Field(min_length=1, max_length=40)
     mode: str | None = Field(default=None, min_length=1, max_length=200)
+    fast: bool | None = None  # None preserves unknown historical/inherited configuration.
 
 
 class EffectiveAgent(AgentRecord):
@@ -38,7 +39,6 @@ class AgentCommand(AgentRecord):
     name: str = Field(pattern=r"^\$?[a-zA-Z0-9_.-]+$", max_length=100)
     description: str = Field(max_length=1000)
     input_hint: str | None = Field(default=None, max_length=200)
-    unavailable_reason: str | None = None
 
 
 AgentRole = Literal["worker", "coordinator"]

@@ -108,6 +108,8 @@ async def probe(
         await client.select("model", "test-model")
         await client.select("reasoning_effort", "low")
         await client.select("mode", mode)
+        if scenario == "resume":
+            await client.select("fast-mode", "on")
         prompt = asyncio.create_task(client.prompt("Offline conformance probe"))
         if scenario == "cancel":
             await asyncio.wait_for(started.wait(), 10)
@@ -137,6 +139,7 @@ async def probe(
         )
         try:
             await client.select("mode", mode)
+            await client.select("fast-mode", "off")
             result = await client.prompt("Continue without replaying the first message")
             resumed_text = [item.data["text"] for item in events if item.kind == "text"]
             assert resumed_text == ["Offline native history: 2 turns"], resumed_text
@@ -161,6 +164,12 @@ async def probe(
         )
         resumes = [item["params"] for item in messages if item.get("method") == "thread/resume"]
         assert len(resumes) == 1
+        turns = [
+            item["params"]
+            for item in messages
+            if item.get("method") == "turn/start" and item["params"]["threadId"] == "test-thread"
+        ]
+        assert [turn["serviceTier"] for turn in turns] == ["fast", None]
         assert any(item.get("method") == "thread/compact/start" for item in messages)
         assert any(item.get("method") == "thread/name/set" for item in messages)
         assert (

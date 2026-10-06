@@ -118,7 +118,10 @@ class Supervisor:
 
     async def configure(self, project_id: str, request: SettingsEdit) -> WorkerSettings:
         await self.validate_agent_choice(
-            AgentChoice(model=request.model, effort=request.effort, mode=request.mode), project_id
+            AgentChoice(
+                model=request.model, effort=request.effort, mode=request.mode, fast=request.fast
+            ),
+            project_id,
         )
         return self.execution.configure(project_id, request)
 
@@ -130,6 +133,7 @@ class Supervisor:
             item.id == choice.model
             and choice.effort in item.efforts
             and (choice.mode is None or choice.mode in {mode.id for mode in item.modes})
+            and (not choice.fast or item.fast)
             for item in models
         ):
             raise ApplicationError(

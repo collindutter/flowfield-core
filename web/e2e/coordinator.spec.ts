@@ -14,20 +14,11 @@ test.beforeEach(async ({ page }) => {
           name: "compact",
           description: "Compact the conversation",
           input_hint: null,
-          unavailable_reason: null,
         },
         {
           name: "status",
           description: "Show session status",
           input_hint: null,
-          unavailable_reason: null,
-        },
-        {
-          name: "goal",
-          description: "Manage a goal",
-          input_hint: "goal",
-          unavailable_reason:
-            "Persistent autonomous goals are not supported yet.",
         },
       ],
     }),
@@ -246,27 +237,19 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   ).toBeVisible();
   const input = page.getByRole("textbox", { name: "Message coordinator" });
   await input.fill("/");
-  await expect(
-    page.getByRole("option", { name: /\/codex compact/ }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("option", { name: /\/codex goal/ }),
-  ).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("option", { name: /\/compact/ })).toBeVisible();
+  await expect(page.locator("[cmdk-item]")).toHaveCount(2);
+  await expect(page.locator("[cmdk-item] svg")).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath("coordinator-commands.png"),
   });
-  await page.getByRole("option", { name: /\/codex compact/ }).click();
-  await expect(input).toHaveValue("/codex compact ");
+  await page.getByRole("option", { name: /\/compact/ }).click();
+  await expect(input).toHaveValue("/compact");
   expect(sends).toBe(0);
-  await input.fill("/mo");
-  const commandInput = page.getByRole("combobox", {
-    name: "Message coordinator",
-  });
-  await expect(page.getByRole("option", { name: /\/model/ })).toBeVisible();
-  await commandInput.press("ArrowDown");
-  await commandInput.press("Home");
-  await commandInput.press("Enter");
-  await expect(input).toHaveValue("");
+  await input.fill("");
+  await page
+    .getByRole("button", { name: "test-model · low", exact: true })
+    .click();
   await expect(
     page.getByRole("dialog", { name: "Coordinator model settings" }),
   ).toBeVisible();
@@ -554,6 +537,8 @@ test("single coordinator requires a saved model, labels loading and retains unsa
         {
           id: "second",
           name: "Second",
+          fast: true,
+          fast_description: "Faster responses, increased usage",
           efforts: ["high"],
           modes: [
             {
@@ -657,7 +642,7 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   await expect(effort).toBeEnabled();
   await effort.selectOption("high");
   await page
-    .getByRole("combobox", { name: "Native access mode" })
+    .getByRole("combobox", { name: "Access mode" })
     .selectOption("agent");
   await expect(send).toBeDisabled();
   await page.getByRole("link", { name: "Flowfield", exact: true }).click();
@@ -673,6 +658,22 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(send).toBeEnabled();
   await expect(model).not.toBeVisible();
+  const fastButton = page
+    .locator(".composer-toolbar")
+    .getByRole("button", { name: "Fast mode", exact: true });
+  await expect(fastButton).toHaveAttribute("aria-pressed", "false");
+  await fastButton.click();
+  await expect(fastButton).toHaveAttribute("aria-pressed", "true");
+  expect(settings.effective?.choice.fast).toBe(true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("tab", { name: "Coordinator", exact: true }).click();
+  await expect(fastButton).toBeVisible();
+  const fastBounds = await fastButton.boundingBox();
+  expect(fastBounds!.x + fastBounds!.width).toBeLessThanOrEqual(390);
+  await page.screenshot({
+    path: testInfo.outputPath("coordinator-fast-mobile.png"),
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page
     .getByRole("button", { name: "second · high", exact: true })
     .click();
@@ -691,6 +692,7 @@ test("single coordinator requires a saved model, labels loading and retains unsa
   ).toBeVisible();
   expect(sends).toBe(1);
   await page.reload();
+  await expect(fastButton).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("button", { name: "second · high", exact: true }),
   ).toBeVisible();
@@ -722,7 +724,13 @@ test("long project chat preserves loaded history while live pages advance", asyn
     native_started: true,
     notice: "",
     settings: {
-      choice: { harness: "codex", model: "test", effort: "low", mode: null },
+      choice: {
+        harness: "codex",
+        model: "test",
+        effort: "low",
+        mode: null,
+        fast: null,
+      },
       source: "project",
       default_revision: 1,
       override_revision: null,

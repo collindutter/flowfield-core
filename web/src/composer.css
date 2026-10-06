@@ -114,21 +114,11 @@
 .composer-command-menu [cmdk-item] {
   display: flex;
   gap: 8px;
-  align-items: center;
+  align-items: flex-start;
   padding: 8px;
   border-radius: 5px;
   cursor: pointer;
   font-size: 13px;
-}
-.composer-command-menu [cmdk-group-heading] {
-  padding: 6px 8px;
-  color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 600;
-}
-.composer-command-menu [cmdk-item][data-disabled="true"] {
-  color: var(--muted-foreground);
-  cursor: default;
 }
 .composer-command-menu [cmdk-item][data-selected="true"] {
   background: var(--accent);
@@ -136,9 +126,6 @@
 }
 .composer-command-menu [cmdk-item] .detail-metadata {
   margin-left: auto;
-}
-.composer-command-menu [cmdk-item] > svg {
-  flex-shrink: 0;
 }
 .composer-command-menu [cmdk-item] > span:not(.detail-metadata) {
   flex-shrink: 0;

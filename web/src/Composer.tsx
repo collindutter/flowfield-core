@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Command } from "cmdk";
 import { Popover } from "radix-ui";
-import { Paperclip, FileText, X, Slash } from "lucide-react";
+import { Paperclip, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { request } from "./workspace";
@@ -48,8 +48,6 @@ export function Composer({
   action,
   onSend,
   onBusy,
-  onModel,
-  onStop,
   nativeCommands,
   inputRef,
   collapsed = false,
@@ -68,8 +66,6 @@ export function Composer({
   action?: ReactNode;
   onSend?: () => void;
   onBusy: (busy: boolean) => void;
-  onModel?: () => void;
-  onStop?: () => void;
   nativeCommands?: {
     items: components["schemas"]["AgentCommand"][];
     loading: boolean;
@@ -98,29 +94,20 @@ export function Composer({
   const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const menu =
+    !!nativeCommands &&
     active &&
     !collapsed &&
     focused &&
     !dismissed &&
-    /^\/(?:[a-z]*|codex [a-z0-9_.$-]*)$/i.test(text);
+    /^\/[a-z]*$/i.test(text);
   const nativeLoad = nativeCommands?.load;
   useEffect(() => {
     if (menu) nativeLoad?.();
   }, [menu, nativeLoad]);
-  const nativeQuery = text.startsWith("/codex") ? text.slice(7) : text.slice(1);
+  const nativeQuery = text.slice(1).toLowerCase();
   const agentCommands = (nativeCommands?.items ?? []).filter((item) =>
     item.name.startsWith(nativeQuery),
   );
-  const actions = [
-    {
-      name: "attach",
-      detail: "Add a file or image",
-    },
-    ...(onModel
-      ? [{ name: "model", detail: "Choose model, effort and access" }]
-      : []),
-    ...(onStop ? [{ name: "stop", detail: "Stop the current turn" }] : []),
-  ].filter((item) => item.name.startsWith(text.slice(1).toLowerCase()));
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -366,35 +353,8 @@ export function Composer({
               onFocusOutside={(event) => event.preventDefault()}
             >
               <Command.List aria-label="Composer commands">
-                {!actions.length && !nativeCommands && (
-                  <p className="detail-metadata">
-                    No composer command. Esc to keep writing.
-                  </p>
-                )}
-                {!!actions.length && (
-                  <Command.Group heading="Flowfield">
-                    {actions.map((item) => (
-                      <Command.Item
-                        key={item.name}
-                        value={`flowfield:${item.name}`}
-                        onSelect={() => {
-                          change("");
-                          setDismissed(true);
-                          if (item.name === "attach") picker.current?.click();
-                          else if (item.name === "model") onModel?.();
-                          else onStop?.();
-                        }}
-                        onMouseDown={(event) => event.preventDefault()}
-                      >
-                        <Slash size={14} />
-                        <span>/{item.name}</span>
-                        <span className="detail-metadata">{item.detail}</span>
-                      </Command.Item>
-                    ))}
-                  </Command.Group>
-                )}
                 {nativeCommands && (
-                  <Command.Group heading="Codex">
+                  <>
                     {nativeCommands.loading ? (
                       <p className="detail-metadata" role="status">
                         Loading commands…
@@ -405,7 +365,7 @@ export function Composer({
                       </p>
                     ) : !agentCommands.length ? (
                       <p className="detail-metadata">
-                        No matching Codex commands.
+                        No matching commands. Esc to keep writing.
                       </p>
                     ) : null}
                     {!nativeCommands.loading &&
@@ -414,32 +374,30 @@ export function Composer({
                         <Command.Item
                           key={item.name}
                           value={`codex:${item.name}`}
-                          disabled={!!item.unavailable_reason || disabled}
+                          disabled={disabled}
                           onMouseDown={(event) => event.preventDefault()}
                           onSelect={() => {
-                            change(`/codex ${item.name} `);
+                            change(`/${item.name}`);
                             setDismissed(true);
                           }}
                         >
-                          <Slash size={14} />
-                          <span>/codex {item.name}</span>
+                          <span>/{item.name}</span>
                           <span className="detail-metadata">
-                            {item.unavailable_reason ?? item.description}
-                            {!item.unavailable_reason && item.input_hint
-                              ? ` · ${item.input_hint}`
-                              : ""}
+                            {item.description}
                           </span>
                         </Command.Item>
                       ))}
-                    <Command.Item
-                      value="reload-codex-commands"
-                      disabled={nativeCommands.loading}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onSelect={() => nativeCommands.load(true)}
-                    >
-                      Reload Codex commands
-                    </Command.Item>
-                  </Command.Group>
+                    {nativeCommands.error && (
+                      <Command.Item
+                        value="reload-codex-commands"
+                        disabled={nativeCommands.loading}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onSelect={() => nativeCommands.load(true)}
+                      >
+                        Retry discovery
+                      </Command.Item>
+                    )}
+                  </>
                 )}
               </Command.List>
             </Popover.Content>

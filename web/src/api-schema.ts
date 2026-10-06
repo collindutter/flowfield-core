@@ -2108,6 +2108,8 @@ export interface components {
       effort: string;
       /** Mode */
       mode?: string | null;
+      /** Fast */
+      fast?: boolean | null;
     };
     /** AgentChoice */
     "AgentChoice-Output": {
@@ -2123,6 +2125,8 @@ export interface components {
       effort: string;
       /** Mode */
       mode: string | null;
+      /** Fast */
+      fast: boolean | null;
     };
     /** AgentCommand */
     AgentCommand: {
@@ -2132,8 +2136,6 @@ export interface components {
       description: string;
       /** Input Hint */
       input_hint: string | null;
-      /** Unavailable Reason */
-      unavailable_reason: string | null;
     };
     /** AgentSettingsEdit */
     AgentSettingsEdit: {
@@ -3068,6 +3070,16 @@ export interface components {
       efforts: string[];
       /** Modes */
       modes: components["schemas"]["NativeMode"][];
+      /**
+       * Fast
+       * @default false
+       */
+      fast: boolean;
+      /**
+       * Fast Description
+       * @default
+       */
+      fast_description: string;
     };
     /** NativeMode */
     NativeMode: {
@@ -3969,6 +3981,11 @@ export interface components {
       /** Mode */
       mode?: string | null;
       /**
+       * Fast
+       * @default false
+       */
+      fast: boolean;
+      /**
        * Max Parallel
        * @default 1
        */
@@ -4776,6 +4793,11 @@ export interface components {
       effort: string | null;
       /** Mode */
       mode: string | null;
+      /**
+       * Fast
+       * @default false
+       */
+      fast: boolean;
       /**
        * Max Parallel
        * @default 1

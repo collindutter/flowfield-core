@@ -653,7 +653,7 @@ export function TaskConversation({
               disabled={busy || !inputEnabled}
               onBusy={setUploading}
               onSend={() => void send()}
-              onModel={() => setModelOpen(true)}
+
               controls={settingsControl}
               action={
                 showComposer && (

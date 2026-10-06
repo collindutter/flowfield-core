@@ -356,8 +356,7 @@ export function CoordinatorChat({
           disabled={busy}
           onBusy={setUploading}
           onSend={() => void send()}
-          onModel={() => setSettingsOpen(true)}
-          onStop={running ? () => void action(active, "stop") : undefined}
+
           controls={
             <>
               <AgentSettingsControl
