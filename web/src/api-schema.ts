@@ -89,6 +89,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/setup-defaults": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Setup Defaults */
+    post: operations["setup_defaults_api_projects_setup_defaults_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/select-directory": {
     parameters: {
       query?: never;
@@ -3310,6 +3327,15 @@ export interface components {
       /** Task Prefix */
       task_prefix?: string | null;
     };
+    /** ProjectSetupDefaults */
+    ProjectSetupDefaults: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /** Task Prefix */
+      task_prefix: string;
+    };
     /** Publication */
     Publication: {
       /** Agreement Revision */
@@ -4918,6 +4944,39 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Project"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  setup_defaults_api_projects_setup_defaults_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProjectSetup"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProjectSetupDefaults"];
         };
       };
       /** @description Validation Error */

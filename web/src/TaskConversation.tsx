@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
-import { OverlayFooter } from "./EntityOverlay";
+import { OverlayFooter, useOverlayBody } from "./EntityOverlay";
 import { Button } from "@/components/ui/button";
 import { Composer } from "./Composer";
 import { AgentSettingsControl } from "./AgentSettings";
@@ -213,6 +213,7 @@ export function TaskConversation({
     setSeenResult(gate.data.result_id);
   }
   const root = useRef<HTMLDivElement>(null);
+  const overlayBody = useOverlayBody();
   const input = useRef<HTMLTextAreaElement>(null);
   const [actionHost, setActionHost] = useState<HTMLDivElement | null>(null);
   const [actionContext, setActionContext] = useState<HTMLDivElement | null>(
@@ -593,17 +594,12 @@ export function TaskConversation({
                           Replacement {message.title.toLowerCase()}
                         </WorkspaceLink>
                       )}
-                      {message.kind === "attempt" &&
-                        !messages.some(
-                          (item) =>
-                            item.kind === "result" &&
-                            item.run_id === message.source_id,
-                        ) && (
-                          <RunActivity
-                            projectId={projectId}
-                            runId={message.source_id}
-                          />
-                        )}
+                      {message.kind === "attempt" && (
+                        <RunActivity
+                          projectId={projectId}
+                          runId={message.source_id}
+                        />
+                      )}
                       {message.kind === "attempt" &&
                         executionId &&
                         execution.data?.run_id === message.source_id && (
@@ -634,6 +630,22 @@ export function TaskConversation({
           <form
             className="task-input content-stack"
             aria-label="Task input"
+            onKeyDown={(event) => {
+              if (
+                event.key !== "Escape" ||
+                event.defaultPrevented ||
+                modelOpen ||
+                !showComposer
+              )
+                return;
+              event.preventDefault();
+              event.stopPropagation();
+              if (busy || uploading) return;
+              discardDraft();
+              requestAnimationFrame(() =>
+                overlayBody?.focus({ preventScroll: true }),
+              );
+            }}
             onSubmit={(event) => {
               event.preventDefault();
               void send();

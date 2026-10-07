@@ -312,9 +312,15 @@ test("integration settings create an explicit local target without changing the 
     "python app.py",
   );
   // Integration was saved; retry only the pending run command without revising delivery settings.
+  const runSaved = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/projects/${project}/inspection/settings`) &&
+      response.request().method() === "PUT",
+  );
   await settings
     .getByRole("button", { name: "Save integration settings", exact: true })
     .click();
+  expect((await runSaved).ok()).toBe(true);
   await expect(
     settings.getByRole("button", {
       name: "Save integration settings",

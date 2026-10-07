@@ -382,8 +382,15 @@
   }
 
   @keyframes work-pulse {
+    0%,
+    100% {
+      opacity: 0.45;
+      box-shadow: 0 0 0 0 transparent;
+    }
     50% {
-      opacity: 0.8;
+      opacity: 1;
+      box-shadow: 0 0 0 4px
+        color-mix(in srgb, var(--state-dot) 25%, transparent);
     }
   }
   @media (prefers-reduced-motion: reduce) {

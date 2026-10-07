@@ -456,6 +456,13 @@ test("closing entity overlays returns through history without duplicate collecti
   await expect(
     page.getByRole("region", { name: "Task details", exact: true }),
   ).toBeVisible();
+  const answer = page.getByLabel("Your answer", { exact: true });
+  await expect(answer).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(answer).not.toBeFocused();
+  await expect(
+    page.getByRole("region", { name: "Task details", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(inbox);
   await page.goBack();
@@ -798,6 +805,18 @@ test("workspace navigation, mobile board and appearance work beside the coordina
   await expect(detail).toBeVisible();
   await back.click();
   await expect(card).toBeFocused();
+  // History reopening must resolve the task entry even if the Board tab still
+  // owns focus, and an older restoration frame must not steal from the new pane.
+  for (let visit = 0; visit < 2; visit++) {
+    await card.click();
+    await expect(detail).toBeVisible();
+    await page.getByRole("tab", { name: /^Board/ }).click();
+    await expect(detail).not.toBeVisible();
+    await page.goBack();
+    await expect(detail).toBeVisible();
+    await back.click();
+    await expect(card).toBeFocused();
+  }
   await expect(
     page.getByRole("button", { name: /Collapse projects|Expand projects/ }),
   ).toHaveCount(0);

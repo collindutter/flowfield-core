@@ -368,6 +368,8 @@ test("validated result approval delivers real Git code with the worker queue pau
   const timeline = page.locator(".conversation-messages");
   const history = timeline.locator('[data-kind="attempt"]');
   await expect(history).toHaveCount(1);
+  await expect(history.locator(".run-activity")).toBeVisible();
+  await expect(result.locator(".run-activity")).toHaveCount(0);
   await page
     .getByLabel("Message coordinator", { exact: true })
     .fill("Keep this question draft while inspecting evidence.");
@@ -738,9 +740,10 @@ test("inspection preserves exact versions, preview edits and direct approval", a
     (await (await request.get(`${path}/results/${first!.id}`)).json())
       .approved_at,
   ).toBeNull();
-  await page
-    .getByRole("button", { name: "Cancel approval", exact: true })
-    .click();
+  await approvalComment.press("Escape");
+  await expect(
+    page.getByRole("region", { name: "Task details", exact: true }),
+  ).toBeVisible();
   await expect(approvalComment).toHaveCount(0);
   await page
     .getByRole("button", { name: "Request changes", exact: true })
@@ -750,9 +753,10 @@ test("inspection preserves exact versions, preview edits and direct approval", a
   await feedback.fill("A bound result change request");
   await feedback.fill("");
   await expect(feedback).toBeVisible();
-  await page
-    .getByRole("button", { name: "Cancel feedback", exact: true })
-    .click();
+  await feedback.press("Escape");
+  await expect(
+    page.getByRole("region", { name: "Task details", exact: true }),
+  ).toBeVisible();
   await expect(feedback).toHaveCount(0);
   await page
     .getByRole("button", { name: "Request changes", exact: true })

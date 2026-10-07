@@ -13,11 +13,14 @@ Plan, run and review work together in Flowfield with the embedded Coordinator.
 - Run the Coordinator and managed workers through the shared Local/ACP runtime with
   scoped tools, durable permission requests, bounded stop/cleanup and explicit recovery.
 - Add an existing project through the directory picker and optionally preview/install
-  guidance during adoption. The Coordinator can configure and validate worker setup through
+  guidance during adoption. Review required, prefilled project details before adding it.
+  The Coordinator can configure and validate worker setup through
   its project-scoped tools without requiring installed repository guidance.
 - Follow mandatory task stages and worker output in the task feed. Active output stays
-  after new feed events; completed output is available with the result. Focused activity
+  after new feed events; completed output stays in its attempt event. Focused activity
   updates replace output polling without refreshing the whole board for each chunk.
+- Remove the fixed 15-minute agent execution cap while preserving explicit stop and bounded
+  cleanup. Clarify current context tokens and omit unavailable usage totals from worker output.
 - Confirm exact-result approval in the task composer, with an optional testing or approval
   comment. Standalone Record testing controls are removed; earlier observations remain readable.
 - Simplify navigation with a permanent project rail, persistent project views, task context

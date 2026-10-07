@@ -1224,6 +1224,23 @@ test("attempt activity updates without reloading the board and replays on reload
   await expect(
     page.locator(".task-conversation-header .work-state"),
   ).toContainText("Working");
+  const dot = page.locator(".task-conversation-header .work-state-dot");
+  const pulse = await dot.evaluate((el) => {
+    const animation = el.getAnimations()[0];
+    animation.pause();
+    animation.currentTime = 0;
+    const low = Number(getComputedStyle(el).opacity);
+    animation.currentTime = 900;
+    const high = Number(getComputedStyle(el).opacity);
+    const glow = getComputedStyle(el).boxShadow;
+    animation.play();
+    return { low, high, glow };
+  });
+  expect(pulse.high - pulse.low).toBeGreaterThan(0.4);
+  expect(pulse.glow).not.toBe("none");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(dot).toHaveCSS("animation-name", "none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await fixture("long");
   await expect(output).toContainText("long observed output");
   const atEnd = () =>

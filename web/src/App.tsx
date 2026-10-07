@@ -988,7 +988,11 @@ function ProjectBoard({
           )}
         </TabsContent>
         {selection?.kind === "task" && selection.id ? (
-          <EntityPane identity={selection.id} close={() => choose(null)}>
+          <EntityPane
+            identity={selection.id}
+            close={() => choose(null)}
+            returnFocusHref={selectionUrl(selection)}
+          >
             {editorPanel}
           </EntityPane>
         ) : (

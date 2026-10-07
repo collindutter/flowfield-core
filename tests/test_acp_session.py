@@ -37,7 +37,7 @@ def test_commands_arrive_before_or_after_session_and_update_while_idle(tmp_path,
 
 
 async def start(tmp_path, events, *flags, permission=None, load=None, resume=None):
-    client = AcpSession(events.append, on_permission=permission, request_timeout=2, turn_timeout=4)
+    client = AcpSession(events.append, on_permission=permission, request_timeout=2)
     await client.start(
         [sys.executable, str(FAKE), *flags],
         cwd=tmp_path,
@@ -47,6 +47,49 @@ async def start(tmp_path, events, *flags, permission=None, load=None, resume=Non
         resume_session_id=resume,
     )
     return client
+
+
+@pytest.mark.parametrize("mode", ["wait", "permission"])
+def test_elapsed_time_does_not_end_a_turn_or_permission_and_stop_still_works(
+    tmp_path, monkeypatch, mode
+):
+    async def exercise():
+        entered = asyncio.Event()
+        permission_cancelled = asyncio.Event()
+
+        async def permission(request):
+            entered.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                permission_cancelled.set()
+
+        events = []
+        client = await start(tmp_path, events, "close-session", permission=permission)
+        prompt = asyncio.create_task(client.prompt(json.dumps({"mode": mode})))
+        try:
+            async with asyncio.timeout(3):
+                while not events and not entered.is_set():
+                    await asyncio.sleep(0.01)
+            # Advance beyond the former 15-minute adapter and one-hour session limits
+            # without a live model or a long-running test.
+            loop = asyncio.get_running_loop()
+            clock = loop.time
+            monkeypatch.setattr(loop, "time", lambda: clock() + 7200)
+            await asyncio.sleep(0.02)
+            assert not prompt.done()
+            assert client.state == "running"
+            assert not permission_cancelled.is_set()
+            receipt = await client.close()
+            assert receipt.turn_finished and receipt.process_group_exited
+            assert await prompt == "cancelled"
+            if mode == "permission":
+                assert permission_cancelled.is_set()
+        finally:
+            await client.close()
+            await asyncio.gather(prompt, return_exceptions=True)
+
+    asyncio.run(exercise())
 
 
 def test_resume_negotiates_capability_and_does_not_replay_history(tmp_path):

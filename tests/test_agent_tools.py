@@ -56,7 +56,7 @@ def test_coordinator_reads_overlap_with_bounded_revocable_access(tmp_path):
 
 async def journey(tmp_path, grant, calls):
     events = []
-    client = AcpSession(events.append, request_timeout=5, turn_timeout=10)
+    client = AcpSession(events.append, request_timeout=5)
     async with serve_scope(grant) as server:
         await client.start([sys.executable, str(FAKE)], cwd=tmp_path, env={}, mcp_servers=[server])
         try:

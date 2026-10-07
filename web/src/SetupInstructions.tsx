@@ -34,8 +34,8 @@ export function SetupInstructions({
   const [busy, setBusy] = useState<"choosing" | "adding" | null>(null);
   const [error, setError] = useState("");
   return (
-    <section className="welcome" aria-label="Project setup instructions">
-      <ContentStack space="section">
+    <section className="setup-page" aria-label="Project setup instructions">
+      <ContentStack space="section" className="welcome">
         <h1>Set up your project</h1>
         <p>
           Choose an existing project to plan work in the Coordinator and follow
@@ -57,7 +57,8 @@ export function SetupInstructions({
           <form
             onSubmit={async (event) => {
               event.preventDefault();
-              if (!path || busy) return;
+              if (!path || !id.trim() || !name.trim() || !prefix.trim() || busy)
+                return;
               setBusy("adding");
               setError("");
               try {
@@ -66,9 +67,9 @@ export function SetupInstructions({
                   "POST",
                   {
                     path,
-                    ...(id.trim() ? { id: id.trim() } : {}),
-                    ...(name.trim() ? { name: name.trim() } : {}),
-                    ...(prefix.trim() ? { task_prefix: prefix.trim() } : {}),
+                    id: id.trim(),
+                    name: name.trim(),
+                    task_prefix: prefix.trim(),
                   },
                 );
                 setRegistered(project);
@@ -108,11 +109,6 @@ export function SetupInstructions({
                   </Label>
                 )}
                 <div className="actions">
-                  {path && (
-                    <Button type="submit">
-                      {busy === "adding" ? "Adding project…" : "Add project"}
-                    </Button>
-                  )}
                   <Button
                     type="button"
                     variant={path ? "outline" : "default"}
@@ -130,10 +126,15 @@ export function SetupInstructions({
                           310000,
                         );
                         if (selection.path) {
+                          const defaults = await request<
+                            components["schemas"]["ProjectSetupDefaults"]
+                          >("projects/setup-defaults", "POST", {
+                            path: selection.path,
+                          });
                           setPath(selection.path);
-                          setId("");
-                          setName("");
-                          setPrefix("");
+                          setId(defaults.id);
+                          setName(defaults.name);
+                          setPrefix(defaults.task_prefix);
                         }
                       } catch (failure) {
                         setError((failure as Error).message);
@@ -151,6 +152,51 @@ export function SetupInstructions({
                   </Button>
                 </div>
               </ContentStack>
+              {path && (
+                <DetailSection title="Project details">
+                  <ContentStack space="section">
+                    <Label className="field block">
+                      Name
+                      <Input
+                        required
+                        pattern={".*\\S.*"}
+                        value={name}
+                        maxLength={200}
+                        onChange={(event) => setName(event.target.value)}
+                      />
+                    </Label>
+                    <Label className="field block">
+                      Project ID
+                      <Input
+                        required
+                        value={id}
+                        maxLength={64}
+                        pattern={"[a-z0-9][a-z0-9_\\-]{0,63}"}
+                        onChange={(event) => setId(event.target.value)}
+                      />
+                    </Label>
+                    <p className="detail-metadata">
+                      A unique ID used in project links.
+                    </p>
+                    <Label className="field block">
+                      Task prefix
+                      <Input
+                        required
+                        value={prefix}
+                        minLength={3}
+                        maxLength={3}
+                        pattern="[A-Za-z]{3}"
+                        onChange={(event) =>
+                          setPrefix(event.target.value.toUpperCase())
+                        }
+                      />
+                    </Label>
+                    <p className="detail-metadata">
+                      Three unique letters for task IDs, such as FOL-1.
+                    </p>
+                  </ContentStack>
+                </DetailSection>
+              )}
               {path && (
                 <ContentStack>
                   <Label>
@@ -171,24 +217,32 @@ export function SetupInstructions({
                     summary="Preview project guidance"
                     onToggle={(event) => setPreview(event.currentTarget.open)}
                   >
-                    <p>
-                      <code>AGENTS.md</code> gets a Flowfield reference;{" "}
-                      <code>.agents/skills/flowfield-coordinator/SKILL.md</code>{" "}
-                      contains coordinator guidance. Review and commit these
-                      files so workers receive them.
-                    </p>
-                    {templates.error && <p role="alert">{templates.error}</p>}
-                    {templates.loading && <p>Loading guidance…</p>}
-                    {templates.data && (
-                      <ContentStack>
-                        <pre className="evidence-output">
-                          {templates.data.section}
-                        </pre>
-                        <pre className="evidence-output">
-                          {templates.data.skill}
-                        </pre>
-                      </ContentStack>
-                    )}
+                    <ContentStack space="section">
+                      <p>
+                        <code>AGENTS.md</code> gets a Flowfield reference;{" "}
+                        <code>
+                          .agents/skills/flowfield-coordinator/SKILL.md
+                        </code>{" "}
+                        contains coordinator guidance. Review and commit these
+                        files so workers receive them.
+                      </p>
+                      {templates.error && <p role="alert">{templates.error}</p>}
+                      {templates.loading && <p>Loading guidance…</p>}
+                      {templates.data && (
+                        <ContentStack space="section">
+                          <DetailSection title="AGENTS.md section">
+                            <pre className="evidence-output">
+                              {templates.data.section}
+                            </pre>
+                          </DetailSection>
+                          <DetailSection title=".agents/skills/flowfield-coordinator/SKILL.md">
+                            <pre className="evidence-output">
+                              {templates.data.skill}
+                            </pre>
+                          </DetailSection>
+                        </ContentStack>
+                      )}
+                    </ContentStack>
                   </Disclosure>
                   {!installGuidance && (
                     <p className="detail-metadata">
@@ -199,50 +253,11 @@ export function SetupInstructions({
                 </ContentStack>
               )}
               {path && (
-                <Disclosure summary="Project details (optional)">
-                  <ContentStack space="section">
-                    <Label className="field block">
-                      Name
-                      <Input
-                        value={name}
-                        maxLength={200}
-                        placeholder="Derived from the directory name"
-                        onChange={(event) => setName(event.target.value)}
-                      />
-                    </Label>
-                    <Label className="field block">
-                      Project ID
-                      <Input
-                        value={id}
-                        maxLength={64}
-                        pattern={"[a-z0-9][a-z0-9_\\-]{0,63}"}
-                        placeholder="Derived from the directory name"
-                        onChange={(event) => setId(event.target.value)}
-                      />
-                    </Label>
-                    <p>
-                      Choose a unique ID if another project has the same
-                      directory name.
-                    </p>
-                    <Label className="field block">
-                      Task prefix
-                      <Input
-                        value={prefix}
-                        minLength={3}
-                        maxLength={3}
-                        pattern="[A-Za-z]{3}"
-                        placeholder="Three letters, derived from the project ID"
-                        onChange={(event) =>
-                          setPrefix(event.target.value.toUpperCase())
-                        }
-                      />
-                    </Label>
-                    <p>
-                      Choose a unique three-letter prefix if the derived prefix
-                      is already used.
-                    </p>
-                  </ContentStack>
-                </Disclosure>
+                <div className="actions">
+                  <Button type="submit">
+                    {busy === "adding" ? "Adding project…" : "Add project"}
+                  </Button>
+                </div>
               )}
             </fieldset>
           </form>
@@ -256,16 +271,6 @@ export function SetupInstructions({
           Registration adds <code>.flowfield/config.toml</code>. Flowfield does
           not create directories or initialize Git.
         </p>
-        <DetailSection title="Start planning">
-          <p>
-            Choose a model in the Coordinator. Flowfield uses this machine’s
-            installed, signed-in Codex and managed ACP runtime.
-          </p>
-          <p>
-            Worker setup and delivery settings can wait until you’re ready to
-            run tasks.
-          </p>
-        </DetailSection>
         <Disclosure summary="Add a project from the CLI">
           <p>
             Run this in your existing project directory while Flowfield is

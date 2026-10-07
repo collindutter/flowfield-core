@@ -386,46 +386,35 @@ class Supervisor:
                 "Keep your assigned worker role when reading repository guidance. "
                 + str(brief["instructions"])
             )
-            try:
-                assert client.session.session_id
-                async with self.permissions.turn(
-                    run.project_id,
-                    "worker",
-                    session_id=client.session.session_id,
-                    turn_id=run.id,
-                    run_id=run.id,
-                ) as turn:
+            assert client.session.session_id
+            async with self.permissions.turn(
+                run.project_id,
+                "worker",
+                session_id=client.session.session_id,
+                turn_id=run.id,
+                run_id=run.id,
+            ) as turn:
 
-                    async def request_permission(request: PermissionRequest) -> str | None:
-                        return await turn.request(
-                            request.tool_id,
-                            request.title,
-                            [
-                                PermissionOption.model_validate(
-                                    {"id": i, "label": label, "kind": kind}
-                                )
-                                for i, label, kind in request.options
-                            ],
-                            details=request.details,
-                        )
-
-                    outcome = await client.prompt(
-                        json.dumps(brief, ensure_ascii=False),
-                        request_permission,
-                        attachments=Attachments(self.workspace).inputs(
-                            run.project_id,
-                            run.task_id,
-                            sections.get("feedback", "") + sections.get("input", ""),
-                        ),
+                async def request_permission(request: PermissionRequest) -> str | None:
+                    return await turn.request(
+                        request.tool_id,
+                        request.title,
+                        [
+                            PermissionOption.model_validate({"id": i, "label": label, "kind": kind})
+                            for i, label, kind in request.options
+                        ],
+                        details=request.details,
                     )
-            except TimeoutError as error:
-                raise ApplicationError(
-                    "worker_timeout",
-                    (
-                        "Worker reached the 15-minute local execution limit. Inspect "
-                        "preserved work and explicitly retry."
+
+                outcome = await client.prompt(
+                    json.dumps(brief, ensure_ascii=False),
+                    request_permission,
+                    attachments=Attachments(self.workspace).inputs(
+                        run.project_id,
+                        run.task_id,
+                        sections.get("feedback", "") + sections.get("input", ""),
                     ),
-                ) from error
+                )
             confirmed = await client.stop()
             if not confirmed:
                 terminal, problem = (

@@ -93,6 +93,36 @@ class ProjectSetup(Input):
     task_prefix: ProjectPrefix | None = None
 
 
+class ProjectSetupDefaults(Input):
+    # Suggestions may be empty for directory names without a usable identifier.
+    # Registration still validates the user's required, editable choices.
+    id: str
+    name: str
+    task_prefix: str
+
+
+def setup_defaults(
+    path: Path, config: ProjectConfig | None, existing: "Project | None"
+) -> ProjectSetupDefaults:
+    identity = (
+        config.project_id
+        if config
+        else existing.id
+        if existing
+        else re.sub(r"[^a-z0-9_-]+", "-", path.name.lower()).strip("-_")[:64]
+    )
+    return ProjectSetupDefaults(
+        id=identity,
+        name=existing.name if existing else config.name if config else path.name[:200],
+        task_prefix=existing.task_prefix if existing else default_task_prefix(identity),
+    )
+
+
+def default_task_prefix(project_id: str) -> str:
+    letters = re.sub(r"[^a-z]", "", project_id).upper()
+    return (letters + "XXX")[:3] if letters else "PRJ"
+
+
 class Project(Input):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
     id: Identifier
@@ -472,8 +502,7 @@ class Workspace:
             ]
 
     def _task_prefix(self, db: sqlite3.Connection, project_id: str) -> str:
-        letters = re.sub(r"[^a-z]", "", project_id).upper()
-        candidate = (letters + "XXX")[:3] if letters else "PRJ"
+        candidate = default_task_prefix(project_id)
         self._available_prefix(db, candidate)
         return candidate
 
@@ -485,8 +514,8 @@ class Workspace:
                 409,
             )
 
-    def setup_project(self, request: ProjectSetup) -> Project:
-        path = Path(request.path).expanduser()
+    def _setup_path(self, value: str) -> Path:
+        path = Path(value).expanduser()
         if not path.is_absolute():
             raise ApplicationError(
                 "invalid_path", "Project setup requires an absolute directory path."
@@ -496,6 +525,22 @@ class Workspace:
             raise ApplicationError(
                 "invalid_path", "Project config cannot share the global data directory."
             )
+        if not path.is_dir():
+            raise ApplicationError(
+                "invalid_path",
+                "Choose an existing project directory. Flowfield does not create projects.",
+            )
+        return path
+
+    def project_setup_defaults(self, request: ProjectSetup) -> ProjectSetupDefaults:
+        path = self._setup_path(request.path)
+        config = read_config(path)
+        with self.connection() as db:
+            row = db.execute("SELECT * FROM projects WHERE path = ?", (str(path),)).fetchone()
+            return setup_defaults(path, config, Project(**dict(row)) if row else None)
+
+    def setup_project(self, request: ProjectSetup) -> Project:
+        path = self._setup_path(request.path)
         try:
             with self.connection(write=True) as db:
                 if not path.is_dir():
@@ -506,9 +551,8 @@ class Workspace:
                 config = read_config(path)
                 row = db.execute("SELECT * FROM projects WHERE path = ?", (str(path),)).fetchone()
                 existing = Project(**dict(row)) if row else None
-                default_id = re.sub(r"[^a-z0-9_-]+", "-", path.name.lower()).strip("-_")[:64]
-                identity = config.project_id if config else existing.id if existing else default_id
-                name = existing.name if existing else config.name if config else path.name
+                defaults = setup_defaults(path, config, existing)
+                identity, name = defaults.id, defaults.name
                 if (config or existing) and (
                     (request.id is not None and request.id != identity)
                     or (request.name is not None and request.name != name)

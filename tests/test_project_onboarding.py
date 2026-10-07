@@ -106,3 +106,38 @@ def test_local_is_automatic_before_git_or_delivery(tmp_path: Path) -> None:
     ) as client:
         assert client.get("/api/projects/project/integration").json()["runtime"] == "local"
         assert client.post("/api/projects/project/integration/local", json={}).status_code == 404
+
+
+def test_setup_defaults_are_read_only_and_preserve_existing_identity(tmp_path: Path) -> None:
+    root = tmp_path / "Project with spaces 🚢"
+    root.mkdir()
+    with TestClient(create_app(data_dir=tmp_path / "state"), base_url="http://localhost") as client:
+        preview = client.post("/api/projects/setup-defaults", json={"path": str(root)})
+        assert preview.status_code == 200
+        assert preview.json() == {
+            "id": "project-with-spaces",
+            "name": root.name,
+            "task_prefix": "PRO",
+        }
+        assert not (root / ".flowfield").exists()
+        assert client.get("/api/projects").json() == []
+        chosen = {"id": "custom", "name": "My project", "task_prefix": "CUS"}
+        assert (
+            client.post("/api/projects/initialize", json={"path": str(root), **chosen}).status_code
+            == 200
+        )
+        assert (
+            client.post("/api/projects/setup-defaults", json={"path": str(root)}).json() == chosen
+        )
+        assert (
+            client.post(
+                "/api/projects/setup-defaults", json={"path": str(root / "missing")}
+            ).status_code
+            == 400
+        )
+    # A portable config is also honored before registration in another workspace.
+    with TestClient(create_app(data_dir=tmp_path / "fresh"), base_url="http://localhost") as client:
+        assert (
+            client.post("/api/projects/setup-defaults", json={"path": str(root)}).json() == chosen
+        )
+        assert client.get("/api/projects").json() == []

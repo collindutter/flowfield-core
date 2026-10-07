@@ -29,6 +29,11 @@ commands instead. Flowfield does not choose a language environment for you.
    slot; increase it when independent tasks can run without sharing mutable resources.
 4. Move a prepared task to **Up next** and choose **Run queue**.
 
+Worker execution has no elapsed-time cutoff. Use **Stop worker** in the task to interrupt it;
+Flowfield preserves unfinished work and reports whether cleanup was confirmed. Setup and
+validation commands retain their configured timeouts, and connection/cleanup operations remain
+bounded so a failed process cannot leave those operations waiting indefinitely.
+
 Setup and validation commands run in the worktree directory. They must leave source files
 unchanged. Keep dependency outputs ignored and put temporary files under
 `FLOWFIELD_RUNTIME_DIR`; `FLOWFIELD_WORKSPACE` identifies the checkout. The service host

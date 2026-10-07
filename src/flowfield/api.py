@@ -28,6 +28,7 @@ from flowfield.application import (
     Project,
     ProjectEdit,
     ProjectSetup,
+    ProjectSetupDefaults,
     Task,
     TaskCreate,
     TaskEdit,
@@ -145,6 +146,10 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
     @router.post("/initialize")
     def initialize(request: ProjectSetup, service: Service) -> Project:
         return service.setup_project(request)
+
+    @router.post("/setup-defaults")
+    def setup_defaults(request: ProjectSetup, service: Service) -> ProjectSetupDefaults:
+        return service.project_setup_defaults(request)
 
     @router.post("/select-directory")
     def choose_directory() -> DirectorySelection:

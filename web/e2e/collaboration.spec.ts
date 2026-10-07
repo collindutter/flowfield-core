@@ -595,6 +595,12 @@ test("Needs you carries a free-text answer from browser to coordinator applicati
   ).toBeFocused();
   await page.getByLabel("Your answer", { exact: true }).focus();
   await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("region", { name: "Task details", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Your answer", { exact: true }),
+  ).not.toBeFocused();
   await closeOverlay(page);
   await page.getByRole("tab", { name: /^Needs you(?: \d+)?$/ }).click();
   await page
@@ -647,7 +653,9 @@ test("Needs you carries a free-text answer from browser to coordinator applicati
     .fill(
       "All filtered rows, capped at 10,000. Explain when the limit is exceeded.",
     );
-  await page.keyboard.press("Escape");
+  await detail
+    .getByRole("button", { name: "Back to board", exact: true })
+    .click();
   await page.getByRole("button", { name: "Keep editing", exact: true }).click();
   await expect(detail.getByLabel("Your answer", { exact: true })).toHaveValue(
     /Explain/,

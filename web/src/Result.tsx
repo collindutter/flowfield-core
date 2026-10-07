@@ -17,7 +17,6 @@ import { taskHref } from "./navigation";
 import { FailureEvidence } from "./Integration";
 import { ReviewChecks } from "./ReviewChecks";
 import { Inspection } from "./Inspection";
-import { RunActivity } from "./RunActivity";
 import { ResultActions } from "./TaskActions";
 
 const CodeDiff = lazy(() => import("./CodeDiff"));
@@ -315,9 +314,6 @@ export function Result({
                 )}
               </ResultActions>
             )}
-          <DetailGroup title="Worker output">
-            <RunActivity projectId={projectId} runId={version.run_id} />
-          </DetailGroup>
           <DetailGroup title="Worker report">
             <Markdown>{version.report.summary}</Markdown>
             {version.report.outcome === "partial" && (

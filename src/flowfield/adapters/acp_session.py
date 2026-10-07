@@ -87,7 +87,6 @@ class AcpSession:
         permission_projection: Callable[[BaseModel], str] | None = None,
         activity_projection: Callable[[BaseModel], str] | None = None,
         request_timeout: float = 30,
-        turn_timeout: float = 3600,
         shutdown_timeouts: ShutdownTimeouts | None = None,
     ):
         self.on_event, self.on_permission = on_event, on_permission
@@ -97,7 +96,7 @@ class AcpSession:
         self.shutdown_timeouts = shutdown_timeouts or ShutdownTimeouts()
         self.permission_projection = permission_projection or permission_details
         self._tool_details: dict[str, str] = {}
-        self.request_timeout, self.turn_timeout = request_timeout, turn_timeout
+        self.request_timeout = request_timeout
         self.state = "new"
         self.session_id: str | None = None
         self.config: list[dict[str, Any]] = []
@@ -261,8 +260,7 @@ class AcpSession:
             connection.prompt(session_id=session_id, prompt=[text_block(text), *(content or [])])
         )
         try:
-            async with asyncio.timeout(self.turn_timeout):
-                response = await asyncio.shield(self._turn)
+            response = await asyncio.shield(self._turn)
             if self._event_failed:
                 raise RuntimeError("Agent response could not be delivered")
             if self.state == "running":
@@ -407,8 +405,7 @@ class AcpSession:
         )
         task = self._permission = asyncio.create_task(self.on_permission(request))
         try:
-            async with asyncio.timeout(self.turn_timeout):
-                selected = await task
+            selected = await task
             if self.state != "running" or selected not in {item.option_id for item in options}:
                 return cancelled
             return RequestPermissionResponse.model_validate(
@@ -416,7 +413,7 @@ class AcpSession:
                     "outcome": {"outcome": "selected", "optionId": selected},
                 }
             )
-        except (asyncio.CancelledError, TimeoutError):
+        except asyncio.CancelledError:
             return cancelled
         finally:
             self._permission = None

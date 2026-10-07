@@ -87,7 +87,6 @@ class CodexAgent:
             self._event,
             cleanup=quiesce,
             shutdown_timeouts=CODEX_SHUTDOWN_TIMEOUTS,
-            turn_timeout=900,
             permission_projection=codex_permission_details,
             activity_projection=codex_activity_details,
         )

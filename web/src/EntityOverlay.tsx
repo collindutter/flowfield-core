@@ -130,10 +130,12 @@ export function EntityPane({
   children,
   close,
   identity,
+  returnFocusHref,
 }: {
   children: ReactNode;
   close: () => void;
   identity: string;
+  returnFocusHref: string;
 }) {
   const [title, setTitle] = useState<HTMLDivElement | null>(null);
   const [body, setBody] = useState<HTMLDivElement | null>(null);
@@ -145,12 +147,24 @@ export function EntityPane({
   }, [identity, body]);
   useLayoutEffect(
     () => () => {
+      const scope = body?.closest(".workspace-pane");
       requestAnimationFrame(() => {
-        if (opener.current?.isConnected)
-          opener.current.focus({ preventScroll: true });
+        // History can reopen a task while the prior tab/button has focus. Return
+        // to its visible collection entry, and never steal from a newer pane.
+        if (document.querySelector(".entity-pane")) return;
+        const entry = [
+          ...(scope?.querySelectorAll<HTMLAnchorElement>("a[href]") ?? []),
+        ].find(
+          (link) =>
+            (link.pathname === returnFocusHref ||
+              link.pathname.startsWith(returnFocusHref + "/")) &&
+            link.getClientRects().length > 0,
+        );
+        const target = entry ?? opener.current;
+        if (target?.isConnected) target.focus({ preventScroll: true });
       });
     },
-    [],
+    [body, returnFocusHref],
   );
   return (
     <OverlayClose.Provider value={close}>

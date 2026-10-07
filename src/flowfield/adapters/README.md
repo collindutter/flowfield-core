@@ -18,6 +18,11 @@ The ACP path separates `GitWorkspace` (checkout and result capture),
 and `LocalProcess` (owned POSIX process groups). Local is the automatic environment
 for managed execution, result validation and inspection copies.
 
+Model turns have no elapsed-time deadline. Explicit stop, transport failure and service shutdown
+still use the shared cancellation/native-cleanup/session/process-exit budgets; setup and
+validation retain their command timeouts. The former fixed 15-minute Codex turn cap is removed
+for both worker and coordinator sessions.
+
 `LocalHost` preserves the supplied HOME, PATH and harness configuration, without a
 tool inventory or mandatory language runtime. Its input is the intended launch
 environment, not necessarily the service's activated virtual environment or an

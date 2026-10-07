@@ -40,12 +40,83 @@ test("directory adoption keeps cancellation harmless and opens project chat", as
   const setup = page.getByRole("region", {
     name: "Project setup instructions",
   });
+  await expect(
+    setup.getByRole("textbox", { name: "Name", exact: true }),
+  ).toHaveValue("native-directory-project");
+  await expect(
+    setup.getByRole("textbox", { name: "Project ID", exact: true }),
+  ).toHaveValue("native-directory-project");
+  await expect(
+    setup.getByRole("textbox", { name: "Task prefix", exact: true }),
+  ).toHaveValue("NAT");
+  for (const label of ["Name", "Project ID", "Task prefix"]) {
+    const field = setup.getByRole("textbox", { name: label, exact: true });
+    const value = await field.inputValue();
+    await expect(field).toHaveAttribute("required", "");
+    await field.fill("");
+    await setup
+      .getByRole("button", { name: "Add project", exact: true })
+      .click();
+    await expect(field).toBeFocused();
+    expect(existsSync(join(directory, ".flowfield"))).toBe(false);
+    await field.fill(value);
+  }
+  await expect(
+    setup.getByRole("heading", { name: "Start planning", exact: true }),
+  ).toHaveCount(0);
   await setup.getByText("Preview project guidance", { exact: true }).click();
   await expect(
     setup.locator("pre").filter({ hasText: "<!-- flowfield:begin -->" }),
   ).toBeVisible();
+  await expect(
+    setup.getByRole("heading", { name: "AGENTS.md section", exact: true }),
+  ).toBeVisible();
+  await expect(
+    setup.getByRole("heading", {
+      name: ".agents/skills/flowfield-coordinator/SKILL.md",
+      exact: true,
+    }),
+  ).toHaveCount(1);
+  const setupBox = (await setup.boundingBox())!;
+  const paneBox = (await page.locator(".workspace-pane").last().boundingBox())!;
+  expect(
+    Math.abs(setupBox.x + setupBox.width - paneBox.x - paneBox.width),
+  ).toBeLessThan(2);
+  expect(await setup.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
+    true,
+  );
+  expect(
+    await setup
+      .locator(".welcome")
+      .evaluate((el) => getComputedStyle(el).overflowY),
+  ).toBe("visible");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight <= innerHeight,
+    ),
+  ).toBe(true);
+  await setup
+    .getByRole("heading", { name: "AGENTS.md section", exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("guidance-preview.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const skillTitle = setup.getByRole("heading", {
+    name: ".agents/skills/flowfield-coordinator/SKILL.md",
+    exact: true,
+  });
+  await skillTitle.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: testInfo.outputPath("guidance-preview-mobile.png"),
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
   expect(existsSync(join(directory, "AGENTS.md"))).toBe(false);
   await setup.getByText("Preview project guidance", { exact: true }).click();
+  await setup.evaluate((el) => el.scrollTo({ top: 0 }));
   await page.screenshot({
     path: testInfo.outputPath("guidance-at-adoption.png"),
   });
@@ -121,7 +192,6 @@ test("registration conflict retains selection for a unique project ID", async ({
   await setup.getByRole("button", { name: "Add project", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("another directory");
   expect(existsSync(join(selected, ".flowfield"))).toBe(false);
-  await setup.getByText("Project details (optional)", { exact: true }).click();
   await setup
     .getByRole("textbox", { name: "Project ID", exact: true })
     .fill("picked-unique");
