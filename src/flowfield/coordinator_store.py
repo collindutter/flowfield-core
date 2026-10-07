@@ -280,6 +280,9 @@ class CoordinatorStore:
             update_activity(turn.activity, updates)
             self._save(db, turn)
 
+        if self.workspace.on_activity:
+            self.workspace.on_activity(project, identity)
+
     def restart(self) -> None:
         with self.workspace.connection(write=True) as db:
             rows = db.execute(

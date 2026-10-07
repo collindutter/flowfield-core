@@ -1061,7 +1061,7 @@ test("conversation capture prepares atomically while task defaults show only use
   });
   const changedStages = page.locator('[data-message-id="plan:2"]');
   await expect(changedStages).toContainText("Stage changed");
-  await expect(changedStages).toContainText(
+  await expect(changedStages).not.toContainText(
     "Investigate: Planned → Completed.",
   );
   await expect(stages.locator('[aria-current="step"]')).toHaveText(
@@ -1150,8 +1150,8 @@ test("conversation capture prepares atomically while task defaults show only use
 test("attempt activity updates without reloading the board and replays on reload", async ({
   page,
 }) => {
-  const fixture = (op: string) =>
-    JSON.parse(
+  const fixture = async (op: string) => {
+    const value = JSON.parse(
       execFileSync(
         "uv",
         [
@@ -1166,7 +1166,21 @@ test("attempt activity updates without reloading the board and replays on reload
         { encoding: "utf8" },
       ),
     );
-  const seeded = fixture("create");
+    // The fixture process writes durable state without the service callback. Deliver
+    // its focused notification explicitly; backend tests verify publication/coalescing.
+    if (op !== "create")
+      await page.evaluate(
+        (attempt) =>
+          window.dispatchEvent(
+            new CustomEvent("flowfield:activity", {
+              detail: { activity: [["stream-project", attempt]] },
+            }),
+          ),
+        value.run_id,
+      );
+    return value;
+  };
+  const seeded = await fixture("create");
   await page.goto("/projects/stream-project/tasks/STR-1");
   const output = page.getByRole("region", {
     name: "Worker activity",
@@ -1182,16 +1196,20 @@ test("attempt activity updates without reloading the board and replays on reload
   page.on("request", (req) => {
     if (req.url().endsWith("/view/board")) boards++;
   });
-  fixture("later");
+  await fixture("later");
   await expect(output).toContainText("later observed output");
   expect(boards).toBe(0);
   await page.reload();
   await expect(output).toContainText("create observed output");
   await expect(output).toContainText("later observed output");
+  await expect(page.locator(".conversation-message").last()).toHaveAttribute(
+    "data-message-id",
+    `attempt:${seeded.run_id}`,
+  );
   await expect(
     page.locator(".task-conversation-header .work-state"),
   ).toContainText("Working");
-  fixture("long");
+  await fixture("long");
   await expect(output).toContainText("long observed output");
   const atEnd = () =>
     output.evaluate(
@@ -1201,18 +1219,18 @@ test("attempt activity updates without reloading the board and replays on reload
   await output.evaluate((el) => el.scrollTo({ top: el.scrollHeight / 3 }));
   await expect.poll(atEnd).toBe(false);
   const before = await output.evaluate((el) => el.scrollTop);
-  fixture("while-reading");
+  await fixture("while-reading");
   await expect(output).toContainText("while-reading observed output");
   await expect.poll(() => output.evaluate((el) => el.scrollTop)).toBe(before);
   await output.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
   await expect.poll(atEnd).toBe(true);
-  fixture("following-again");
+  await fixture("following-again");
   await expect(output).toContainText("following-again observed output");
   await expect.poll(atEnd).toBe(true);
   await expect(
     page.getByRole("button", { name: "Follow latest activity" }),
   ).toHaveCount(0);
-  fixture("compact");
+  await fixture("compact");
   const script = output.locator('[data-kind="command"]');
   await expect(script).toContainText("Exit code: 17");
   await expect(script.locator("pre").first()).not.toContainText(
@@ -1258,7 +1276,7 @@ test("attempt activity updates without reloading the board and replays on reload
   await page.route(
     `**/api/projects/stream-project/runs/${seeded.run_id}/stop`,
     async (route) => {
-      fixture("stop-race"); // Progress arrives after confirmation serialized its attempt revision.
+      await fixture("stop-race"); // Progress arrives after confirmation serialized its attempt revision.
       await route.continue();
     },
   );

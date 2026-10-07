@@ -356,3 +356,31 @@ def test_report_completion_and_report_cannot_smuggle_code(tmp_path):
     changed.results.process("harbor")
     assert current(changed).status == "blocked"
     assert "includes code changes" in current(changed).problem
+
+
+def test_approval_comment_is_bound_persisted_and_replayed_without_overwrite(tmp_path):
+    from flowfield.thread_view import ThreadView
+
+    service, _, _ = fixture(tmp_path)
+    service.results.process("harbor")
+    version = current(service)
+    request = ResultReview(
+        expected_revision=version.revision,
+        candidate_commit=version.candidate_commit,
+        action="approve",
+        note="Keyboard checked; narrow view not tested.",
+    )
+    with pytest.raises(ApplicationError):
+        service.results.review(
+            "harbor", version.id, request.model_copy(update={"candidate_commit": "0" * 40})
+        )
+    assert not current(service).approved_at
+    approved = service.results.review("harbor", version.id, request)
+    assert approved.approval_note == request.note
+    replay = service.results.review(
+        "harbor", version.id, request.model_copy(update={"note": "Different note"})
+    )
+    assert replay.approval_note == request.note
+    restored = Supervisor(Workspace(service.workspace.directory))
+    entry = ThreadView(restored.workspace).page_view("harbor", "work")
+    assert next(item for item in entry.items if item.kind == "approval").body == request.note

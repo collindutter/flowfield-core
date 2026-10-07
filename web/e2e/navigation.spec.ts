@@ -600,7 +600,7 @@ test.describe("relative timestamps", () => {
     await page.goto(`/projects/${project}/tasks/TIM-1`);
     const card = page.locator(".conversation-message").first();
     const time = card.locator("time").first();
-    await expect(time).toHaveText("10 seconds ago");
+    await expect(time).toHaveText("just now");
     await expect(time).toHaveAttribute("datetime", task.updated_at);
     const exact = new Intl.DateTimeFormat("en-US", {
       dateStyle: "full",

@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+  "/api/guidance-template": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Guidance Template */
+    get: operations["guidance_template_api_guidance_template_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/health": {
     parameters: {
       query?: never;
@@ -2577,8 +2594,19 @@ export interface components {
        */
       action: "install" | "remove";
     };
+    /** GuidanceTemplates */
+    GuidanceTemplates: {
+      /** Section */
+      section: string;
+      /** Skill */
+      skill: string;
+    };
     /** GuidanceView */
     GuidanceView: {
+      /** Section */
+      section: string;
+      /** Skill */
+      skill: string;
       /** Project Id */
       project_id: string;
       /** Revision */
@@ -2594,10 +2622,6 @@ export interface components {
         | "update_available"
         | "partial"
         | "conflict";
-      /** Section */
-      section: string;
-      /** Skill */
-      skill: string;
       /** Can Install */
       can_install: boolean;
       /** Can Remove */
@@ -3700,6 +3724,11 @@ export interface components {
       approved_at: string | null;
       /** Approved By */
       approved_by: string | null;
+      /**
+       * Approval Note
+       * @default
+       */
+      approval_note: string;
       /** Completed At */
       completed_at: string | null;
       /**
@@ -4787,6 +4816,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  guidance_template_api_guidance_template_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GuidanceTemplates"];
+        };
+      };
+    };
+  };
   health_api_health_get: {
     parameters: {
       query?: never;

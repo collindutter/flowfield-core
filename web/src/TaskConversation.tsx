@@ -41,7 +41,8 @@ type Draft = {
   id: string;
   body: string;
   binding: Binding;
-  action: NonNullable<components["schemas"]["ReplyCreate"]["action"]>;
+  action: "answer" | "changes" | "approve";
+  candidate?: string;
 };
 const binding = (gate: Gate): Binding => ({
   task_revision: gate.task_revision,
@@ -113,6 +114,10 @@ export function TaskConversation({
   const tick = useMemo(() => ({ refresh, revision }), [refresh, revision]);
   const page = useResource<Page>(`${path}/thread`, tick);
   const gate = useResource<Gate>(`${path}/input-eligibility`, tick);
+  const currentAttempt = useResource<Message>(
+    gate.data?.run_id ? `${path}/thread/attempt:${gate.data.run_id}` : null,
+    tick,
+  );
   const currentResult = useResource<Message>(
     gate.data?.result_id
       ? `${path}/thread/result:${gate.data.result_id}`
@@ -235,13 +240,30 @@ export function TaskConversation({
     onDirty(Object.values(drafts).some((d) => !!d.body));
     return () => onDirty(false);
   }, [drafts, onDirty]);
-  const messages = merge(
+  const chronological = merge(
     merge(
-      merge(items, initial.data ? [initial.data] : []),
+      merge(
+        merge(items, currentAttempt.data ? [currentAttempt.data] : []),
+        initial.data ? [initial.data] : [],
+      ),
       selected.data ? [selected.data] : [],
     ),
     currentResult.data ? [currentResult.data] : [],
   );
+  const activeAttempt = chronological.find(
+    (message) =>
+      message.kind === "attempt" &&
+      message.source_id === gate.data?.run_id &&
+      ["preparing", "running", "stopping", "uncertain"].includes(
+        message.status ?? "",
+      ),
+  );
+  const messages = activeAttempt
+    ? [
+        ...chronological.filter((message) => message !== activeAttempt),
+        activeAttempt,
+      ]
+    : chronological;
   const replyBinding = draft?.binding ?? currentBinding;
   const replyResult = messages.find(
     (m) => m.kind === "result" && m.source_id === replyBinding?.result_id,
@@ -324,12 +346,33 @@ export function TaskConversation({
       result_revision: version.revision,
     });
   }
+  function approve(version: Version) {
+    if (!currentBinding) return;
+    const target = {
+      ...currentBinding,
+      result_id: version.id,
+      result_revision: version.revision,
+    };
+    const nextKey = contextKey(target);
+    setChosen(nextKey);
+    setDrafts((values) => ({
+      ...values,
+      [nextKey]: {
+        id: crypto.randomUUID(),
+        body: "",
+        binding: target,
+        action: "approve",
+        candidate: version.candidate_commit ?? version.source_commit,
+      },
+    }));
+  }
   async function send() {
     if (
       busy ||
       uploading ||
       settingsDirty ||
-      !draft?.body.trim() ||
+      !draft ||
+      (draft.action !== "approve" && !draft.body.trim()) ||
       !gate.data?.enabled ||
       stale
     )
@@ -338,7 +381,19 @@ export function TaskConversation({
     setError("");
     setNotice("");
     try {
-      await request(`${path}/replies`, "POST", draft);
+      if (draft.action === "approve") {
+        await request(
+          `projects/${projectId}/results/${draft.binding.result_id}/review`,
+          "POST",
+          {
+            expected_revision: draft.binding.result_revision,
+            candidate_commit: draft.candidate,
+            action: "approve",
+            note: draft.body,
+            author: "human",
+          },
+        );
+      } else await request(`${path}/replies`, "POST", draft);
       if (!alive.current) return;
       page.invalidate();
       gate.invalidate();
@@ -351,8 +406,8 @@ export function TaskConversation({
       setNotice(
         draft.action === "answer"
           ? "Answer sent."
-          : draft.action === "observation"
-            ? "Testing recorded for this result."
+          : draft.action === "approve"
+            ? "Approved for integration."
             : "Feedback sent for the selected result.",
       );
       setRevision((n) => n + 1);
@@ -476,6 +531,7 @@ export function TaskConversation({
                           versionId={message.source_id}
                           refresh={tick}
                           onReply={requestChanges}
+                          onApprove={approve}
                           inputEnabled={
                             !!gate.data?.enabled && !gate.data.question_id
                           }
@@ -546,12 +602,17 @@ export function TaskConversation({
                           Replacement {message.title.toLowerCase()}
                         </WorkspaceLink>
                       )}
-                      {message.kind === "attempt" && (
-                        <RunActivity
-                          projectId={projectId}
-                          runId={message.source_id}
-                        />
-                      )}
+                      {message.kind === "attempt" &&
+                        !messages.some(
+                          (item) =>
+                            item.kind === "result" &&
+                            item.run_id === message.source_id,
+                        ) && (
+                          <RunActivity
+                            projectId={projectId}
+                            runId={message.source_id}
+                          />
+                        )}
                       {message.kind === "attempt" &&
                         executionId &&
                         execution.data?.run_id === message.source_id && (
@@ -594,8 +655,8 @@ export function TaskConversation({
                     ? "Answer the worker"
                     : draft?.action === "changes"
                       ? "Request changes"
-                      : draft?.action === "observation"
-                        ? "Record human testing"
+                      : draft?.action === "approve"
+                        ? "Approve and integrate"
                         : replyResult
                           ? (replyResult.status === "ready"
                               ? "Review "
@@ -607,8 +668,8 @@ export function TaskConversation({
                 )}
                 {!replyBinding?.question_id && replyResult && (
                   <p className="detail-metadata">
-                    {draft?.action === "observation"
-                      ? "Testing"
+                    {draft?.action === "approve"
+                      ? "Approval"
                       : draft?.action === "changes"
                         ? "Feedback"
                         : "Review"}{" "}
@@ -617,12 +678,6 @@ export function TaskConversation({
                   </p>
                 )}
               </div>
-            )}
-            {composerAction === "observation" && (
-              <p>
-                Record what you tested and the outcome. This does not start a
-                worker or approve the result.
-              </p>
             )}
             {currentQuestion.error && (
               <p role="alert">{currentQuestion.error}</p>
@@ -639,8 +694,8 @@ export function TaskConversation({
               label={
                 draft?.action === "changes"
                   ? "Feedback for this result"
-                  : draft?.action === "observation"
-                    ? "Testing observations"
+                  : draft?.action === "approve"
+                    ? "Testing notes or approval comment (optional)"
                     : composerAction === "answer"
                       ? "Your answer"
                       : "Task response"
@@ -654,12 +709,12 @@ export function TaskConversation({
                 showComposer && (
                   <Button
                     type="submit"
-                    size="icon-sm"
+                    size={composerAction === "approve" ? "sm" : "icon-sm"}
                     aria-label={
                       draft?.action === "changes"
                         ? "Send feedback"
-                        : composerAction === "observation"
-                          ? "Save testing"
+                        : composerAction === "approve"
+                          ? "Approve and integrate"
                           : composerAction === "answer"
                             ? "Send answer"
                             : "Send message"
@@ -669,11 +724,16 @@ export function TaskConversation({
                       uploading ||
                       settingsDirty ||
                       !inputEnabled ||
-                      !draft?.body.trim() ||
+                      !draft ||
+                      (draft.action !== "approve" && !draft.body.trim()) ||
                       stale
                     }
                   >
-                    <ArrowUp size={16} />
+                    {composerAction === "approve" ? (
+                      "Approve and integrate"
+                    ) : (
+                      <ArrowUp size={16} />
+                    )}
                   </Button>
                 )
               }
@@ -706,6 +766,16 @@ export function TaskConversation({
               className="task-action-context content-stack"
             />
             <div className="actions" role="group" aria-label="Task actions">
+              <div
+                ref={setActionHost}
+                className="task-result-actions"
+                hidden={
+                  draft?.action === "changes" ||
+                  draft?.action === "approve" ||
+                  !!gate.data?.question_id
+                }
+              />
+
               {gate.data?.reason === "answer_editable" && !draft && (
                 <Button
                   type="button"
@@ -741,7 +811,7 @@ export function TaskConversation({
                   </Button>
                 ))}
 
-              {stale && draft?.action !== "observation" && (
+              {stale && draft?.action !== "approve" && (
                 <Button
                   type="button"
                   variant="outline"
@@ -765,19 +835,6 @@ export function TaskConversation({
                   Use current context
                 </Button>
               )}
-              {!showComposer &&
-                gate.data?.enabled &&
-                gate.data.reason === "idle" &&
-                currentBinding?.result_id && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => beginDraft("observation", currentBinding)}
-                  >
-                    Record testing
-                  </Button>
-                )}
               {draft && (
                 <Button
                   type="button"
@@ -792,20 +849,11 @@ export function TaskConversation({
                       : "Discard answer"
                     : composerAction === "changes"
                       ? "Cancel feedback"
-                      : composerAction === "observation"
-                        ? "Cancel testing"
+                      : composerAction === "approve"
+                        ? "Cancel approval"
                         : "Cancel message"}
                 </Button>
               )}
-              <div
-                ref={setActionHost}
-                className="task-result-actions"
-                hidden={
-                  draft?.action === "changes" ||
-                  draft?.action === "observation" ||
-                  !!gate.data?.question_id
-                }
-              />
               {gate.data?.pending_reply_id && (
                 <Button
                   type="button"
@@ -858,9 +906,6 @@ function MessageBody({ message, path }: { message: Message; path: string }) {
       )}
       {!!message.stages.length && (
         <StageSequence stages={message.stages} label="Stages at this update" />
-      )}
-      {!!message.stage_changes.length && (
-        <p>{message.stage_changes.join(" ")}</p>
       )}
       {message.body && <Markdown>{source.data?.body ?? message.body}</Markdown>}
       {source.error && <p role="alert">{source.error}</p>}

@@ -46,3 +46,24 @@ def test_only_committed_writes_publish_project(tmp_path: Path) -> None:
     with pytest.raises(ApplicationError):
         workspace.edit_task(project.id, task.id, TaskEdit(expected_revision=999, title="Stale"))
     assert not published
+
+
+def test_activity_updates_are_scoped_coalesced_and_bounded():
+    async def check():
+        changes = Changes()
+        events = changes.events()
+        await anext(events)
+        for _ in range(20):
+            changes.publish_activity("alpha", "attempt")
+        await asyncio.sleep(0)
+        event = await anext(events)
+        assert event["event"] == "activity"
+        assert json.loads(event["data"]) == {"activity": [["alpha", "attempt"]]}
+        for i in range(101):
+            changes.publish_activity("alpha", str(i))
+        await asyncio.sleep(0)
+        assert json.loads((await anext(events))["data"]) == {"projects": None}
+        await events.aclose()
+        assert not changes.subscribers
+
+    asyncio.run(check())

@@ -5,6 +5,7 @@ import { request, RequestError, type Task } from "./workspace";
 import { Markdown } from "./Markdown";
 import { Timestamp } from "./Timestamp";
 import { AgentSettingsControl } from "./AgentSettings";
+import { ActionTooltip } from "./ActionTooltip";
 import { Composer } from "./Composer";
 import { ContextRing } from "./ContextRing";
 import { AgentPermissions } from "./AgentPermissions";
@@ -17,6 +18,8 @@ import { WorkspaceLink } from "./WorkspaceLink";
 import { taskHref } from "./navigation";
 type Page = components["schemas"]["CoordinatorPage"];
 type Turn = components["schemas"]["CoordinatorTurn"];
+const isActive = (page: Page) =>
+  !!page.active && page.active.status !== "uncertain";
 type Choice = components["schemas"]["AgentChoice-Output"];
 type ChatDraft = {
   id: string;
@@ -83,7 +86,11 @@ export function CoordinatorChat({
   const latest = history.items.at(-1)?.number;
   const path = latest ? `${base}?after=${latest}` : base;
   const [tick, setTick] = useState(0);
-  const resource = useResource<Page>(path, `${refresh}:${tick}`);
+  const resource = useResource<Page>(path, `${refresh}:${tick}`, 10000, {
+    projectId,
+    attemptId: history.page?.active?.id,
+    isActive,
+  });
   const [before, setBefore] = useState<number | null | undefined>(undefined);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -192,11 +199,6 @@ export function CoordinatorChat({
   const cursor = before;
   const turns = history.items;
   const scroll = useFeedScroll(content, !!page, undefined, true, pane);
-  useEffect(() => {
-    if (!running) return;
-    const interval = window.setInterval(() => setTick((n) => n + 1), 600);
-    return () => window.clearInterval(interval);
-  }, [running]);
   function update(text: string) {
     const next = {
       id: draft.text === text ? draft.id : crypto.randomUUID(),
@@ -515,22 +517,28 @@ export function CoordinatorChat({
           }
           action={
             running ? (
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="secondary"
-                aria-label={active.status === "stopping" ? "Stopping…" : "Stop"}
+              <ActionTooltip
+                label={active.status === "stopping" ? "Stopping…" : "Stop"}
                 disabled={busy || active.status === "stopping"}
-                onClick={() => void action(active, "stop")}
               >
-                <Square size={14} />
-              </Button>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="secondary"
+                  aria-label={
+                    active.status === "stopping" ? "Stopping…" : "Stop"
+                  }
+                  disabled={busy || active.status === "stopping"}
+                  onClick={() => void action(active, "stop")}
+                >
+                  <Square size={14} />
+                </Button>
+              </ActionTooltip>
             ) : (
               <Button
                 type="button"
                 size="icon-sm"
                 aria-label="Send"
-                title="Send (Enter)"
                 disabled={
                   busy ||
                   uploading ||

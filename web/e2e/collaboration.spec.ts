@@ -1796,6 +1796,14 @@ test("review journey preserves feedback, navigates complete files and reviews a 
     .getByRole("button", { name: "Approve and integrate", exact: true })
     .click();
   await expect(
+    page.getByLabel("Testing notes or approval comment (optional)", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Approve and integrate", exact: true })
+    .click();
+  await expect(
     page.locator('[data-message-id="result:successor"]'),
   ).toContainText("Task complete.");
   await dialog

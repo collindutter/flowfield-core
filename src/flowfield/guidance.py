@@ -49,12 +49,15 @@ class GuidanceChange(BaseModel):
     action: Literal["install", "remove"]
 
 
-class GuidanceView(BaseModel):
+class GuidanceTemplates(BaseModel):
+    section: str
+    skill: str
+
+
+class GuidanceView(GuidanceTemplates):
     project_id: str
     revision: str
     status: Literal["available", "installed", "manual", "update_available", "partial", "conflict"]
-    section: str
-    skill: str
     can_install: bool
     can_remove: bool
     notices: list[str]

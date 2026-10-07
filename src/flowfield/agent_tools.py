@@ -8,22 +8,30 @@ import asyncio
 import copy
 import json
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mcp.server.lowlevel import Server
 from mcp.types import CallToolResult, TextContent, Tool
 from pydantic import ValidationError
 
-from flowfield.application import Workspace
 from flowfield.errors import ApplicationError
 from flowfield.mcp import create_mcp
 from flowfield.worker_tools import WorkerBridge, worker_tools
 
+if TYPE_CHECKING:
+    from flowfield.supervisor import Supervisor
+
 # Explicit authority, not "anything with a project_id argument". Human answer,
-# result approval, settings, queue, project adoption and filesystem setup are absent.
+# result approval, worker settings, queue and project adoption are absent.
 COORDINATOR_TOOLS = frozenset(
     {
         "get_project",
+        "get_integration_settings",
+        "configure_integration",
+        "get_inspection_settings",
+        "configure_inspection",
+        "get_setup_validation",
+        "validate_project_setup",
         "get_board",
         "search_context",
         "list_milestones",
@@ -144,9 +152,10 @@ def worker_scope(bridge: WorkerBridge) -> ScopedTools:
     )
 
 
-async def coordinator_scope(workspace: Workspace, project_id: str) -> ScopedTools:
+async def coordinator_scope(supervisor: "Supervisor", project_id: str) -> ScopedTools:
+    workspace = supervisor.workspace
     workspace.project(project_id)
-    canonical = create_mcp(lambda: workspace, origin="")
+    canonical = create_mcp(lambda: workspace, lambda: supervisor, origin="")
     scoped = []
     for tool in await canonical.list_tools():
         if tool.name not in COORDINATOR_TOOLS:

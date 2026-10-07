@@ -222,6 +222,7 @@ class Results:
                         "The prepared candidate changed; prepare a new version.",
                         409,
                     )
+            version.approval_note = request.note.strip()
             version.approved_at, version.approved_by = now(), request.author
             run.status, run.accepted_at, run.accepted_by = (
                 "accepted",

@@ -7,6 +7,7 @@ import { BlockedBy } from "./TaskLinks";
 import { TaskNeeds, TaskState, hasTaskNeeds } from "./TaskNeeds";
 import { TaskConversation, StageHeader } from "./TaskConversation";
 import { Button } from "@/components/ui/button";
+import { ActionTooltip } from "./ActionTooltip";
 import { ConfirmButton } from "./ConfirmButton";
 import { AgentPermissions } from "./AgentPermissions";
 import { label, request, type Board, type Task } from "./workspace";
@@ -166,39 +167,34 @@ export function TaskDetail({
         refresh={board}
         onDirty={setDirty}
         onSettingsDirty={setSettingsDirty}
-        taskActionContext={
-          <>
-            {error && <p role="alert">{error}</p>}
-            {archiveReason && (
-              <p className="detail-metadata">{archiveReason}</p>
-            )}
-          </>
-        }
+        taskActionContext={<>{error && <p role="alert">{error}</p>}</>}
         taskActions={
           <>
             {priorityControls}
-            {task.archived ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={busy || !!archiveReason}
-                onClick={() => void archive()}
-              >
-                Restore
-              </Button>
-            ) : (
-              <ConfirmButton
-                size="sm"
-                variant="outline"
-                disabled={busy || !!archiveReason}
-                title={`Archive ${task.key}?`}
-                description="Remove this task from the board? Its status stays the same. Restore it from Archive anytime."
-                action={() => void archive()}
-              >
-                Archive
-              </ConfirmButton>
-            )}
+            <ActionTooltip label={archiveReason} disabled>
+              {task.archived ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || !!archiveReason}
+                  onClick={() => void archive()}
+                >
+                  Restore
+                </Button>
+              ) : (
+                <ConfirmButton
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || !!archiveReason}
+                  title={`Archive ${task.key}?`}
+                  description="Remove this task from the board? Its status stays the same. Restore it from Archive anytime."
+                  action={() => void archive()}
+                >
+                  Archive
+                </ConfirmButton>
+              )}
+            </ActionTooltip>
           </>
         }
       />

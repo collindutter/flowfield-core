@@ -38,6 +38,11 @@ You can also register the same project from another terminal in its directory:
 flowfield project init
 ```
 
+Add project offers **Install project guidance**. Keep it selected to add the coordinator
+skill and its `AGENTS.md` reference while preserving existing instructions. If skipped,
+install later under **Project settings → Coordinator**. Commit the instructions so workers
+receive them in their checkouts.
+
 Registration adds `.flowfield/config.toml`. Flowfield adopts your project; it does not
 create directories, initialize Git or scaffold an application. Without a desktop folder
 chooser, use the CLI option.
@@ -60,7 +65,7 @@ instead.
 
 ## Prepare the first task
 
-When you’re ready to run tasks, preview and install project guidance in **Coordinator**
+If you skipped guidance during registration, preview and install it in **Coordinator**
 settings or from a terminal in your project directory:
 
 ```sh
@@ -97,8 +102,9 @@ active workers continue. **Stop worker** stops the selected attempt.
 ## Review and finish
 
 When the task reaches **In review**, read its result and checks. Inspect the diff or use
-**Try result** to test an independent copy of that exact version. Record testing in the
-feed, request changes, or choose **Approve and integrate** for the selected result.
+**Try result** to test an independent copy of that exact version. Request changes, or
+choose **Approve and integrate**, optionally add testing notes or an approval comment,
+then confirm. Approval stays tied to that selected result; changed results require a new review.
 
 ![A task feed beside the Coordinator, with a result ready for review](/images/overview.png)
 

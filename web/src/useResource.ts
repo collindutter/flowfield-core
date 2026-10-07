@@ -7,6 +7,11 @@ export function useResource<T>(
   path: string | null,
   refresh: unknown,
   timeoutMs = 10000,
+  activity?: {
+    projectId: string;
+    attemptId?: string;
+    isActive?: (data: T) => boolean;
+  },
 ) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
@@ -23,25 +28,69 @@ export function useResource<T>(
     controller.current?.abort();
     setLoading(false);
   }, []);
+  const projectId = activity?.projectId;
+  const attemptId = activity?.attemptId;
+  const isActive = activity?.isActive;
   useEffect(() => {
     const pending = new AbortController();
     controller.current = pending;
     if (!path) return () => pending.abort();
-    request<T>(path, "GET", undefined, pending.signal, timeoutMs)
-      .then((result) => {
-        if (!pending.signal.aborted) {
-          setData(result);
-          setError("");
+    let reading = false,
+      again = false;
+    async function read() {
+      if (reading) {
+        again = true;
+        return;
+      }
+      reading = true;
+      do {
+        again = false;
+        try {
+          const result = await request<T>(
+            path!,
+            "GET",
+            undefined,
+            pending.signal,
+            timeoutMs,
+          );
+          if (!pending.signal.aborted) {
+            setData(result);
+            setError("");
+            if (isActive && !isActive(result))
+              window.removeEventListener("flowfield:activity", updated);
+          }
+        } catch (error) {
+          if (!pending.signal.aborted) setError((error as Error).message);
+        } finally {
+          if (!pending.signal.aborted) setLoading(false);
         }
-      })
-      .catch((error: Error) => {
-        if (!pending.signal.aborted) setError(error.message);
-      })
-      .finally(() => {
-        if (!pending.signal.aborted) setLoading(false);
-      });
-    return () => pending.abort();
-  }, [path, refresh, timeoutMs]);
+      } while (again && !pending.signal.aborted);
+      reading = false;
+    }
+    function updated(event: Event) {
+      const update = (
+        event as CustomEvent<{
+          projects?: string[] | null;
+          activity?: [string, string][];
+        }>
+      ).detail;
+      if (
+        update.projects === null ||
+        update.projects?.includes(projectId!) ||
+        update.activity?.some(
+          ([project, attempt]) =>
+            project === projectId && attempt === attemptId,
+        )
+      )
+        void read();
+    }
+    if (attemptId) window.addEventListener("flowfield:activity", updated);
+    void read();
+    return () => {
+      pending.abort();
+      window.removeEventListener("flowfield:activity", updated);
+    };
+  }, [path, refresh, timeoutMs, projectId, attemptId, isActive]);
   return { data, setData, error, setError, loading, invalidate };
 }
 

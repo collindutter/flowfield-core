@@ -17,6 +17,7 @@ import { taskHref } from "./navigation";
 import { FailureEvidence } from "./Integration";
 import { ReviewChecks } from "./ReviewChecks";
 import { Inspection } from "./Inspection";
+import { RunActivity } from "./RunActivity";
 import { ResultActions } from "./TaskActions";
 
 const CodeDiff = lazy(() => import("./CodeDiff"));
@@ -29,6 +30,7 @@ export function Result({
   refresh,
   versionId,
   onReply,
+  onApprove,
   inputEnabled,
 }: {
   projectId: string;
@@ -37,6 +39,7 @@ export function Result({
   refresh: unknown;
   versionId: string;
   onReply: (version: Version) => void;
+  onApprove: (version: Version) => void;
   inputEnabled: boolean;
 }) {
   const path = `projects/${projectId}`;
@@ -81,31 +84,6 @@ export function Result({
     version?.id === page.data?.current_id &&
     version?.run_id === page.data?.current_run_id;
   const href = taskHref(projectId, { key: taskKey }, "result");
-  async function review() {
-    if (!version) return;
-    setBusy(true);
-    setError("");
-    try {
-      const value = await request<Version>(
-        `${path}/results/${version.id}/review`,
-        "POST",
-        {
-          expected_revision: version.revision,
-          candidate_commit: version.candidate_commit ?? version.source_commit,
-          action: "approve",
-          note: "",
-          author: "human",
-        },
-      );
-      detail.invalidate();
-      page.invalidate();
-      setSaved(value);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
   async function recover(
     action: "prepare" | "correct" | "cancel" | "revalidate" | "retry-delivery",
   ) {
@@ -339,6 +317,9 @@ export function Result({
                 )}
               </ResultActions>
             )}
+          <DetailGroup title="Worker output">
+            <RunActivity projectId={projectId} runId={version.run_id} />
+          </DetailGroup>
           <DetailGroup title="Worker report">
             <Markdown>{version.report.summary}</Markdown>
             {version.report.outcome === "partial" && (
@@ -424,7 +405,7 @@ export function Result({
                 type="button"
                 size="sm"
                 disabled={busy || !inputEnabled}
-                onClick={() => void review()}
+                onClick={() => onApprove(version)}
               >
                 Approve and integrate
               </Button>

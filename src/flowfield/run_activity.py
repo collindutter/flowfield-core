@@ -114,6 +114,9 @@ class RunActivity:
                 (run, page.revision, page.model_dump_json()),
             )
 
+        if self.workspace.on_activity:
+            self.workspace.on_activity(project, run)
+
     def read(self, project: str, run: str, after: int = -1) -> RunActivityPage:
         with self.workspace.connection() as db:
             owner = db.execute(
@@ -185,7 +188,7 @@ class ActivityRecorder:
 
     async def _pump(self) -> None:
         while not self.closed:
-            await asyncio.sleep(0.25)
+            await asyncio.sleep(0.1)
             await self.flush()
 
     async def close(self) -> None:

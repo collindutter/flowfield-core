@@ -54,14 +54,6 @@ export function ConfirmButton({
           <DialogDescription>{description}</DialogDescription>
           <div className="actions">
             <Button
-              ref={cancel}
-              type="button"
-              variant="outline"
-              onClick={() => setPending(null)}
-            >
-              Cancel
-            </Button>
-            <Button
               type="button"
               disabled={props.disabled}
               onClick={() => {
@@ -71,6 +63,14 @@ export function ConfirmButton({
               }}
             >
               {children}
+            </Button>
+            <Button
+              ref={cancel}
+              type="button"
+              variant="outline"
+              onClick={() => setPending(null)}
+            >
+              Cancel
             </Button>
           </div>
         </DialogContent>

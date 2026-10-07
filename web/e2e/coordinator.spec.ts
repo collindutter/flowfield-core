@@ -351,6 +351,13 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     expires_at: now,
     released_at: null,
   };
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new CustomEvent("flowfield:activity", {
+        detail: { projects: ["chat-browser"] },
+      }),
+    ),
+  );
   await expect(
     page.getByRole("button", { name: "Allow once", exact: true }),
   ).toBeVisible();
@@ -376,6 +383,13 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   ).toHaveCount(0);
   active!.activity.items.find((item) => item.key === "reply")!.text +=
     " Open [CHT-1](/projects/chat-browser/tasks/CHT-1).";
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new CustomEvent("flowfield:activity", {
+        detail: { projects: ["chat-browser"] },
+      }),
+    ),
+  );
   await expect(
     page
       .getByRole("region", { name: "Coordinator conversation" })

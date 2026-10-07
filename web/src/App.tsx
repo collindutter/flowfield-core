@@ -148,6 +148,9 @@ export function App() {
       events.onerror = () => setLive(false);
       events.addEventListener("change", (event) => {
         const change = JSON.parse(event.data) as { projects: string[] | null };
+        window.dispatchEvent(
+          new CustomEvent("flowfield:activity", { detail: change }),
+        );
         if (change.projects === null) setRefresh((v) => v + 1);
         else
           setProjectRefresh((previous) => {
@@ -156,6 +159,13 @@ export function App() {
             return next;
           });
       });
+      events.addEventListener("activity", (event) =>
+        window.dispatchEvent(
+          new CustomEvent("flowfield:activity", {
+            detail: JSON.parse(event.data),
+          }),
+        ),
+      );
     }
     function offline() {
       events?.close();

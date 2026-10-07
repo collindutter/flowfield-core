@@ -12,14 +12,14 @@ from test_execution import BASE, fixture
 from flowfield.adapters.acp_session import AcpSession
 from flowfield.adapters.agent_mcp import serve_scope
 from flowfield.agent_tools import COORDINATOR_TOOLS, coordinator_scope, worker_scope
-from flowfield.supervisor import WorkerBridge
+from flowfield.supervisor import Supervisor, WorkerBridge
 
 
 def test_coordinator_reads_overlap_with_bounded_revocable_access(tmp_path):
     service = fixture(tmp_path)
 
     async def exercise():
-        grant = await coordinator_scope(service.workspace, "harbor")
+        grant = await coordinator_scope(Supervisor(service.workspace), "harbor")
         original = grant._call
         entered = asyncio.Queue()
         release = asyncio.Event()
@@ -77,7 +77,7 @@ def test_coordinator_captures_work_in_fixed_project(tmp_path):
     execution = fixture(tmp_path)
 
     async def exercise():
-        grant = await coordinator_scope(execution.workspace, "harbor")
+        grant = await coordinator_scope(Supervisor(execution.workspace), "harbor")
         assert set(grant.tools) == COORDINATOR_TOOLS
         for tool in grant.tools.values():
             assert "project_id" not in tool.inputSchema["properties"]
@@ -170,7 +170,7 @@ def test_scoped_endpoint_rejects_ambient_browser_and_expired_access(tmp_path):
     execution = fixture(tmp_path)
 
     async def exercise():
-        grant = await coordinator_scope(execution.workspace, "harbor")
+        grant = await coordinator_scope(Supervisor(execution.workspace), "harbor")
         async with serve_scope(grant) as server:
             headers = {item.name: item.value for item in server.headers}
             async with httpx.AsyncClient() as client:
@@ -189,7 +189,7 @@ def test_scoped_endpoint_rejects_ambient_browser_and_expired_access(tmp_path):
                 grant.revoke()
                 assert (await client.get(server.url, headers=headers)).status_code == 403
         async with serve_scope(
-            await coordinator_scope(execution.workspace, "harbor"), lifetime=-1
+            await coordinator_scope(Supervisor(execution.workspace), "harbor"), lifetime=-1
         ) as server:
             async with httpx.AsyncClient(
                 headers={item.name: item.value for item in server.headers}
@@ -203,7 +203,7 @@ def test_no_silent_loss_of_tools_for_unsupported_harness(tmp_path):
     execution = fixture(tmp_path)
 
     async def exercise():
-        grant = await coordinator_scope(execution.workspace, "harbor")
+        grant = await coordinator_scope(Supervisor(execution.workspace), "harbor")
         async with serve_scope(grant) as server:
             client = AcpSession(lambda event: None)
             with pytest.raises(RuntimeError, match="HTTP MCP"):
@@ -245,5 +245,44 @@ def test_pending_workflow_operation_blocks_report_and_revocation_prevents_late_w
         release.set()
         await command
         assert (await grant.call("submit_result", {})).isError
+
+    asyncio.run(exercise())
+
+
+def test_coordinator_configures_and_validates_only_its_project(tmp_path, monkeypatch):
+    from test_setup_validation import configured
+
+    _, validation, settings = configured(tmp_path, monkeypatch)
+    service = Supervisor(validation.workspace)
+
+    async def exercise():
+        grant = await coordinator_scope(service, "project")
+        read = await grant.call("get_integration_settings", {})
+        assert not read.isError
+        configured_result = await grant.call(
+            "configure_integration",
+            {
+                "settings": {
+                    "expected_revision": settings.revision,
+                    "target_branch": "delivery",
+                    "checks": ["test -f base.txt"],
+                    "setup_commands": ['test -n "$FLOWFIELD_RUNTIME_DIR"'],
+                }
+            },
+        )
+        assert not configured_result.isError, configured_result
+        actual = service.integrations.settings("project")
+        checked = await grant.call(
+            "validate_project_setup", {"request": {"expected_revision": actual.revision}}
+        )
+        assert not checked.isError, checked
+        assert service.setup_validation.get("project").status == "passed"
+        assert not service.execution.settings("project").enabled
+        assert not (await grant.call("get_inspection_settings", {})).isError
+        assert (
+            await grant.call("configure_integration", {"project_id": "other", "settings": {}})
+        ).isError
+        for name in ("set_queue", "review_result", "configure_workers", "apply_integration"):
+            assert (await grant.call(name, {})).isError
 
     asyncio.run(exercise())

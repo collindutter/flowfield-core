@@ -142,6 +142,7 @@ type AgentSettingsProps = {
   onReady?: (choice: Choice | null) => void;
   onSaved?: () => void;
   onSaveError?: () => void;
+  onCancel?: () => void;
   compact?: boolean;
   open?: boolean;
 };
@@ -154,6 +155,7 @@ function useAgentSettingsContent({
   onReady,
   onSaved,
   onSaveError,
+  onCancel,
   compact = false,
   open = true,
 }: AgentSettingsProps) {
@@ -255,11 +257,7 @@ function useAgentSettingsContent({
             : "Applies to the next worker run."}
         </p>
       )}
-      {!coordinator && (
-        <p className="detail-metadata">
-          {data?.selection ? "Task override" : "Using project defaults"}
-        </p>
-      )}
+      {!coordinator && <p className="detail-metadata">Task overrides</p>}
       {(catalog.error || (!catalog.loading && !catalog.data?.length)) && (
         <Alert>
           <AlertDescription>
@@ -282,7 +280,7 @@ function useAgentSettingsContent({
         }}
       >
         <fieldset
-          disabled={busy || !data}
+          disabled={busy}
           className="content-stack"
           data-space={compact ? "content" : "section"}
         >
@@ -324,36 +322,52 @@ function useAgentSettingsContent({
                 Use defaults
               </Button>
             )}
-            {(draft || error || resource.error) && (
+            {(draft || error || resource.error) &&
+              (!compact || stale || error || resource.error) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (!stale && !error && !resource.error) {
+                      setDraft(null);
+                      return;
+                    }
+                    if (
+                      draft &&
+                      !window.confirm(
+                        "Discard your edits and load the saved settings?",
+                      )
+                    )
+                      return;
+                    try {
+                      resource.invalidate();
+                      resource.setData(await request<Settings>(path));
+                      resource.setError("");
+                      setDraft(null);
+                      setError("");
+                    } catch (error) {
+                      setError((error as Error).message);
+                    }
+                  }}
+                >
+                  {stale || error || resource.error ? "Reload" : "Cancel"}
+                </Button>
+              )}
+            {compact && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 disabled={busy}
-                onClick={async () => {
-                  if (!stale && !error && !resource.error) {
-                    setDraft(null);
-                    return;
-                  }
-                  if (
-                    draft &&
-                    !window.confirm(
-                      "Discard your edits and load the saved settings?",
-                    )
-                  )
-                    return;
-                  try {
-                    resource.invalidate();
-                    resource.setData(await request<Settings>(path));
-                    resource.setError("");
-                    setDraft(null);
-                    setError("");
-                  } catch (error) {
-                    setError((error as Error).message);
-                  }
+                onClick={() => {
+                  setDraft(null);
+                  setError("");
+                  onCancel?.();
                 }}
               >
-                {stale || error || resource.error ? "Reload" : "Cancel"}
+                Cancel
               </Button>
             )}
           </div>
@@ -421,6 +435,7 @@ export function AgentSettingsControl({
     compact: true,
     open,
     onSaved: () => onOpenChange(false),
+    onCancel: () => onOpenChange(false),
     onSaveError: () => onOpenChange(true),
   });
   const automaticallyOpened = useRef(false);

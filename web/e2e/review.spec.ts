@@ -261,7 +261,7 @@ test("managed review keeps its URL, binds the result, and preserves feedback on 
 test("validated result approval delivers real Git code with the worker queue paused", async ({
   page,
   request,
-}) => {
+}, testInfo) => {
   const seed = JSON.parse(
     execFileSync(
       join(checkout, ".venv/bin/python"),
@@ -304,6 +304,21 @@ test("validated result approval delivers real Git code with the worker queue pau
   await page
     .getByRole("button", { name: "Approve and integrate", exact: true })
     .click();
+  await expect(
+    page.getByLabel("Testing notes or approval comment (optional)", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Testing notes or approval comment (optional)", { exact: true })
+    .fill("Keyboard checked; mobile not tested.");
+  await page.screenshot({ path: testInfo.outputPath("approval-comment.png") });
+  await page
+    .getByRole("button", { name: "Approve and integrate", exact: true })
+    .click();
+  await expect(
+    page.getByText("Keyboard checked; mobile not tested.", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Retry integration", exact: true }),
   ).toBeVisible();
@@ -703,35 +718,26 @@ test("inspection preserves exact versions, preview edits and direct approval", a
     execFileSync("/bin/sh", ["-c", copy.command], { encoding: "utf8" }),
   ).toContain("First greeting");
   writeFileSync(join(copy.workspace, "app.py"), "print('Preview edit')\n");
-  const beforeTesting = await (
-    await request.get(`${path}/tasks/try/results`)
-  ).json();
+  await expect(
+    page.getByRole("button", { name: "Record testing", exact: true }),
+  ).toHaveCount(0);
   await page
-    .getByRole("button", { name: "Record testing", exact: true })
+    .getByRole("button", { name: "Approve and integrate", exact: true })
     .click();
-  await expect(
-    page.getByRole("button", { name: "Approve and integrate", exact: true }),
-  ).toBeHidden();
-  await page
-    .getByLabel("Testing observations", { exact: true })
-    .fill("I tried Result 1: keyboard works; narrow view not tested.");
-  await page.getByRole("button", { name: "Save testing", exact: true }).click();
-  await expect(
-    page.getByText("Human testing · Result 1", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Tested result", exact: true }),
-  ).toHaveAttribute("href", /conversation\/result%3A/);
-  expect(await (await request.get(`${path}/tasks/try/results`)).json()).toEqual(
-    beforeTesting,
+  const approvalComment = page.getByLabel(
+    "Testing notes or approval comment (optional)",
+    { exact: true },
   );
-  await page.reload();
-  await expect(
-    page.getByText(
-      "I tried Result 1: keyboard works; narrow view not tested.",
-      { exact: true },
-    ),
-  ).toBeVisible();
+  await expect(approvalComment).toBeFocused();
+  await approvalComment.fill("Partial test, not ready to approve yet.");
+  expect(
+    (await (await request.get(`${path}/results/${first!.id}`)).json())
+      .approved_at,
+  ).toBeNull();
+  await page
+    .getByRole("button", { name: "Cancel approval", exact: true })
+    .click();
+  await expect(approvalComment).toHaveCount(0);
   await page
     .getByRole("button", { name: "Request changes", exact: true })
     .click();
@@ -794,6 +800,14 @@ test("inspection preserves exact versions, preview edits and direct approval", a
   expect(readFileSync(join(copy.workspace, "app.py"), "utf8")).toContain(
     "Preview edit",
   );
+  await page
+    .getByRole("button", { name: "Approve and integrate", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Testing notes or approval comment (optional)", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Approve and integrate", exact: true })
     .click();

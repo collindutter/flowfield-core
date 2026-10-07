@@ -19,7 +19,9 @@ its own MCP connection; `flowfield integration connect codex` is only for standa
 Write your message and select **Send** (or press Enter). Use Command/Ctrl+Enter or
 Shift+Enter for a new line. Opening a project
 starts no model turn. Send is available once you have saved these choices.
-The coordinator manages work through project-scoped Flowfield tools. You can also ask it
+The coordinator manages work through project-scoped Flowfield tools, including destination,
+setup/check commands, result-preview settings and setup validation. Validation runs in a
+separate checkout without starting a model or enabling the worker queue. You can also ask it
 to configure the project or local environment directly, within its selected access mode.
 These setup changes affect the project directory immediately; they do not produce a task
 result for approval. Agreed implementation work belongs to task workers. Answer worker
@@ -27,7 +29,7 @@ questions and approve exact code results in their task feeds.
 
 Use the model button beside the input to change model, effort or access. Changes apply to the next
 message; a running turn keeps its saved choice. Standalone coding-agent settings are separate.
-Save to apply your choices; closing the popup cancels unsaved changes.
+Save to apply your choices; Cancel or closing the popup discards unsaved changes.
 
 Access modes come from Codex, including Read only, workspace access and Auto review.
 Auto review uses Codex's native
@@ -94,7 +96,7 @@ also attaches that exact result. The coordinator reads current task state before
 Session commands still operate on the coordinator conversation as a whole.
 
 Discuss planning, card changes and result questions here. Task feeds retain worker activity,
-questions, answers, testing and exact-result review. Their text inputs are for those specific
+questions, answers, feedback and exact-result approval with optional testing notes. Their text inputs are for those specific
 interactions. Selecting a task never launches a worker.
 
 ![Task feed and review beside the Coordinator](/images/overview.png)

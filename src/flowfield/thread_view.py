@@ -141,6 +141,7 @@ class ThreadView(Conversation):
             body = data["reason"]
         elif kind == "approval":
             title = "Approved for integration"
+            body = data.get("approval_note", "")
         elif kind == "delivery":
             title = (
                 "Integrated into " + str(data["target_branch"])

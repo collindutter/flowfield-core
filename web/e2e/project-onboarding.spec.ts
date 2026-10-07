@@ -40,12 +40,27 @@ test("directory adoption keeps cancellation harmless and opens project chat", as
   const setup = page.getByRole("region", {
     name: "Project setup instructions",
   });
+  await setup.getByText("Preview project guidance", { exact: true }).click();
+  await expect(
+    setup.locator("pre").filter({ hasText: "<!-- flowfield:begin -->" }),
+  ).toBeVisible();
+  expect(existsSync(join(directory, "AGENTS.md"))).toBe(false);
+  await setup.getByText("Preview project guidance", { exact: true }).click();
+  await page.screenshot({
+    path: testInfo.outputPath("guidance-at-adoption.png"),
+  });
   await setup.getByRole("button", { name: "Add project", exact: true }).click();
   await expect(page).toHaveURL("/projects/native-directory-project");
   await expect(
     page.getByRole("heading", { name: "Coordinator" }),
   ).toBeVisible();
   expect(existsSync(join(directory, ".flowfield/config.toml"))).toBe(true);
+  expect(existsSync(join(directory, "AGENTS.md"))).toBe(true);
+  expect(
+    existsSync(
+      join(directory, ".agents/skills/flowfield-coordinator/SKILL.md"),
+    ),
+  ).toBe(true);
 
   await page.goto("/projects/native-directory-project/edit/integration");
   await expect(page.getByLabel("Validation commands")).toHaveValue("");
@@ -117,8 +132,11 @@ test("registration conflict retains selection for a unique project ID", async ({
   await setup
     .getByRole("textbox", { name: "Task prefix", exact: true })
     .fill("PKU");
+  await setup.getByLabel("Install project guidance", { exact: true }).uncheck();
+  await expect(setup).toContainText("Install later in Project settings");
   await setup.getByRole("button", { name: "Add project", exact: true }).click();
   await expect(page).toHaveURL("/projects/picked-unique");
+  expect(existsSync(join(selected, "AGENTS.md"))).toBe(false);
   await expect(setup).not.toBeVisible();
   await page.getByRole("button", { name: "Add project", exact: true }).click();
   await expect(page).toHaveURL("/new-project");

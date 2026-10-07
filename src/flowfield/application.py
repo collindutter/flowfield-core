@@ -410,7 +410,14 @@ def generated_id(title: str) -> str:
 
 
 class Workspace:
-    def __init__(self, directory: Path, *, on_change: Callable[[str | None], None] | None = None):
+    def __init__(
+        self,
+        directory: Path,
+        *,
+        on_change: Callable[[str | None], None] | None = None,
+        on_activity: Callable[[str, str], None] | None = None,
+    ):
+        self.on_activity = on_activity
         self.on_change = on_change
         self.directory = directory.expanduser().resolve()
         self.database = self.directory / "workspace.sqlite3"

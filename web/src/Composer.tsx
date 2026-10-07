@@ -7,6 +7,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
+import { ActionTooltip } from "./ActionTooltip";
 import { Command } from "cmdk";
 import { Popover } from "radix-ui";
 import { Paperclip, FileText, X } from "lucide-react";
@@ -319,18 +320,22 @@ export function Composer({
                 </Command.Input>
               )}
               <div className="composer-toolbar">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Add attachment"
-                  hidden={collapsed}
-                  title="Attach text, code or image"
+                <ActionTooltip
+                  label={collapsed ? null : "Attach text, code or image"}
                   disabled={disabled || uploading || files.length >= 4}
-                  onClick={() => picker.current?.click()}
                 >
-                  <Paperclip size={16} />
-                </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Add attachment"
+                    hidden={collapsed}
+                    disabled={disabled || uploading || files.length >= 4}
+                    onClick={() => picker.current?.click()}
+                  >
+                    <Paperclip size={16} />
+                  </Button>
+                </ActionTooltip>
                 {controls}
                 <span className="composer-spacer" />
                 {uploading && (

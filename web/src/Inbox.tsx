@@ -195,7 +195,7 @@ function QuestionDetail({
           setEditing(false);
           setDraft("");
         }
-        setError("");
+        if (!dirtyRef.current) setError("");
       })
       .catch((e) => {
         if (current === generation.current) setError(e.message);

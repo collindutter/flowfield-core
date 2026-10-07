@@ -20,12 +20,15 @@ def test_bounded_snapshot_replays_after_restart_and_rejects_late_output(tmp_path
     execution = fixture(tmp_path)
     run = execution.claim("harbor", BASE, {})
     store = RunActivity(execution.workspace)
+    activity = []
+    execution.workspace.on_activity = lambda project, attempt: activity.append((project, attempt))
     invalidations = []
     execution.workspace.on_change = invalidations.append
     store.write("harbor", run.id, [ActivityUpdate(key="agent", kind="agent", text="Hello")])
     store.write(
         "harbor", run.id, [ActivityUpdate(key="agent", kind="agent", text=" world", append=True)]
     )
+    assert activity == [("harbor", run.id), ("harbor", run.id)]
     assert not invalidations
     read = store.read("harbor", run.id)
     assert read.items[0].text == "Hello world" and read.active and read.supported
@@ -84,7 +87,7 @@ def test_shared_state_matches_question_attention_and_static_pause(tmp_path):
     state = next(t.state for t in board.tasks if t.id == "task-0")
     attention = attention_page(execution.workspace, "harbor", "action")
     assert attention.items[0].state == state
-    assert state.tone == "attention" and item.id in state.href
+    assert state.tone == "waiting" and item.id in state.href
     notices = attention_notices(execution.workspace)
     assert notices[0].href == state.href
     second = Questions(execution.workspace).ask(

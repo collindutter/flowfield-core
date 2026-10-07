@@ -40,7 +40,6 @@ export function Timestamp({
   const { formattedDate } = useTimeAgo({
     date: Date.parse(date),
     locale: "en",
-    timeStyle: "round",
     polyfill: false,
   });
   const time = (

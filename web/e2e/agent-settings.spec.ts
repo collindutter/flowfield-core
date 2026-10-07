@@ -202,7 +202,9 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
   await page
     .getByRole("button", { name: "second · medium", exact: true })
     .click();
-  await expect(picker.getByText("Task override")).toBeVisible();
+  await expect(
+    picker.getByText("Task overrides", { exact: true }),
+  ).toBeVisible();
   expect(settings.selection?.mode).toBe("read-only");
   expect(settings.selection?.fast).toBe(true);
   await picker.getByLabel("Model", { exact: true }).selectOption("first");
@@ -227,9 +229,11 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
   expect(settings.effective.choice.fast).toBe(false);
   await page.getByRole("button", { name: "first · low", exact: true }).click();
   await expect(
-    picker.getByText("Using project defaults", { exact: true }),
+    picker.getByText("Task overrides", { exact: true }),
   ).toBeVisible();
-  await page.keyboard.press("Escape");
+  await picker.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(picker).not.toBeVisible();
+  expect(settings.selection).toBeNull();
   await detail
     .getByText("Run the project checks", { exact: true })
     .scrollIntoViewIfNeeded();

@@ -47,7 +47,7 @@ from flowfield.conversation_api import conversation_router
 from flowfield.coordinator_api import coordinator_router
 from flowfield.errors import ApplicationError
 from flowfield.execution_api import execution_router
-from flowfield.guidance import Guidance, GuidanceChange, GuidanceView
+from flowfield.guidance import Guidance, GuidanceChange, GuidanceTemplates, GuidanceView, template
 from flowfield.inspection_api import inspection_router
 from flowfield.integration_api import integration_router
 from flowfield.mcp import create_mcp
@@ -63,7 +63,9 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.changes = Changes()
         app.state.workspace = Workspace(
-            data_dir if data_dir is not None else data_path(), on_change=app.state.changes.publish
+            data_dir if data_dir is not None else data_path(),
+            on_change=app.state.changes.publish,
+            on_activity=app.state.changes.publish_activity,
         )
         app.state.supervisor = Supervisor(app.state.workspace)
         await app.state.supervisor.start()
@@ -133,6 +135,12 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
                 row[0]: attention_counts(db, row[0]).get("action", 0)
                 for row in db.execute("SELECT id FROM projects ORDER BY id").fetchall()
             }
+
+    @app.get("/api/guidance-template")
+    def guidance_template() -> GuidanceTemplates:
+        return GuidanceTemplates(
+            section=template("agents-section.md"), skill=template("flowfield-coordinator/SKILL.md")
+        )
 
     @router.post("/initialize")
     def initialize(request: ProjectSetup, service: Service) -> Project:

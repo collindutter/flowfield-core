@@ -127,8 +127,7 @@ def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
         resumed = await settled(service, second)
         assert resumed.status == "completed"
         assert resumed.session == "resumed"
-        assert resumed.activity.items[0].kind == "status"
-        assert "resumed" in resumed.activity.items[0].text
+        assert all(item.key != "session" for item in resumed.activity.items)
         assert service.coordinator.send("harbor", conversation.id, request).id == turn.id
         assert not service.coordinator.jobs
         await service.close()
@@ -426,7 +425,7 @@ def test_scoped_coordinator_applies_saved_answer_without_code_approval(tmp_path)
     )
 
     async def exercise():
-        grant = await coordinator_scope(workspace, "harbor")
+        grant = await coordinator_scope(Supervisor(workspace), "harbor")
         assert not {
             "review_result",
             "answer_question",

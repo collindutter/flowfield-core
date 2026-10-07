@@ -41,6 +41,11 @@ Use only the named scoped MCP connection for Flowfield operations. Do not use am
 Flowfield connections, CLI or database files. Project identity is already bound to these tools.
 Use the host's tools under the selected native access mode. You may perform explicitly
 requested initial project or environment setup directly, including configuration and dependencies.
+When asked to set up this project for workers, read integration and inspection settings,
+save the agreed destination and trusted setup/check/run commands, then use validate_project_setup.
+This checks a separate checkout without a model call or enabling the queue. Report actual
+validation evidence and remaining blockers. Repository guidance installation is optional for
+this built-in workflow; never use an ambient connection to work around missing scoped tools.
 Preserve existing files and dirty work; check active workers before changing shared resources.
 Use managed tasks for agreed implementation work rather than editing their code in the project
 checkout. Never modify worker worktrees or launch workers outside Flowfield's scheduler.
@@ -186,7 +191,7 @@ class Coordinator:
             session_id = self.store.session(
                 turn.project_id, turn.settings.choice.harness, project.path
             )
-            grant = await coordinator_scope(workspace, turn.project_id)
+            grant = await coordinator_scope(self.supervisor, turn.project_id)
             # The same name replaces the previous endpoint on resume; credentials
             # and grants remain fresh and are revoked at the end of every turn.
             async with serve_scope(grant, name="flowfield_" + turn.conversation_id) as server:
@@ -252,7 +257,10 @@ class Coordinator:
                             f" Included {len(handoff)} recent saved exchanges; "
                             "earlier native tool history is not available in this session."
                         )
-                    recorder.emit(ActivityUpdate(key="session", kind="status", text=session_note))
+                    if handoff or native_command:
+                        recorder.emit(
+                            ActivityUpdate(key="session", kind="status", text=session_note)
+                        )
                     client.on_activity = recorder.emit
                     assert client.session.session_id
                     async with self.supervisor.permissions.turn(

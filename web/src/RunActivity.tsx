@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { request, label } from "./workspace";
+import { useLayoutEffect, useRef } from "react";
+import { useResource } from "./useResource";
+import { label } from "./workspace";
 import type { components } from "./api-schema";
 import { Disclosure } from "./DetailLayout";
 import { UsageSummary } from "./UsageSummary";
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 
 type Page = components["schemas"]["RunActivityPage"];
+const isActive = (page: Page) => page.active;
 const activityIcons = {
   agent: MessageSquare,
   tool: Wrench,
@@ -26,44 +28,14 @@ export function RunActivity({
   projectId: string;
   runId: string;
 }) {
-  const [page, setPage] = useState<Page | null>(null);
-  const [error, setError] = useState("");
+  const { data: page, error } = useResource<Page>(
+    `projects/${projectId}/runs/${runId}/activity`,
+    runId,
+    10000,
+    { projectId, attemptId: runId, isActive },
+  );
   const pane = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
-  useEffect(() => {
-    let alive = true,
-      revision = -1;
-    let timer: ReturnType<typeof setTimeout>;
-    const controller = new AbortController();
-    async function poll() {
-      try {
-        const value = await request<Page>(
-          `projects/${projectId}/runs/${runId}/activity?after=${revision}`,
-          "GET",
-          undefined,
-          controller.signal,
-        );
-        if (!alive) return;
-        revision = value.revision;
-        setPage((old) => ({
-          ...value,
-          items: value.changed ? value.items : (old?.items ?? []),
-        }));
-        setError("");
-        if (!value.active) return;
-      } catch (e) {
-        if (!alive) return;
-        setError((e as Error).message);
-      }
-      timer = setTimeout(() => void poll(), 1000);
-    }
-    void poll();
-    return () => {
-      alive = false;
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [projectId, runId]);
   useLayoutEffect(() => {
     if (follow.current && pane.current)
       pane.current.scrollTop = pane.current.scrollHeight;
@@ -78,7 +50,8 @@ export function RunActivity({
       )}
       {error && (
         <p role="alert">
-          Activity disconnected. Retrying; saved output is kept. {error}
+          Activity disconnected. Saved output is kept; reconnect to refresh.{" "}
+          {error}
         </p>
       )}
       {!page && !error && <p className="muted">Loading activity…</p>}

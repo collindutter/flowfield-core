@@ -6,6 +6,7 @@ from pathlib import Path
 
 from project_fixtures import task_request
 
+from flowfield.activity import ActivityCreate
 from flowfield.application import ProjectSetup, TaskPublish, Workspace
 from flowfield.execution import Execution
 from flowfield.execution_models import QueueEdit, SettingsEdit, Usage
@@ -43,6 +44,11 @@ if sys.argv[2] == "create":
     execution.queue("stream-project", QueueEdit(expected_revision=3, enabled=False))
 else:
     run = execution.page("stream-project").items[0]
+if sys.argv[2] == "later":
+    ws.add_activity(
+        "stream-project",
+        ActivityCreate(task_id="stream", body="Later progress while work continues."),
+    )
 if sys.argv[2] == "long":
     # Enough independent entries to exercise scrolling after per-entry abbreviation.
     RunActivity(ws).write(

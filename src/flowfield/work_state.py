@@ -61,7 +61,7 @@ def question_state(db: sqlite3.Connection, project: str, identity: str) -> WorkS
         else delivery.state
         if delivery
         else "Resume coordinator",
-        tone="attention" if row["status"] == "open" else "waiting",
+        tone="waiting",
         href=(
             f"/projects/{project}/tasks/{row['key']}/conversation/question:{identity}"
             + (f":{row['revision']}" if row["status"] in ("open", "answered", "withdrawn") else "")
@@ -105,7 +105,7 @@ def task_state(
                 (project, task_id),
             ).fetchone()
         ):
-            return WorkState(label="Review tool permission", tone="attention", href=href)
+            return WorkState(label="Review tool permission", tone="waiting", href=href)
         return WorkState(
             label={
                 "preparing": "Preparing worker",
@@ -155,7 +155,7 @@ def task_state(
                 tone = "active"
             elif result.status == "delivered":
                 tone = "complete" if action.action == "none" else "attention"
-            elif result.status in ("ready", "blocked", "stale", "cancelled"):
+            elif result.status in ("blocked", "stale"):
                 tone = "attention"
             return WorkState(
                 label="Integration blocked" if action.action == "retry-delivery" else action.label,
