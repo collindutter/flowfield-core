@@ -868,6 +868,7 @@ export function TaskConversation({
               )}
               <WorkerActions
                 projectId={projectId}
+                task={task}
                 runId={
                   gate.data?.run_id ??
                   messages.filter((m) => m.kind === "attempt").at(-1)

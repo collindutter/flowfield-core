@@ -166,7 +166,7 @@ def task_state(
         "SELECT id,status FROM runs WHERE project_id=? AND task_id=? ORDER BY number DESC LIMIT 1",
         (project, task_id),
     ).fetchone()
-    if latest and latest["status"] in ("failed", "stopped"):
+    if latest and latest["status"] in ("failed", "stopped") and task["status"] != "up_next":
         return WorkState(
             label="Worker failed" if latest["status"] == "failed" else "Work stopped",
             tone="attention" if latest["status"] == "failed" else "waiting",

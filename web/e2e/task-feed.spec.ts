@@ -1322,6 +1322,19 @@ test("attempt activity updates without reloading the board and replays on reload
   await expect(
     page.getByRole("button", { name: "Archive", exact: true }),
   ).toBeDisabled();
+  await page.getByRole("button", { name: "Retry worker", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Retry worker", exact: true }),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator(".task-conversation-header")).toContainText(
+    "Queue paused",
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry worker", exact: true }),
+  ).toHaveCount(0);
+  await closeOverlay(page);
+  await expect(page.locator(".up_next")).toContainText("Observe live output");
 });
 
 test("task feed follows the live end but preserves reading position and timestamp targets", async ({

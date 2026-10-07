@@ -226,7 +226,14 @@ def test_report_prerequisite_does_not_require_code_availability(tmp_path: Path) 
 
 
 def test_failure_retry_and_restart_never_automatically_relaunch(tmp_path: Path) -> None:
+    from flowfield.work_state import task_state
+
     execution = fixture(tmp_path, count=2)
+
+    def state_label():
+        with execution.workspace.connection() as db:
+            return task_state(execution.workspace, db, "harbor", "task-0").label
+
     run = execution.claim("harbor", BASE, {BASE: set()})
     assert run
     execution.restart()
@@ -238,12 +245,16 @@ def test_failure_retry_and_restart_never_automatically_relaunch(tmp_path: Path) 
     execution.stop_requested("harbor", run.id, RunAction(expected_revision=unknown.revision))
     stopped = execution.finish("harbor", run.id, "stopped")
     assert not execution.active()
+    assert state_label() == "Work stopped"
     execution.retry("harbor", run.id, RunAction(expected_revision=stopped.revision))
+    assert state_label() == "Queue paused"
     assert execution.claim("harbor", BASE, {BASE: set()}) is None  # queue stays paused
     settings = execution.settings("harbor")
     execution.queue("harbor", QueueEdit(expected_revision=settings.revision, enabled=True))
+    assert state_label() == "Queued"
     retry = execution.claim("harbor", BASE, {BASE: set()})
     assert retry and retry.predecessor_id == run.id and retry.environment_id != run.environment_id
+    assert state_label() == "Preparing worker"
 
 
 def test_usage_replay_is_not_added_and_history_is_paged(tmp_path: Path) -> None:

@@ -703,7 +703,7 @@ function ProjectBoard({
         </div>
         <TabsContent
           value={view}
-          className="workspace-work-content"
+          className={`workspace-work-content ${!showInbox && !milestonesView && !archive ? "workspace-task-board" : ""}`}
           hidden={!!taskRef}
         >
           <div className="board-toolbar">
@@ -778,7 +778,10 @@ function ProjectBoard({
               refresh={refresh}
             />
           ) : (
-            <ContentStack space="section">
+            <ContentStack
+              space="section"
+              className={archive ? undefined : "board-content"}
+            >
               {error && (
                 <Alert variant="destructive">
                   <CircleAlert aria-hidden="true" />
@@ -860,124 +863,140 @@ function ProjectBoard({
                               refresh={refresh}
                             />
                           )}
-                          {tasks.map((task) => (
-                            <div
-                              className={`card-shell ${dragged?.id === task.id ? "dragging" : ""} ${dropTarget?.before === task.id ? "drop-before" : ""}`}
-                              key={task.id}
-                              draggable={
-                                !archive && isUpcoming(column) && !prioritizing
-                              }
-                              onDragStart={(e) => {
-                                setDragged(task);
-                                e.dataTransfer.effectAllowed = "move";
-                                e.dataTransfer.setData("text/plain", task.id);
-                              }}
-                              onDragEnd={() => {
-                                setDragged(null);
-                                setDropTarget(null);
-                              }}
-                              onDragOver={(e) => {
-                                if (
-                                  !dragged ||
-                                  archive ||
-                                  !isUpcoming(column) ||
-                                  prioritizing
-                                )
-                                  return;
-                                e.preventDefault();
-                                e.stopPropagation();
-                                e.dataTransfer.dropEffect = "move";
-                                const bounds =
-                                  e.currentTarget.getBoundingClientRect();
-                                const upcoming = activeTasks
-                                  .filter((t) => t.status === column)
-                                  .sort(compareTasks);
-                                const index = upcoming.findIndex(
-                                  (t) => t.id === task.id,
-                                );
-                                const before =
-                                  e.clientY < bounds.top + bounds.height / 2
-                                    ? task.id
-                                    : (upcoming[index + 1]?.id ?? null);
-                                setDropTarget({ status: column, before });
-                              }}
-                            >
-                              <Card
-                                className={
-                                  selection?.id === task.id &&
-                                  selection.kind === "task"
-                                    ? "task-card picked gap-1 p-3"
-                                    : "task-card gap-1 p-3"
+                          <div
+                            className="column-cards"
+                            tabIndex={0}
+                            role="region"
+                            aria-label={`${label(column)} tasks`}
+                          >
+                            {tasks.map((task) => (
+                              <div
+                                className={`card-shell ${dragged?.id === task.id ? "dragging" : ""} ${dropTarget?.before === task.id ? "drop-before" : ""}`}
+                                key={task.id}
+                                draggable={
+                                  !archive &&
+                                  isUpcoming(column) &&
+                                  !prioritizing
                                 }
+                                onDragStart={(e) => {
+                                  setDragged(task);
+                                  e.dataTransfer.effectAllowed = "move";
+                                  e.dataTransfer.setData("text/plain", task.id);
+                                }}
+                                onDragEnd={() => {
+                                  setDragged(null);
+                                  setDropTarget(null);
+                                }}
+                                onDragOver={(e) => {
+                                  if (
+                                    !dragged ||
+                                    archive ||
+                                    !isUpcoming(column) ||
+                                    prioritizing
+                                  )
+                                    return;
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  e.dataTransfer.dropEffect = "move";
+                                  const bounds =
+                                    e.currentTarget.getBoundingClientRect();
+                                  const upcoming = activeTasks
+                                    .filter((t) => t.status === column)
+                                    .sort(compareTasks);
+                                  const index = upcoming.findIndex(
+                                    (t) => t.id === task.id,
+                                  );
+                                  const before =
+                                    e.clientY < bounds.top + bounds.height / 2
+                                      ? task.id
+                                      : (upcoming[index + 1]?.id ?? null);
+                                  setDropTarget({ status: column, before });
+                                }}
                               >
-                                <TaskIdentity
-                                  task={task}
-                                  title={
-                                    <a
-                                      className="task-card-link"
-                                      aria-label={`${task.key} ${task.title}`}
-                                      href={taskHref(projectId, task)}
-                                      draggable={false}
-                                      onClick={(event) =>
-                                        followLink(event, () =>
-                                          choose({ kind: "task", id: task.id }),
-                                        )
-                                      }
-                                    >
-                                      {task.title}
-                                    </a>
+                                <Card
+                                  className={
+                                    selection?.id === task.id &&
+                                    selection.kind === "task"
+                                      ? "task-card picked gap-1 p-3"
+                                      : "task-card gap-1 p-3"
                                   }
-                                  labels={
-                                    <>
-                                      <TaskTypeBadge type={task.task_type} />
-                                      <DraftBadge
-                                        publicationStatus={
-                                          task.publication_status
+                                >
+                                  <TaskIdentity
+                                    task={task}
+                                    title={
+                                      <a
+                                        className="task-card-link"
+                                        aria-label={`${task.key} ${task.title}`}
+                                        href={taskHref(projectId, task)}
+                                        draggable={false}
+                                        onClick={(event) =>
+                                          followLink(event, () =>
+                                            choose({
+                                              kind: "task",
+                                              id: task.id,
+                                            }),
+                                          )
                                         }
-                                      />
-                                      <MilestoneBadge
-                                        milestone={board.milestones.find(
-                                          (m) => m.id === task.milestone_id,
-                                        )}
-                                      />
-                                    </>
-                                  }
-                                />
-                                {task.state?.tone !== "idle" && (
-                                  <TaskState
-                                    task={task}
-                                    projectId={projectId}
-                                    open={(id) => choose({ kind: "task", id })}
-                                    linked
+                                      >
+                                        {task.title}
+                                      </a>
+                                    }
+                                    labels={
+                                      <>
+                                        <TaskTypeBadge type={task.task_type} />
+                                        <DraftBadge
+                                          publicationStatus={
+                                            task.publication_status
+                                          }
+                                        />
+                                        <MilestoneBadge
+                                          milestone={board.milestones.find(
+                                            (m) => m.id === task.milestone_id,
+                                          )}
+                                        />
+                                      </>
+                                    }
                                   />
-                                )}
-                                {hasTaskNeeds(
-                                  task,
-                                  board.pending_code[task.id],
-                                  !task.state,
-                                ) && (
-                                  <TaskNeeds
-                                    task={task}
-                                    projectId={projectId}
-                                    pendingCode={board.pending_code[task.id]}
-                                    showQuestions={!task.state}
-                                    open={(id) => choose({ kind: "task", id })}
-                                  />
-                                )}
-                              </Card>
-                            </div>
-                          ))}
-                          {!tasks.length && (
-                            <p className="empty-column">
-                              {column === "backlog"
-                                ? "Ideas and future work"
-                                : column === "up_next"
-                                  ? "Choose what matters next"
-                                  : column === "done"
-                                    ? "Finished outcomes"
-                                    : "No work here yet"}
-                            </p>
-                          )}
+                                  {task.state?.tone !== "idle" && (
+                                    <TaskState
+                                      task={task}
+                                      projectId={projectId}
+                                      open={(id) =>
+                                        choose({ kind: "task", id })
+                                      }
+                                      linked
+                                    />
+                                  )}
+                                  {hasTaskNeeds(
+                                    task,
+                                    board.pending_code[task.id],
+                                    !task.state,
+                                  ) && (
+                                    <TaskNeeds
+                                      task={task}
+                                      projectId={projectId}
+                                      pendingCode={board.pending_code[task.id]}
+                                      showQuestions={!task.state}
+                                      open={(id) =>
+                                        choose({ kind: "task", id })
+                                      }
+                                    />
+                                  )}
+                                </Card>
+                              </div>
+                            ))}
+                            {!tasks.length && (
+                              <p className="empty-column">
+                                {column === "backlog"
+                                  ? "Ideas and future work"
+                                  : column === "up_next"
+                                    ? "Choose what matters next"
+                                    : column === "done"
+                                      ? "Finished outcomes"
+                                      : "No work here yet"}
+                              </p>
+                            )}
+                          </div>
                         </section>
                       );
                     })}

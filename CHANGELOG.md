@@ -26,6 +26,8 @@ Plan, run and review work together in Flowfield with the embedded Coordinator.
 - Simplify navigation with a permanent project rail, persistent project views, task context
   beside the Coordinator and shared scroll boundaries. Refine tooltips, relative timestamps,
   task overrides, action ordering and review colors; remove routine session-resume notices.
+- Scroll board columns independently with fixed headings and thinner native scrollbars.
+  Show active workers against capacity and make queued retries reflect the queue state.
 - Remove the Decisions feature and retired worker runtime. Keep durable technical guidance
   in the repository and use task conversations for questions, feedback and review.
 - Open the ready local service in a browser for interactive launches; use `--no-open` to

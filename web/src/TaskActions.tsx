@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useResource } from "./useResource";
-import { request } from "./workspace";
+import { request, type Task } from "./workspace";
 import type { components } from "./api-schema";
 import { ConfirmButton } from "./ConfirmButton";
 
@@ -48,11 +48,13 @@ export function ResultActions({
 type Run = components["schemas"]["Run"];
 export function WorkerActions({
   projectId,
+  task,
   runId,
   refresh,
   changed,
 }: {
   projectId: string;
+  task: Task;
   runId: string | null;
   refresh: unknown;
   changed: () => void;
@@ -64,6 +66,7 @@ export function WorkerActions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<Run | null>(null);
+  const [queuedRevision, setQueuedRevision] = useState<number | null>(null);
   const run =
     saved?.id === resource.data?.id &&
     saved &&
@@ -82,6 +85,7 @@ export function WorkerActions({
           { expected_revision: run.revision, author: "human" },
         ),
       );
+      if (action === "retry") setQueuedRevision(task.revision);
       resource.invalidate();
       changed();
     } catch (e) {
@@ -119,17 +123,21 @@ export function WorkerActions({
               : "Stop worker"}
         </ConfirmButton>
       )}
-      {run && ["stopped", "failed"].includes(run.status) && (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => void act("retry")}
-        >
-          Retry worker
-        </Button>
-      )}
+      {run &&
+        !task.archived &&
+        task.status !== "up_next" &&
+        queuedRevision !== task.revision &&
+        ["stopped", "failed"].includes(run.status) && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void act("retry")}
+          >
+            Retry worker
+          </Button>
+        )}
     </>
   );
 }

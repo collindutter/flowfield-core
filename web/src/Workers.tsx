@@ -51,7 +51,8 @@ export function QueueControls({
         <>
           <span className="muted">
             Queue {data.enabled ? "enabled" : "paused"}
-            {occupancy.data && ` · ${occupancy.data.active} active`}
+            {occupancy.data &&
+              ` · ${occupancy.data.active}/${data.max_parallel} active`}
             {!!occupancy.data?.uncertain &&
               ` · ${occupancy.data.uncertain} uncertain`}
           </span>

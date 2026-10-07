@@ -310,7 +310,7 @@ test("shared overlays preserve the workspace, related return paths and mobile cr
     "Run queue",
   );
   await expect(page.locator(".up_next .queue-controls")).toContainText(
-    "0 active",
+    "0/1 active",
   );
   await expect(page.getByText("Local workspace · Preview")).toHaveCount(0);
   await page.getByLabel("Filter by milestone").selectOption("group");
