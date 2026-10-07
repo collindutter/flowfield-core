@@ -57,7 +57,7 @@ class FakeWorker:
         self.session = SimpleNamespace(session_id="fixture-" + self.cwd.parent.name)
         self.process = SimpleNamespace(pid=os.getpid())
 
-    async def configure(self, choice, *, read_only=False):
+    async def configure(self, choice):
         self.choice = choice
         return choice
 
@@ -182,7 +182,7 @@ def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
 def test_recovery_does_not_confuse_harness_absence_with_tool_exit(tmp_path):
     execution = fixture(tmp_path)
     run = execution.claim("harbor", "a" * 40, {"a" * 40: set()})
-    execution.save_local(run.id, {"commands": ["unconfirmed-tool"]})
+    execution.save_local(run.id, {"runtime_kind": "local", "setup_process": 12345})
     execution.restart()
     current = execution.get("harbor", run.id)
     service = Supervisor(execution.workspace)
@@ -191,25 +191,6 @@ def test_recovery_does_not_confuse_harness_absence_with_tool_exit(tmp_path):
     )
     assert recovered.status == "uncertain"
     assert "does not prove" in recovered.problem
-
-
-def test_legacy_discussion_cannot_launch_a_new_process(tmp_path, monkeypatch):
-    execution = fixture(tmp_path)
-    run = execution.claim("harbor", "a" * 40, {})
-    with execution.workspace.connection(write=True) as db:
-        run.purpose = "discussion"
-        execution._save(db, run)
-
-    def unexpected_launch(*args, **kwargs):
-        raise AssertionError("A retired discussion must never launch a harness")
-
-    monkeypatch.setattr("flowfield.supervisor.CodexAgent", unexpected_launch)
-    service = Supervisor(execution.workspace)
-    asyncio.run(service._execute(run, tmp_path / "harbor"))
-    retained = execution.get("harbor", run.id)
-    assert retained.status == "failed"
-    assert retained.problem == "Continue this discussion with the coordinator."
-    assert not execution.local(run.id)
 
 
 def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch):

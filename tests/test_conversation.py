@@ -196,24 +196,6 @@ def test_eligibility_tracks_ownership_and_exact_input_binding(tmp_path):
         assert not db.execute(
             "SELECT 1 FROM activity WHERE task_id=? AND kind='note'", (run.task_id,)
         ).fetchone()
-    legacy = execution.workspace.add_activity(
-        "harbor",
-        ActivityCreate(
-            task_id=run.task_id,
-            author="flowfield",
-            body=f"Attempt {run.id[:8]}: waiting_for_input.",
-        ),
-    )
-    meaningful = execution.workspace.add_activity(
-        "harbor",
-        ActivityCreate(task_id=run.task_id, author="flowfield", body="A useful finding."),
-    )
-    visible = {item.id for item in thread.page("harbor", run.task_id).items}
-    assert f"activity:{legacy.id}" not in visible
-    assert f"activity:{meaningful.id}" in visible
-    # Retained activity evidence has not been removed from storage.
-    with execution.workspace.connection() as db:
-        assert db.execute("SELECT 1 FROM activity WHERE id=?", (legacy.id,)).fetchone()
     expected = thread.eligibility("harbor", "task-0")
     assert expected.enabled and expected.reason == "answer_expected"
     assert expected.question_revision == q.revision

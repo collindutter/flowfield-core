@@ -193,14 +193,6 @@ class Execution:
         self.workspace._apply_task(db, TaskRevision(**values))
 
     def _current_assignment(self, run: Run, task: Task) -> None:
-        if run.purpose == "discussion":
-            if (
-                task.archived
-                or task.reconciliation_reason
-                or task.agreement_revision != run.agreement_revision
-            ):
-                raise ApplicationError("assignment_changed", "The conversation scope changed.", 409)
-            return
         if (
             task.archived
             or task.readiness != "ready"
@@ -399,10 +391,6 @@ class Execution:
                     "SELECT data FROM integration_settings WHERE project_id=?", (project_id,)
                 ).fetchone()
                 runtime_settings = json.loads(runtime_row[0]) if runtime_row else {}
-                if runtime_settings.get("runtime") == "local":
-                    runtime_settings.pop(
-                        "environment", None
-                    )  # Retained legacy inventory is inactive.
                 if (
                     (continuation or retrying_input)
                     and predecessor
@@ -436,7 +424,6 @@ class Execution:
                     else None,
                     input_base_commit=input_base,
                     correction=correction,
-                    environment=runtime_settings.get("environment", {}),
                     runtime=runtime_settings.get("runtime", "local"),
                     setup_commands=runtime_settings.get("setup_commands", []),
                     setup_timeout_seconds=runtime_settings.get("setup_timeout_seconds", 120),
@@ -627,7 +614,7 @@ class Execution:
             run = self._run(db, project_id, run_id)
             if run.status != "running" or run.result:
                 raise ApplicationError("worker_scope_closed", "This report is closed.", 409)
-            if run.purpose == "work" and result.outcome == "complete":
+            if result.outcome == "complete":
                 from flowfield.stages import Stages
 
                 task = self.workspace._task(db, project_id, run.task_id)
@@ -709,11 +696,6 @@ class Execution:
             run.ended_at = now() if status != "uncertain" else None
             self._save(db, run)
             task = self.workspace._task(db, project_id, run.task_id)
-            if run.purpose == "discussion":
-                if status == "in_review":
-                    run.status = "accepted"
-                    self._save(db, run)
-                return run
             if status == "in_review":
                 from flowfield.results import Results
 
@@ -794,10 +776,6 @@ class Execution:
                     409,
                 )
             task = self.workspace._task(db, project_id, run.task_id)
-            if run.purpose == "discussion":
-                raise ApplicationError(
-                    "discussion_retired", "Continue this discussion with the coordinator.", 409
-                )
             if run.correction and self._correction_count(db, project_id, run.task_id) >= 2:
                 raise ApplicationError(
                     "correction_limit",

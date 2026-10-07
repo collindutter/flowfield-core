@@ -1,4 +1,4 @@
-"""Prepare exact-result copies and read retained inspections without running project commands."""
+"""Prepare and inspect exact-result copies without running project commands."""
 
 import os
 import shlex
@@ -54,11 +54,10 @@ class Inspections:
             )
             return value
 
-    def latest(self, project_id: str, result_id: str | None = None) -> Inspection | None:
+    def latest(self, project_id: str, result_id: str) -> Inspection | None:
         with self.workspace.connection() as db:
             self.workspace._project(db, project_id)
-            if result_id:
-                Results(self.workspace)._get(db, project_id, result_id)
+            Results(self.workspace)._get(db, project_id, result_id)
             row = db.execute(
                 "SELECT data FROM inspections WHERE project_id=? AND result_id IS ? "
                 "ORDER BY number DESC LIMIT 1",
@@ -80,24 +79,14 @@ class Inspections:
         settings = self.integrations.settings(value.project_id)
         value.instructions_changed = (
             settings.runtime != value.runtime
-            or settings.environment != value.environment
             or settings.setup_commands != value.setup_commands
             or self.settings(value.project_id).run_command != value.run_command
         )
-        if value.result_id:
-            result = Results(self.workspace).get(value.project_id, value.result_id)
-            page = Results(self.workspace).page(value.project_id, result.task_id, limit=1)
-            value.source_changed = (
-                page.current_id != value.result_id or page.current_run_id != result.run_id
-            )
-        else:
-            try:
-                value.source_changed = (
-                    settings.target_branch != value.target_branch
-                    or self.integrations.head(value.project_id) != value.commit
-                )
-            except ApplicationError:
-                value.source_changed = True
+        result = Results(self.workspace).get(value.project_id, value.result_id)
+        page = Results(self.workspace).page(value.project_id, result.task_id, limit=1)
+        value.source_changed = (
+            page.current_id != value.result_id or page.current_run_id != result.run_id
+        )
         if value.status == "ready":
             try:
                 assert value.workspace
@@ -174,7 +163,6 @@ class Inspections:
                 target_branch=branch,
                 commit=commit,
                 created_at=now(),
-                environment=settings.environment,
                 runtime=settings.runtime,
                 setup_commands=settings.setup_commands,
                 run_command=instructions.run_command,

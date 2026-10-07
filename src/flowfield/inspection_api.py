@@ -26,7 +26,7 @@ def inspection_router(workspace: Callable[[], Workspace]) -> APIRouter:
         return Inspections(workspace()).configure(project_id, request)
 
     @router.get("/inspection")
-    def latest(project_id: str, result_id: str | None = None) -> Inspection | None:
+    def latest(project_id: str, result_id: str) -> Inspection | None:
         return Inspections(workspace()).latest(project_id, result_id)
 
     @router.get("/inspections/{identity}")

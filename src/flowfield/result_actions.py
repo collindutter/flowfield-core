@@ -37,12 +37,9 @@ def result_action(
             label="Checking changes" if value.status == "preparing" else "Integrating changes",
         )
     replying = db.execute(
-        "SELECT 1 FROM runs WHERE project_id=? AND task_id=? "
-        "AND json_extract(data,'$.purpose')='discussion' "
-        "AND status IN ('preparing','running','stopping','uncertain') UNION ALL "
         "SELECT 1 FROM task_replies WHERE project_id=? AND task_id=? "
         "AND json_extract(data,'$.status')='pending'",
-        (value.project_id, value.task_id, value.project_id, value.task_id),
+        (value.project_id, value.task_id),
     ).fetchone()
     if replying:
         return ResultAction(owner="worker_queue", action="wait", label="Waiting for worker reply")

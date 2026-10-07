@@ -38,8 +38,7 @@ WITH selected AS (
     SELECT * FROM result_versions v WHERE project_id=:project AND task_id=:task
 ), history AS (
     SELECT 'worker:'||r.id AS id, 'worker' AS kind,
-        CASE WHEN json_extract(r.data,'$.purpose')='discussion' THEN 'Reply to message'
-             WHEN json_extract(r.data,'$.input_question_id') IS NOT NULL
+        CASE WHEN json_extract(r.data,'$.input_question_id') IS NOT NULL
              THEN 'Continue after answer'
              WHEN json_extract(r.data,'$.correction') IS NOT NULL THEN 'Correct result'
              WHEN json_extract(r.data,'$.predecessor_id') IS NULL THEN 'Implement task'

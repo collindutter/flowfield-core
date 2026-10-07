@@ -88,7 +88,6 @@ class Integrations:
                     runtime=runtime,
                     target_branch=request.target_branch,
                     checks=request.checks,
-                    environment=current.environment,
                     setup_commands=request.setup_commands,
                     setup_timeout_seconds=request.setup_timeout_seconds,
                     check_timeout_seconds=request.check_timeout_seconds,
@@ -193,7 +192,6 @@ class Integrations:
             run = self.execution._run(db, project_id, run_id)
             if (
                 run.status not in ("in_review", "accepted")
-                or run.purpose != "work"
                 or not run.result_commit
                 or run.completion != "code"
             ):

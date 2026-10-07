@@ -22,11 +22,9 @@ const activityIcons = {
 export function RunActivity({
   projectId,
   runId,
-  secondary = false,
 }: {
   projectId: string;
   runId: string;
-  secondary?: boolean;
 }) {
   const [page, setPage] = useState<Page | null>(null);
   const [error, setError] = useState("");
@@ -92,62 +90,27 @@ export function RunActivity({
         </p>
       )}
       {page?.supported && (
-        <ActivityContainer
-          secondary={secondary}
-          onReveal={() => {
-            requestAnimationFrame(() => {
-              if (follow.current && pane.current)
-                pane.current.scrollTop = pane.current.scrollHeight;
-            });
+        <div
+          ref={pane}
+          className="run-activity-output"
+          role="region"
+          aria-label="Worker activity"
+          tabIndex={0}
+          onScroll={() => {
+            const element = pane.current!;
+            follow.current =
+              element.scrollHeight - element.scrollTop - element.clientHeight <
+              24;
           }}
         >
-          <div
-            ref={pane}
-            className="run-activity-output"
-            role="region"
-            aria-label="Worker activity"
-            tabIndex={0}
-            onScroll={() => {
-              const element = pane.current!;
-              follow.current =
-                element.scrollHeight -
-                  element.scrollTop -
-                  element.clientHeight <
-                24;
-            }}
-          >
-            {page.omitted && (
-              <p className="muted">Earlier activity was omitted.</p>
-            )}
-            <ActivityEntries items={page.items} />{" "}
-          </div>
-        </ActivityContainer>
+          {page.omitted && (
+            <p className="muted">Earlier activity was omitted.</p>
+          )}
+          <ActivityEntries items={page.items} />{" "}
+        </div>
       )}
       {page && <UsageSummary usage={page.usage} active={page.active} />}
     </div>
-  );
-}
-
-function ActivityContainer({
-  secondary,
-  children,
-  onReveal,
-}: {
-  secondary: boolean;
-  children: React.ReactNode;
-  onReveal: () => void;
-}) {
-  return secondary ? (
-    <Disclosure
-      summary={<>Worker activity</>}
-      onToggle={(event) => {
-        if (event.currentTarget.open) onReveal();
-      }}
-    >
-      {children}
-    </Disclosure>
-  ) : (
-    <>{children}</>
   );
 }
 

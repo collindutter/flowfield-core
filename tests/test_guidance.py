@@ -242,29 +242,6 @@ def test_local_write_between_preview_and_mutation_is_preserved(tmp_path: Path, m
     assert not (root / "AGENTS.md").exists()
 
 
-def test_owned_legacy_guide_upgrades_but_modified_guide_is_preserved(tmp_path):
-    from flowfield.guidance import LEGACY_GUIDE, Ownership, digest
-
-    root, service = setup(tmp_path)
-    section = template("agents-section.md").replace(GUIDE, LEGACY_GUIDE)
-    legacy = "Previous coordinator instructions\n"
-    (root / "AGENTS.md").write_text(section)
-    (root / LEGACY_GUIDE).write_text(legacy)
-    owner = Ownership(section_hashes=[digest(section)], guide_hashes=[digest(legacy)])
-    (root / MANIFEST).write_text(owner.model_dump_json())
-    (root / LEGACY_GUIDE).write_text(legacy + "Local rule\n")
-    assert service.get("project").status == "conflict"
-    with pytest.raises(ApplicationError):
-        change(service)
-    assert "Local rule" in (root / LEGACY_GUIDE).read_text()
-    (root / LEGACY_GUIDE).write_text(legacy)
-    change(service)
-    assert (root / GUIDE).exists() and not (root / LEGACY_GUIDE).exists()
-    assert GUIDE in (root / "AGENTS.md").read_text()
-    change(service, "remove")
-    assert not (root / GUIDE).exists()
-
-
 def test_skill_parent_symlink_is_not_followed(tmp_path):
     root, service = setup(tmp_path)
     outside = tmp_path / "outside"
@@ -275,27 +252,10 @@ def test_skill_parent_symlink_is_not_followed(tmp_path):
     assert list(outside.iterdir()) == []
 
 
-def test_interrupted_legacy_retirement_resumes(tmp_path, monkeypatch):
-    from flowfield.guidance import LEGACY_GUIDE, Ownership, digest
-
+def test_install_and_remove_leave_unmanaged_guidance_untouched(tmp_path):
     root, service = setup(tmp_path)
-    section = template("agents-section.md").replace(GUIDE, LEGACY_GUIDE)
-    (root / "AGENTS.md").write_text(section)
-    (root / LEGACY_GUIDE).write_text("old")
-    (root / MANIFEST).write_text(
-        Ownership(section_hashes=[digest(section)], guide_hashes=[digest("old")]).model_dump_json()
-    )
-    original = guidance.write
-
-    def interrupted(path, before, after):
-        if path == root / LEGACY_GUIDE:
-            raise OSError("interrupted retirement")
-        original(path, before, after)
-
-    with monkeypatch.context() as patch:
-        patch.setattr(guidance, "write", interrupted)
-        with pytest.raises(ApplicationError, match="interrupted"):
-            change(service)
-    assert service.get("project").can_install
+    unmanaged = root / ".flowfield/coordinator.md"
+    unmanaged.write_text("Project-owned instructions\n")
     change(service)
-    assert not (root / LEGACY_GUIDE).exists()
+    change(service, "remove")
+    assert unmanaged.read_text() == "Project-owned instructions\n"

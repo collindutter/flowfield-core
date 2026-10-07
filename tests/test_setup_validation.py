@@ -112,12 +112,12 @@ def test_duplicate_validation_and_midflight_settings_change(tmp_path, monkeypatc
     asyncio.run(scenario())
 
 
-def test_interrupted_legacy_command_evidence_blocks_duplicate_execution(tmp_path, monkeypatch):
+def test_interrupted_process_evidence_blocks_duplicate_execution(tmp_path, monkeypatch):
     _, service, settings = configured(tmp_path, monkeypatch)
     value = asyncio.run(
         service.check("project", SetupCheckRequest(expected_revision=settings.revision))
     )
-    value.status, value.pid, value.commands = "checking", 12345, ["unknown-command"]
+    value.status, value.pid = "checking", 12345
     service._save(value)
     restarted = SetupValidation(service.workspace)
     assert restarted.get("project").status == "uncertain"
@@ -127,7 +127,7 @@ def test_interrupted_legacy_command_evidence_blocks_duplicate_execution(tmp_path
         )
 
 
-def test_cli_check_changes_omit_retired_inventory(monkeypatch):
+def test_cli_check_changes_preserve_other_settings(monkeypatch):
     from typer.testing import CliRunner
 
     from flowfield.cli import app
@@ -136,7 +136,6 @@ def test_cli_check_changes_omit_retired_inventory(monkeypatch):
         "revision": 2,
         "target_branch": "delivery",
         "checks": ["old"],
-        "environment": {"tools": {"compiler": "/bin/sh"}, "read_paths": [], "variables": {}},
     }
     writes = []
 
@@ -162,5 +161,6 @@ def test_cli_check_changes_omit_retired_inventory(monkeypatch):
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "environment" not in writes[0]
+    assert writes[0]["target_branch"] == "delivery"
+    assert writes[0]["checks"] == ["new"]
     assert writes[0]["runtime"] is None and writes[0]["checks"] == ["new"]

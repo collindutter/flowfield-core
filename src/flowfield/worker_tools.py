@@ -116,10 +116,6 @@ class WorkerBridge:
 
             activity(ActivityUpdate(key=uuid4().hex, kind="tool", text=titles[name]))
         if name == "update_stages":
-            if self.run.purpose == "discussion":
-                raise ApplicationError(
-                    "discussion_readonly", "This turn can only answer the message."
-                )
             return (
                 Stages(self.execution.workspace)
                 .update(
@@ -155,10 +151,6 @@ class WorkerBridge:
                 )
             )
         if name == "ask_question":
-            if self.run.purpose == "discussion":
-                raise ApplicationError(
-                    "discussion_readonly", "Return your clarification in the reply."
-                )
             request_question = WorkerQuestion.model_validate(arguments)
             question = self.execution.ask_question(
                 self.run.project_id,
@@ -179,8 +171,6 @@ class WorkerBridge:
             result = WorkerSubmission.model_validate(arguments)
             self.execution.report_result(self.run.project_id, self.run.id, result)
             self.result = result
-            if self.run.purpose == "discussion":
-                return "Reply received. End your turn so the service can deliver your answer."
             return (
                 "Result received for this attempt. End your turn so the service "
                 "can stop execution and capture code for review."

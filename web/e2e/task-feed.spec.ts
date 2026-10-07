@@ -1270,31 +1270,6 @@ test("attempt activity updates without reloading the board and replays on reload
   await expect(
     page.getByRole("button", { name: "Archive", exact: true }),
   ).toBeDisabled();
-  fixture("discussion");
-  await page.reload();
-  const reply = page
-    .locator('[data-kind="attempt"]')
-    .filter({ hasText: "Worker reply" });
-  await expect(reply).toContainText("A focused answer to your question.");
-  await expect(reply).toContainText("No runtime test was needed.");
-  await expect(
-    reply.getByRole("region", { name: "Worker activity", exact: true }),
-  ).toBeHidden();
-  await expect(reply.getByLabel("Reported token usage")).toContainText(
-    "750 tokens reported",
-  );
-  await expect(
-    reply.getByText("Checks and delivery", { exact: true }),
-  ).toHaveCount(0);
-  await reply.getByText("Worker activity", { exact: true }).click();
-  await expect(
-    reply.getByRole("region", { name: "Worker activity", exact: true }),
-  ).toContainText("Reading selected evidence");
-  await expect(
-    reply.getByText("Execution details", { exact: true }),
-  ).toHaveCount(0);
-  await expect(reply.getByText("Inspected", { exact: true })).toHaveCount(0);
-  await expect(reply.getByText("Code changes", { exact: true })).toHaveCount(0);
 });
 
 test("task feed follows the live end but preserves reading position and timestamp targets", async ({

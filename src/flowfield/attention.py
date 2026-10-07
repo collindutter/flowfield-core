@@ -118,10 +118,7 @@ WITH run_items AS (
              WHEN EXISTS (
                  SELECT 1 FROM work_runs n WHERE n.project_id=v.project_id AND n.task_id=v.task_id
                  AND n.number>(SELECT number FROM runs WHERE id=v.run_id)) THEN 'history'
-             WHEN EXISTS (SELECT 1 FROM runs r WHERE r.project_id=v.project_id
-                 AND r.task_id=v.task_id AND json_extract(r.data,'$.purpose')='discussion'
-                 AND r.status IN ('preparing','running','stopping','uncertain'))
-                 OR EXISTS (SELECT 1 FROM task_replies q WHERE q.project_id=v.project_id
+             WHEN EXISTS (SELECT 1 FROM task_replies q WHERE q.project_id=v.project_id
                  AND q.task_id=v.task_id AND json_extract(q.data,'$.status')='pending')
                  THEN 'waiting'
              WHEN v.status IN ('ready','blocked','stale','cancelled') THEN 'action'

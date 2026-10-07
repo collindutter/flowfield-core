@@ -1,4 +1,4 @@
-"""Exactly bound task input and retained historical replies."""
+"""Exactly bound task input."""
 
 from typing import Literal
 from uuid import uuid4
@@ -30,7 +30,7 @@ class ReplyCreate(ReplyFields):
 
 
 class Reply(ReplyFields):
-    action: Literal["message", "changes", "answer", "observation"] = "message"
+    action: Literal["changes", "answer", "observation"]
     project_id: str
     task_id: str
     created_at: str

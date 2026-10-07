@@ -117,6 +117,14 @@ def test_local_workers_validate_and_inspect_with_host_tools(tmp_path, monkeypatc
             InspectionPrepare(result_id=result.id, expected_revision=result.revision),
         )
         assert copy.status == "ready" and copy.runtime == "local"
+        # Saved records tolerate unrelated metadata without accepting it as configuration.
+        for record in [checked, runs[0], settings, copy]:
+            assert (
+                type(record).model_validate(
+                    {**record.model_dump(), "extra_metadata": {"unused": True}}
+                )
+                == record
+            )
         launcher = Path(copy.launcher).read_text()
         assert "do-not-persist-host-secrets" not in launcher and "export HOME=" not in launcher
         assert service.workspace.task("harbor", runs[0].task_id).status != "done"

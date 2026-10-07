@@ -5,7 +5,6 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from flowfield.agent_models import AgentChoice, EffectiveAgent
-from flowfield.environment_models import EnvironmentConfig
 
 ACTIVE = ("preparing", "running", "stopping", "uncertain")
 RunStatus = Literal[
@@ -135,13 +134,14 @@ class Correction(Record):
 
 
 class Run(Record):
+    model_config = ConfigDict(extra="ignore")
     agent_settings: EffectiveAgent | None = None
     applied_agent: AgentChoice | None = None
     id: str
     project_id: str
     task_id: str
     task_key: str
-    purpose: Literal["work", "discussion"] = "work"
+    purpose: Literal["work"] = "work"
     reply_id: str | None = None
     revision: int = 1
     status: RunStatus = "preparing"
@@ -153,8 +153,7 @@ class Run(Record):
     input_checkpoint: str | None = None
     correction: Correction | None = None
     next_correction: Correction | None = None
-    environment: EnvironmentConfig = Field(default_factory=EnvironmentConfig)
-    runtime: Literal["legacy", "local"] = "legacy"
+    runtime: Literal["local"] = "local"
     setup_commands: list[str] = Field(default_factory=list)
     setup_timeout_seconds: int = 120
     setup_checks: list[CheckResult] = Field(default_factory=list)

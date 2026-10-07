@@ -15,10 +15,8 @@ this boundary; the service owns assignments, input delivery, approval and integr
 
 The ACP path separates `GitWorkspace` (checkout and result capture),
 `LocalHost`/`LocalAttempt` (explicit host environment and per-attempt scratch state),
-and `LocalProcess` (owned POSIX process groups). Local is the automatic environment for new managed execution. The native worker, tool inventory and forced language runtime are retired.
-`historical_workspace.py` reads saved legacy locations/diffs; it cannot prepare or launch
-work. Schema migrations update current integration configuration; frozen runs and inspection copies
-retain their original runtime.
+and `LocalProcess` (owned POSIX process groups). Local is the automatic environment
+for managed execution, result validation and inspection copies.
 
 `LocalHost` preserves the supplied HOME, PATH and harness configuration, without a
 tool inventory or mandatory language runtime. Its input is the intended launch

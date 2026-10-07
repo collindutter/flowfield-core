@@ -21,7 +21,6 @@ from flowfield.project_config import read_config
 BEGIN = "<!-- flowfield:begin -->"
 END = "<!-- flowfield:end -->"
 GUIDE = ".agents/skills/flowfield-coordinator/SKILL.md"
-LEGACY_GUIDE = ".flowfield/coordinator.md"
 SKILL_TEMPLATE = "flowfield-coordinator/SKILL.md"
 MANIFEST = ".flowfield/guidance.json"
 LIMIT = 256_000
@@ -36,11 +35,10 @@ def digest(value: str | None) -> str:
 
 
 class Ownership(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    version: Literal[1, 2] = 2
+    model_config = ConfigDict(extra="ignore")
+    version: Literal[2] = 2
     section_hashes: list[str] = Field(default_factory=list, max_length=2)
     skill_hashes: list[str] = Field(default_factory=list, max_length=2)
-    guide_hashes: list[str] = Field(default_factory=list, max_length=2)
     separator: Literal["", "\n\n"] = ""
     created_agents: bool = False
 
@@ -139,31 +137,27 @@ class Guidance:
     def __init__(self, workspace: Workspace):
         self.workspace = workspace
 
-    def _load(
-        self, project_id: str
-    ) -> tuple[Path, str | None, str | None, str | None, str | None, Ownership]:
+    def _load(self, project_id: str) -> tuple[Path, str | None, str | None, str | None, Ownership]:
         root = Path(self.workspace.project(project_id).path)
         config = read_config(root)
         if config is None or config.project_id != project_id:
             raise ApplicationError(
                 "guidance_conflict", "Restore the registered project config first.", 409
             )
-        for name in (GUIDE, MANIFEST, LEGACY_GUIDE):
+        for name in (GUIDE, MANIFEST):
             for parent in (root / name).relative_to(root).parents:
                 if (root / parent).is_symlink():
                     raise ApplicationError(
                         "guidance_conflict", f"Preserve symlinked {parent}.", 409
                     )
-        agents, guide, legacy, raw = (
-            read(root / name) for name in ("AGENTS.md", GUIDE, LEGACY_GUIDE, MANIFEST)
-        )
+        agents, guide, raw = (read(root / name) for name in ("AGENTS.md", GUIDE, MANIFEST))
         try:
             owner = Ownership.model_validate_json(raw) if raw else Ownership()
         except ValidationError as error:
             raise ApplicationError(
                 "guidance_conflict", "Preserve and inspect .flowfield/guidance.json.", 409
             ) from error
-        return root, agents, guide, legacy, raw, owner
+        return root, agents, guide, raw, owner
 
     @staticmethod
     def _instruction_files(root: Path) -> tuple[list[str], bool]:
@@ -196,7 +190,7 @@ class Guidance:
         return found, False
 
     def get(self, project_id: str) -> GuidanceView:
-        root, agents, guide, legacy, raw, owner = self._load(project_id)
+        root, agents, guide, raw, owner = self._load(project_id)
         wanted_section, wanted_guide = template("agents-section.md"), template(SKILL_TEMPLATE)
         region = section_range(agents or "")
         section = agents[region[0] : region[1]] if agents and region else None
@@ -212,19 +206,8 @@ class Guidance:
                 and digest(guide) not in owner.skill_hashes
             )
         )
-        conflict = conflict or bool(
-            legacy is not None
-            and agents
-            and LEGACY_GUIDE in agents
-            and digest(legacy) not in owner.guide_hashes
-        )
-        retire_legacy = bool(
-            legacy is not None
-            and digest(legacy) in owner.guide_hashes
-            and LEGACY_GUIDE not in (agents or "")
-        )
-        current = section == wanted_section and guide == wanted_guide and not retire_legacy
-        owned = bool(owner.section_hashes or owner.skill_hashes or owner.guide_hashes)
+        current = section == wanted_section and guide == wanted_guide
+        owned = bool(owner.section_hashes or owner.skill_hashes)
         status: Literal[
             "available", "installed", "manual", "update_available", "partial", "conflict"
         ] = (
@@ -272,12 +255,6 @@ class Guidance:
             )
         if agents and GUIDE in agents and guide is None:
             notices.append(f"AGENTS.md references the missing {GUIDE} skill.")
-        if legacy is not None:
-            notices.append(
-                "Legacy coordinator guidance exists. Only unchanged owned content "
-                "is retired; local edits and remaining root references are "
-                "preserved."
-            )
         discovered, truncated = self._instruction_files(root)
         if any(name != "AGENTS.md" for name in discovered):
             notices.append(
@@ -324,7 +301,7 @@ class Guidance:
             )
         return GuidanceView(
             project_id=project_id,
-            revision=digest(json.dumps([agents, guide, legacy, raw])),
+            revision=digest(json.dumps([agents, guide, raw])),
             status=status,
             section=wanted_section,
             skill=wanted_guide,
@@ -359,8 +336,8 @@ class Guidance:
                     "Guidance changed; refresh and review before continuing.",
                     409,
                 )
-            root, agents, guide, legacy, raw, owner = self._load(project_id)
-            if digest(json.dumps([agents, guide, legacy, raw])) != request.expected_revision:
+            root, agents, guide, raw, owner = self._load(project_id)
+            if digest(json.dumps([agents, guide, raw])) != request.expected_revision:
                 raise ApplicationError(
                     "guidance_changed", "Guidance changed; refresh before continuing.", 409
                 )
@@ -397,7 +374,6 @@ class Guidance:
                         if guide
                         else [digest(view.skill)]
                     )
-                owner.version = 2
                 # Publish ownership intent first: an interrupted two-file install can be resumed.
                 pending = owner.model_dump_json(indent=2) + "\n"
                 write(root / MANIFEST, raw, pending)
@@ -408,13 +384,6 @@ class Guidance:
                     owner.section_hashes = [digest(view.section)]
                 if owner.skill_hashes:
                     owner.skill_hashes = [digest(view.skill)]
-                if (
-                    legacy is not None
-                    and digest(legacy) in owner.guide_hashes
-                    and LEGACY_GUIDE not in new_agents
-                ):
-                    write(root / LEGACY_GUIDE, legacy, None)
-                    owner.guide_hashes = []
                 write(root / MANIFEST, pending, owner.model_dump_json(indent=2) + "\n")
                 message = "Project guidance installed."
             else:
@@ -439,22 +408,17 @@ class Guidance:
                 elif modified_section:
                     preserved.append("locally modified AGENTS.md section")
                 retained_agents = read(root / "AGENTS.md") or ""
-                for path, content, hashes in (
-                    (GUIDE, guide, "skill_hashes"),
-                    (LEGACY_GUIDE, legacy, "guide_hashes"),
-                ):
-                    owned_hashes = getattr(owner, hashes)
-                    if owned_hashes:
-                        if content is not None and (
-                            digest(content) not in owned_hashes or path in retained_agents
-                        ):
-                            preserved.append(f"{path} (modified or still referenced)")
-                        else:
-                            write(root / path, content, None)
-                            setattr(owner, hashes, [])
+                if owner.skill_hashes:
+                    if guide is not None and (
+                        digest(guide) not in owner.skill_hashes or GUIDE in retained_agents
+                    ):
+                        preserved.append(f"{GUIDE} (modified or still referenced)")
+                    else:
+                        write(root / GUIDE, guide, None)
+                        owner.skill_hashes = []
                 after = (
                     owner.model_dump_json(indent=2) + "\n"
-                    if owner.guide_hashes or owner.skill_hashes or owner.section_hashes
+                    if owner.skill_hashes or owner.section_hashes
                     else None
                 )
                 write(root / MANIFEST, raw, after)
@@ -463,8 +427,8 @@ class Guidance:
                     message += " Preserved " + "; ".join(preserved) + "."
             before = dict(
                 zip(
-                    ("AGENTS.md", GUIDE, LEGACY_GUIDE, MANIFEST),
-                    (agents, guide, legacy, raw),
+                    ("AGENTS.md", GUIDE, MANIFEST),
+                    (agents, guide, raw),
                     strict=True,
                 )
             )

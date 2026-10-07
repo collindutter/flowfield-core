@@ -1258,7 +1258,7 @@ test("related questions preserve the page, drafts, focus and router history", as
   await expect(page).toHaveURL(origin);
   await expect(dialog).toHaveCount(0);
   await expect(
-    editor.getByText("Resume your coordinator to use the saved answer:", {
+    editor.getByText("Ask the coordinator to apply your answer:", {
       exact: true,
     }),
   ).toBeVisible();

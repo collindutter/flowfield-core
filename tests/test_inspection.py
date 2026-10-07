@@ -21,7 +21,7 @@ from flowfield.application import TaskEdit, TaskReconcile
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import QueueEdit, WorkerResult
 from flowfield.inspection import Inspections
-from flowfield.inspection_models import Inspection, InspectionConfig, InspectionPrepare
+from flowfield.inspection_models import InspectionConfig, InspectionPrepare
 from flowfield.integration_models import IntegrationConfig
 from flowfield.result_models import ResultReview
 
@@ -83,17 +83,6 @@ def test_combined_candidate_dirty_preview_and_current_destination_are_independen
     assert current(service).status == "delivered"
     assert service.integrations.head("harbor") == copy.commit
     assert git(repo, "show", copy.commit + ":result.txt") == b"implemented\n"
-    # Copies from the removed destination-snapshot path remain readable unchanged.
-    legacy = copy.model_copy(update={"id": "legacy-project-copy", "result_id": None})
-    with service.workspace.connection(write=True) as db:
-        db.execute(
-            "INSERT INTO inspections(id,project_id,result_id,data) VALUES (?,?,?,?)",
-            (legacy.id, "harbor", None, legacy.model_dump_json()),
-        )
-    assert inspections.latest("harbor").id == legacy.id
-    target_change(service, repo, legacy.commit, "later.txt")
-    assert inspections.get("harbor", legacy.id).source_changed
-    assert baseline(Path(legacy.workspace)) == copy.commit
     assert (tmp_path / "preserved-readme").read_text() == "human dirty work"
 
 
@@ -347,6 +336,9 @@ def test_real_mcp_and_http_inspect_the_same_candidate_without_running_commands(t
             assert (
                 await api.get("/api/projects/harbor/inspection", params={"result_id": version.id})
             ).json() is None
+            assert (await api.get("/api/projects/harbor/inspection")).status_code == 422
+            missing_source = await session.call_tool("get_inspection", {"project_id": "harbor"})
+            assert missing_source.isError
             rejected = await api.post(
                 "/api/projects/harbor/inspection", json={"expected_revision": 1}
             )
@@ -414,32 +406,6 @@ def test_real_mcp_and_http_inspect_the_same_candidate_without_running_commands(t
             full = (await api.get(f"/api/projects/harbor/inspections/{item['id']}")).json()
             assert item["command"] == full["command"]
             assert len(Path(full["launcher"]).read_text()) > 8000
-            # Existing inline commands retain lossless pagination; no rewrite/migration.
-            legacy = Inspection.model_validate(full).model_copy(
-                update={"id": "legacy-inline", "launcher": None, "command": "#" + "x" * 16000}
-            )
-            Inspections(service.workspace)._save(legacy, insert=True)
-            saved_legacy = await session.call_tool(
-                "get_inspection", {"project_id": "harbor", "inspection_id": legacy.id}
-            )
-            assert not saved_legacy.isError
-            item = saved_legacy.structuredContent
-            command = item["command"]
-            while item["command_next_offset"] is not None:
-                assert len(item["command"]) <= 8000
-                page = await session.call_tool(
-                    "get_inspection",
-                    {
-                        "project_id": "harbor",
-                        "inspection_id": item["id"],
-                        "command_offset": item["command_next_offset"],
-                    },
-                )
-                assert not page.isError
-                item = page.structuredContent
-                command += item["command"]
-            full = (await api.get(f"/api/projects/harbor/inspections/{item['id']}")).json()
-            assert command == full["command"] and len(command) > 8000
             stale = await api.post(
                 "/api/projects/harbor/inspection",
                 json={"result_id": version.id, "expected_revision": 999},

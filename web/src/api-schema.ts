@@ -2515,28 +2515,6 @@ export interface components {
       /** Override Revision */
       override_revision: number | null;
     };
-    /** EnvironmentConfig */
-    EnvironmentConfig: {
-      /**
-       * Tools
-       * @description Executable name to absolute installed path. No login-shell PATH is inherited. Declare commands the project needs, including helpers such as rg; declaring a tool does not install it. Validate setup to test access through the worker boundary.
-       */
-      tools?: {
-        [key: string]: string;
-      };
-      /**
-       * Read Paths
-       * @description Absolute read-only support paths needed by declared tools. Do not grant the whole home, project checkout or service state.
-       */
-      read_paths?: string[];
-      /**
-       * Variables
-       * @description Non-secret single-line variables; $RUNTIME and $CHECKOUT expand per private copy. Case-insensitive reserved names: BASH_ENV, CDPATH, ENV, HOME, NPM_CONFIG_CACHE, NPM_CONFIG_GLOBALCONFIG, NPM_CONFIG_PREFIX, NPM_CONFIG_USERCONFIG, PATH, PIP_CACHE_DIR, PIP_CONFIG_FILE, PYTHONDONTWRITEBYTECODE, PYTHONHOME, PYTHONPATH, SHELL, TMPDIR, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT, UV_PYTHON_DOWNLOADS, VIRTUAL_ENV, ZDOTDIR. Reserved prefixes: GIT_, DYLD_, LD_, CODEX_; reserved suffixes: PROXY.
-       */
-      variables?: {
-        [key: string]: string;
-      };
-    };
     /** ExecutionItem */
     ExecutionItem: {
       /** Id */
@@ -2710,7 +2688,7 @@ export interface components {
       /** Project Id */
       project_id: string;
       /** Result Id */
-      result_id: string | null;
+      result_id: string;
       /** Task Key */
       task_key: string | null;
       /** Version */
@@ -2736,13 +2714,12 @@ export interface components {
       command: string;
       /** Launcher */
       launcher: string | null;
-      environment: components["schemas"]["EnvironmentConfig"];
       /**
        * Runtime
-       * @default legacy
-       * @enum {string}
+       * @default local
+       * @constant
        */
-      runtime: "legacy" | "local";
+      runtime: "local";
       /** Setup Commands */
       setup_commands: string[];
       /**
@@ -2934,14 +2911,13 @@ export interface components {
       /**
        * Runtime
        * @default local
-       * @enum {string}
+       * @constant
        */
-      runtime: "legacy" | "local";
+      runtime: "local";
       /** Target Branch */
       target_branch: string | null;
       /** Checks */
       checks: string[];
-      environment: components["schemas"]["EnvironmentConfig"];
       /** Setup Commands */
       setup_commands: string[];
       /**
@@ -3539,10 +3515,9 @@ export interface components {
       author: string;
       /**
        * Action
-       * @default message
        * @enum {string}
        */
-      action: "message" | "changes" | "answer" | "observation";
+      action: "changes" | "answer" | "observation";
       /** Project Id */
       project_id: string;
       /** Task Id */
@@ -3780,9 +3755,9 @@ export interface components {
       /**
        * Purpose
        * @default work
-       * @enum {string}
+       * @constant
        */
-      purpose: "work" | "discussion";
+      purpose: "work";
       /** Reply Id */
       reply_id: string | null;
       /**
@@ -3820,13 +3795,12 @@ export interface components {
       input_checkpoint: string | null;
       correction: components["schemas"]["Correction"] | null;
       next_correction: components["schemas"]["Correction"] | null;
-      environment: components["schemas"]["EnvironmentConfig"];
       /**
        * Runtime
-       * @default legacy
-       * @enum {string}
+       * @default local
+       * @constant
        */
-      runtime: "legacy" | "local";
+      runtime: "local";
       /** Setup Commands */
       setup_commands: string[];
       /**
@@ -4025,8 +3999,6 @@ export interface components {
       checks: components["schemas"]["CheckResult"][];
       /** Pid */
       pid: number | null;
-      /** Commands */
-      commands: string[];
     };
     /** SetupCheckRequest */
     SetupCheckRequest: {
@@ -4611,7 +4583,7 @@ export interface components {
       /** Run Id */
       run_id: string | null;
       /** Purpose */
-      purpose: ("work" | "discussion") | null;
+      purpose: "work" | null;
       /** Question Id */
       question_id: string | null;
       /** Earlier Id */
@@ -9059,8 +9031,8 @@ export interface operations {
   };
   latest_api_projects__project_id__inspection_get: {
     parameters: {
-      query?: {
-        result_id?: string | null;
+      query: {
+        result_id: string;
       };
       header?: never;
       path: {

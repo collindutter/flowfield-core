@@ -131,17 +131,24 @@ def create_mcp(
         command_offset: int = 0,
     ) -> CallToolResult:
         """Read a retained copy by ID, or the latest copy for a result.
-        Omitting both IDs only reads a legacy destination snapshot, if one exists.
+        Provide an inspection_id or result_id.
         Does not prepare files or run code. Read all command pages before using the command.
         """
-        return await invoke(
-            lambda: inspection_view(
-                Inspections(workspace()).get(project_id, inspection_id)
-                if inspection_id
-                else Inspections(workspace()).latest(project_id, result_id),
-                command_offset,
-            )
-        )
+
+        def load() -> dict[str, Any]:
+            inspections = Inspections(workspace())
+            value: Inspection | None
+            if inspection_id:
+                value = inspections.get(project_id, inspection_id)
+            elif result_id:
+                value = inspections.latest(project_id, result_id)
+            else:
+                raise ApplicationError(
+                    "inspection_source_missing", "Choose an inspection or result."
+                )
+            return inspection_view(value, command_offset)
+
+        return await invoke(load)
 
     @mcp.tool(annotations=write)
     async def prepare_inspection(

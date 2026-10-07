@@ -97,13 +97,6 @@ WITH definitions AS (
           'question_id',a.question_id,'task_revision',a.task_revision,
           'superseded_by',(SELECT id FROM activity b WHERE b.supersedes=a.id))
     FROM activity a WHERE project_id=:project AND task_id=:task AND kind!='event'
-      AND NOT (a.kind='note' AND a.author='flowfield' AND EXISTS (
-        SELECT 1 FROM runs r WHERE r.project_id=a.project_id AND r.task_id=a.task_id
-        AND a.body IN (
-          'Attempt '||substr(r.id,1,8)||': waiting_for_input.',
-          'Attempt '||substr(r.id,1,8)||': failed.',
-          'Attempt '||substr(r.id,1,8)||': stopped.',
-          'Attempt '||substr(r.id,1,8)||': uncertain.')))
     UNION ALL
     SELECT 'attempt:'||id, 'attempt', json_extract(data,'$.created_at'), 'worker', id,
         json_extract(data,'$.revision'), data

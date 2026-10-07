@@ -2,9 +2,8 @@
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
-from flowfield.environment_models import EnvironmentConfig
 from flowfield.execution_models import Record
 
 
@@ -27,9 +26,10 @@ class InspectionPrepare(Record):
 
 
 class Inspection(Record):
+    model_config = ConfigDict(extra="ignore")
     id: str
     project_id: str
-    result_id: str | None = None  # Retained destination snapshots remain readable.
+    result_id: str
     task_key: str | None = None
     version: int | None = None
     target_branch: str
@@ -39,8 +39,7 @@ class Inspection(Record):
     workspace: str | None = None
     command: str = ""
     launcher: str | None = None
-    environment: EnvironmentConfig = Field(default_factory=EnvironmentConfig)
-    runtime: Literal["legacy", "local"] = "legacy"
+    runtime: Literal["local"] = "local"
     setup_commands: list[str] = Field(default_factory=list)
     run_command: str = ""
     problem: str | None = None

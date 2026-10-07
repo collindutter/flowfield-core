@@ -105,21 +105,6 @@ def enrich(db: sqlite3.Connection, run: Run, sections: dict[str, str]) -> None:
     )
     sections["attempt_sources"] = json.dumps(sources)
     sections["prior_concerns"] = json.dumps(concerns)
-    exchange = db.execute(
-        "SELECT q.data AS question,r.data AS reply FROM task_replies q JOIN runs r "
-        "ON r.id=json_extract(q.data,'$.run_id') WHERE q.project_id=? AND q.task_id=? "
-        "AND r.status='accepted' AND json_extract(r.data,'$.purpose')='discussion' "
-        "AND json_extract(r.data,'$.agreement_revision')=? ORDER BY r.number DESC LIMIT 1",
-        (run.project_id, run.task_id, run.agreement_revision),
-    ).fetchone()
-    if exchange:
-        sections["previous_reply"] = json.dumps(
-            {
-                "message": json.loads(exchange["question"])["body"],
-                "answer": json.loads(exchange["reply"])["result"],
-                "authority": "Conversation context, not permission to change code or scope.",
-            }
-        )
 
 
 def attempt_source(
@@ -158,7 +143,6 @@ def brief_context(sections: dict[str, str]) -> dict[str, object]:
         "stages",
         "validation",
         "human_testing",
-        "previous_reply",
         "prerequisites",
         "handoff",
         "questions",

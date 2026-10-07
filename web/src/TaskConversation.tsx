@@ -550,7 +550,6 @@ export function TaskConversation({
                         <RunActivity
                           projectId={projectId}
                           runId={message.source_id}
-                          secondary={message.purpose === "discussion"}
                         />
                       )}
                       {message.kind === "attempt" &&

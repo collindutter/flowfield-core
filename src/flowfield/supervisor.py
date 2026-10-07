@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import json
 import os
-import signal
 import subprocess
 from functools import partial
 from pathlib import Path
@@ -15,7 +14,6 @@ from flowfield.adapters import local_checks
 from flowfield.adapters.acp_session import PermissionRequest
 from flowfield.adapters.codex_agent import CodexAgent, model_options
 from flowfield.adapters.git_workspace import GitWorkspace, contains
-from flowfield.adapters.historical_workspace import HistoricalWorkspace
 from flowfield.adapters.local_execution import LocalAttempt, LocalHost
 from flowfield.agent_models import AgentChoice
 from flowfield.application import Workspace
@@ -229,16 +227,6 @@ class Supervisor:
         input_checkpoint: str | None = None
         starting_commit = run.input_base_commit or run.base_commit
         try:
-            if run.purpose != "work":
-                raise ApplicationError(
-                    "discussion_retired", "Continue this discussion with the coordinator.", 409
-                )
-            if run.runtime != "local":
-                raise ApplicationError(
-                    "retired_runtime",
-                    "This attempt uses a retired runtime. Start a new attempt to use Local.",
-                    409,
-                )
             sections = self.execution.assignment(run.project_id, run.id)
             for prerequisite in json.loads(sections["prerequisites"]):
                 if prerequisite["commit"] and not await asyncio.to_thread(
@@ -337,7 +325,7 @@ class Supervisor:
                 **brief_context(sections),
                 "instructions": (
                     "Read complete description/feedback pages when listed as truncated. "
-                    "Read input, previous_reply, correction and validation when present. "
+                    "Read input, correction and validation when present. "
                     "Read stages and earlier_answers before work; attempt_history for orientation. "
                     "Use update_stages at broad phase transitions and explain what changed. "
                     "Phases describe the process, not file edits or implementation checklists. "
@@ -581,40 +569,8 @@ class Supervisor:
                 "its tools stopped. Work and capacity remain reserved; inspect the local "
                 "processes before recovery. No process was signalled from a saved PID.",
             )
-        pid = metadata.get("pid")
-        if pid:
-            stamp = await asyncio.to_thread(process_stamp, pid)
-            if stamp and stamp != metadata.get("process_stamp"):
-                return self.execution.finish(
-                    project_id,
-                    run_id,
-                    "uncertain",
-                    problem=(
-                        "Process identity changed. Refusing to signal a possibly unrelated"
-                        " process; inspect this attempt before recovery."
-                    ),
-                )
-            if stamp:
-                with contextlib.suppress(ProcessLookupError):
-                    os.killpg(pid, signal.SIGTERM)
-                await asyncio.sleep(0.5)
-                if await asyncio.to_thread(process_stamp, pid):
-                    return self.execution.finish(
-                        project_id,
-                        run_id,
-                        "uncertain",
-                        problem=(
-                            "Owned process still exists after Stop. Work preserved; manual "
-                            "inspection required."
-                        ),
-                    )
-        if (
-            metadata.get("commands")
-            or metadata.get("setup_process")
-            or (
-                metadata.get("native_launch_started")
-                and not metadata.get("native_cleanup_confirmed")
-            )
+        if metadata.get("setup_process") or (
+            metadata.get("native_launch_started") and not metadata.get("native_cleanup_confirmed")
         ):
             return self.execution.finish(
                 project_id,
@@ -633,7 +589,7 @@ class Supervisor:
             ),
         )
 
-    def environment(self, run_id: str) -> HistoricalWorkspace | LocalAttempt | None:
+    def environment(self, run_id: str) -> LocalAttempt | None:
         data = self.execution.local(run_id)
         if not data:
             return None
@@ -643,16 +599,11 @@ class Supervisor:
                 GitWorkspace(Path(data["root"]), Path(data["checkout"]), Path(data["common_git"])),
                 Path(data["runtime"]),
             )
-        return HistoricalWorkspace(Path(data["checkout"]), Path(data["runtime"]))
+        return None
 
     def location(self, project_id: str, run_id: str) -> RunLocation:
         run = self.execution.get(project_id, run_id)
         environment = self.environment(run_id)
-        if not environment:
-            root = self.workspace.directory / "environments" / run.id
-            checkout = root / "worktree"
-            if root.exists():
-                return RunLocation(workspace=str(checkout if checkout.exists() else root))
         return (
             environment.location(run.base_commit, run.result_commit)
             if environment

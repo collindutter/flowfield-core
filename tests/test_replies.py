@@ -243,19 +243,3 @@ def test_new_worker_discussion_is_rejected_without_scheduling(tmp_path):
         assert db.execute("SELECT COUNT(*) FROM task_replies").fetchone()[0] == 0
     queue(execution, True)
     assert execution.claim("harbor", BASE, {}).purpose == "work"
-
-
-def test_retained_worker_discussion_cannot_be_retried(tmp_path):
-    from flowfield.execution_models import RunAction
-
-    execution = fixture(tmp_path)
-    run = execution.claim("harbor", BASE, {})
-    execution.finish("harbor", run.id, "stopped")
-    with execution.workspace.connection(write=True) as db:
-        historical = execution._run(db, "harbor", run.id)
-        historical.purpose = "discussion"
-        execution._save(db, historical)
-    before = execution.workspace.task("harbor", run.task_id)
-    with pytest.raises(ApplicationError, match="coordinator"):
-        execution.retry("harbor", run.id, RunAction(expected_revision=historical.revision))
-    assert execution.workspace.task("harbor", run.task_id) == before

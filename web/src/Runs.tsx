@@ -231,16 +231,10 @@ function WorkerEvidence({
       )}
       {record.result ? (
         <>
-          <DetailSection
-            title={record.purpose === "discussion" ? "Answer" : "Worker report"}
-          >
+          <DetailSection title="Worker report">
             <Markdown>{record.result.summary}</Markdown>
           </DetailSection>
-          <DetailSection
-            title={
-              record.purpose === "discussion" ? "Inspected" : "Reported checks"
-            }
-          >
+          <DetailSection title="Reported checks">
             <Markdown>{record.result.checks}</Markdown>
           </DetailSection>
           {record.result.limitations && (
@@ -256,7 +250,7 @@ function WorkerEvidence({
             : "No result was captured."}
         </p>
       )}
-      {record.result_commit && record.purpose !== "discussion" && (
+      {record.result_commit && (
         <Suspense fallback={<p>Loading worker changes…</p>}>
           <CodeDiff
             path={path}

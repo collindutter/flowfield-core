@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from flowfield.adapters import git_checkout, local_checks
 from flowfield.adapters import git_integration as gitops
@@ -24,6 +24,7 @@ class SetupCheckRequest(Record):
 
 
 class SetupCheck(Record):
+    model_config = ConfigDict(extra="ignore")
     project_id: str
     settings_revision: int
     id: str
@@ -38,7 +39,6 @@ class SetupCheck(Record):
     checks: list[CheckResult] = Field(default_factory=list)
     # Process transport remains local diagnostic evidence; never passed to a model.
     pid: int | None = None
-    commands: list[str] = Field(default_factory=list)
 
 
 class SetupValidation:
@@ -88,7 +88,7 @@ class SetupValidation:
             except ApplicationError:
                 value.stale = True
         if value.status == "checking" and project_id not in self.active:
-            value.status = "uncertain" if value.pid or value.commands else "failed"
+            value.status = "uncertain" if value.pid else "failed"
             value.problem = (
                 (
                     "Setup validation was interrupted. Preserved files and process "

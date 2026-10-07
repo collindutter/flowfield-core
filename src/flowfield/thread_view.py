@@ -29,7 +29,7 @@ class ThreadMessage(Record):
     status: str | None = None
     result_id: str | None = None
     run_id: str | None = None
-    purpose: Literal["work", "discussion"] | None = None
+    purpose: Literal["work"] | None = None
     question_id: str | None = None
     earlier_id: str | None = None
     successor_id: str | None = None
@@ -116,8 +116,6 @@ class ThreadView(Conversation):
                 "observation": "Human testing",
             }.get(data["action"], "Message")
             body = data["body"]
-            if data["action"] == "message" and data.get("status") == "cancelled":
-                title = "Message · cancelled"
             if data["action"] == "observation":
                 version = db.execute(
                     "SELECT version FROM result_versions WHERE project_id=? AND id=?",
@@ -125,18 +123,8 @@ class ThreadView(Conversation):
                 ).fetchone()
                 title += f" · Result {version[0]}"
         elif kind == "attempt":
-            title = "Worker reply" if data.get("purpose") == "discussion" else "Worker attempt"
-            body = (
-                (data.get("result") or {}).get("summary", "")
-                if data.get("purpose") == "discussion"
-                else ""
-            )
-            if data.get("problem"):
-                body = data["problem"]
-            if data.get("purpose") == "discussion" and data["status"] == "accepted":
-                data["status"] = "replied"
-                if (data.get("result") or {}).get("limitations"):
-                    body += "\n\n**Limitations:** " + data["result"]["limitations"]
+            title = "Worker attempt"
+            body = data.get("problem") or ""
         elif kind == "result":
             title = "Result " + str(data["version"])
             body = data["report"]["summary"]

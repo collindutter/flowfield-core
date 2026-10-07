@@ -2,9 +2,8 @@
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
-from flowfield.environment_models import EnvironmentConfig
 from flowfield.execution_models import CheckResult, Record
 
 DELIVERY_BLOCKERS = frozenset(
@@ -29,12 +28,12 @@ class CheckoutBinding(Record):
 
 
 class IntegrationSettings(Record):
+    model_config = ConfigDict(extra="ignore")
     project_id: str
     revision: int = 1
-    runtime: Literal["legacy", "local"] = "local"
+    runtime: Literal["local"] = "local"
     target_branch: str | None = None
     checks: list[str] = Field(default_factory=list)
-    environment: EnvironmentConfig = Field(default_factory=EnvironmentConfig)
     setup_commands: list[str] = Field(default_factory=list)
     setup_timeout_seconds: int = 120
     check_timeout_seconds: int = 60

@@ -67,13 +67,7 @@ class Stages:
         ).fetchone()
         if run_id is not None:
             run = Run.model_validate_json(owner[0]) if owner else None
-            if (
-                not run
-                or run.id != run_id
-                or run.status != "running"
-                or run.result
-                or run.purpose != "work"
-            ):
+            if not run or run.id != run_id or run.status != "running" or run.result:
                 raise ApplicationError(
                     "worker_scope_closed", "This worker no longer owns progress.", 409
                 )

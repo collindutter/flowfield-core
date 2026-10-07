@@ -199,22 +199,21 @@ class CodexAgent:
             ) from error
         require_cleanup(self.session.capabilities)
 
-    async def configure(self, choice: AgentChoice, *, read_only: bool = False) -> AgentChoice:
+    async def configure(self, choice: AgentChoice) -> AgentChoice:
         if self.stopping:
             raise ApplicationError("agent_stopping", "The agent is stopping.", 409)
-        if not choice.mode and not read_only:
+        if not choice.mode:
             raise ApplicationError(
                 "agent_mode_required", "Choose an Access mode in agent settings.", 409
             )
         try:
-            # Task discussion applies read-only access; coordinator uses its saved mode.
-            await self.session.select("mode", "read-only" if read_only else choice.mode or "")
+            await self.session.select("mode", choice.mode)
             await self.session.select("model", choice.model)
             await self.session.select("reasoning_effort", choice.effort)
             expected = {
                 "model": choice.model,
                 "reasoning_effort": choice.effort,
-                "mode": "read-only" if read_only else choice.mode,
+                "mode": choice.mode,
             }
             if choice.fast is not None:
                 available = {item["value"] for item in choices(self.session.config, "fast-mode")}

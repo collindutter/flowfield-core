@@ -3,7 +3,7 @@
 The caller supplies the intended host environment explicitly (not a login shell
 command or a persisted bag of credentials). Each attempt owns its checkout and
 scratch directories. Native harness configuration controls access to host resources.
-Local is the default environment; saved legacy attempts retain their meaning.
+Local uses the service host and isolates ordinary edits in Git worktrees.
 """
 
 import re
