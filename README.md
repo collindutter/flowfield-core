@@ -1,6 +1,6 @@
 <h1 align="center">Flowfield</h1>
 
-<p align="center"><strong>Shape software together.</strong></p>
+<p align="center"><strong>A workspace for you and your coding agents, with a board and task feeds.</strong></p>
 
 <p align="center">
   <a href="https://pypi.org/project/flowfield-core/"><img src="https://img.shields.io/pypi/v/flowfield-core?logo=pypi&amp;logoColor=white&amp;color=2563eb" alt="PyPI version"></a>
@@ -10,17 +10,30 @@
 
 ![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-hero.png)
 
-**Good software takes shape through collaboration.**
+- **💬 Plan with the Coordinator**
 
-Requirements, design and implementation develop together. Flowfield gives you and the
-Coordinator a visual task board to shape the work while agents build in parallel. As
-results arrive, refine the plan, resolve questions and decide what happens next.
-Dependencies, checks and explicit code approval give that collaboration a dependable structure.
+  Explore ideas, turn them into milestones and tasks, and refine the plan while workers build.
+  Open a card beside the conversation to discuss its scope or results.
 
-- **Coordinator.** Turn ideas into milestones and tasks, adjust scope, and keep planning while workers build.
-- **Task board and feeds.** See what’s queued, running or ready for review. Each card keeps its definition, progress, questions and results together.
-- **Parallel work.** Independent tasks run in separate checkouts; dependencies hold work until it's ready.
-- **Explicit review.** Review an exact result, request changes when needed, and approve delivery to your project.
+- **📋 Organize work on the board**
+
+  Prioritize tasks, track dependencies, and see what’s queued, running or ready for review.
+  Needs you brings questions, blockers and review requests into one place.
+
+- **🧵 Follow each task in its feed**
+
+  Keep definitions, progress, tool activity, questions, answers and results together.
+  See what changed and respond to the work that needs your attention.
+
+- **⚡ Run workers in parallel**
+
+  Independent tasks run in separate Git checkouts with configurable worker capacity.
+  Dependencies hold work until it’s ready, and each worker uses your project’s tools and checks.
+
+- **🔎 Review and integrate results**
+
+  Inspect code changes, try an exact result, and request revisions or approve delivery to your project.
+  Flowfield protects your working changes and keeps approval tied to the code you reviewed.
 
 ## Install
 
@@ -32,9 +45,7 @@ flowfield harness install codex
 flowfield serve
 ```
 
-The browser opens at [localhost:8765](http://127.0.0.1:8765). Use `--no-open` to keep it closed.
-The browser UI is included.
-See [Installation](https://docs.flowfield.sh/installation) for the pip alternative.
+The browser opens at [localhost:8765](http://127.0.0.1:8765). See [Installation](https://docs.flowfield.sh/installation) for the pip alternative.
 
 Choose **Add project** in the sidebar and select an existing directory, or register it from a terminal:
 
