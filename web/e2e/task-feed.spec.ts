@@ -1149,7 +1149,7 @@ test("conversation capture prepares atomically while task defaults show only use
 
 test("attempt activity updates without reloading the board and replays on reload", async ({
   page,
-}) => {
+}, testInfo) => {
   const fixture = async (op: string) => {
     const value = JSON.parse(
       execFileSync(
@@ -1187,6 +1187,21 @@ test("attempt activity updates without reloading the board and replays on reload
     exact: true,
   });
   await expect(output).toContainText("create observed output");
+  await expect(
+    page.getByText("Token usage not reported", { exact: true }),
+  ).toHaveCount(0);
+  const currentTokens = page.locator(".run-activity .activity-context");
+  await expect(currentTokens).toContainText("Current tokens");
+  await expect(
+    currentTokens.getByLabel("12% context used", { exact: true }),
+  ).toBeVisible();
+  const outputBox = (await output.boundingBox())!;
+  expect((await currentTokens.boundingBox())!.y).toBeGreaterThanOrEqual(
+    outputBox.y + outputBox.height,
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("worker-current-tokens.png"),
+  });
   await expect(
     page
       .getByRole("region", { name: "Task details", exact: true })

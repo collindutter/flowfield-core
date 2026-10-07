@@ -572,6 +572,10 @@ test("managed answers show durable pause, safe edits and immutable correction in
   await detail
     .getByRole("button", { name: "Send answer", exact: true })
     .click();
+  await expect(detail.locator('[data-kind="answer"]')).toContainText([
+    "All records",
+    "Only favourites",
+  ]);
   await page.reload();
   await expect(
     detail.getByText("Only favourites", { exact: true }),

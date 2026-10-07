@@ -204,7 +204,6 @@ export function TaskConversation({
     />
   );
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [olderBusy, setOlderBusy] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [seenResult, setSeenResult] = useState<string | null>(null);
@@ -379,7 +378,6 @@ export function TaskConversation({
       return;
     setBusy(true);
     setError("");
-    setNotice("");
     try {
       if (draft.action === "approve") {
         await request(
@@ -403,13 +401,6 @@ export function TaskConversation({
         return next;
       });
       setChosen(null);
-      setNotice(
-        draft.action === "answer"
-          ? "Answer sent."
-          : draft.action === "approve"
-            ? "Approved for integration."
-            : "Feedback sent for the selected result.",
-      );
       setRevision((n) => n + 1);
     } catch (e) {
       if (alive.current) setError((e as Error).message);
@@ -757,9 +748,7 @@ export function TaskConversation({
                 question or result.{" "}
               </p>
             )}
-            {(error || notice) && (
-              <p role={error ? "alert" : "status"}>{error || notice}</p>
-            )}
+            {error && <p role="alert">{error}</p>}
             {taskActionContext}
             <div
               ref={setActionContext}

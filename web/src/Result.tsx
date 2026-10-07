@@ -206,28 +206,26 @@ export function Result({
             )}
             {current &&
               ["preparing", "delivering"].includes(version.status) && (
-                <ResultActions
-                  version={version.version}
-                  context={
-                    <p>
-                      {version.status === "preparing"
-                        ? "Flowfield is combining these changes with the branch and running checks. You can stop this cycle if the work needs to change; code and output are kept."
-                        : "Approved changes are waiting to reach the branch. You can cancel until the branch update starts; the task becomes Done after delivery."}
-                    </p>
-                  }
-                >
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => void recover("cancel")}
-                  >
+                <>
+                  <p>
                     {version.status === "preparing"
-                      ? "Stop checks"
-                      : "Cancel delivery"}
-                  </Button>
-                </ResultActions>
+                      ? "Flowfield is combining these changes with the branch and running checks. You can stop this cycle if the work needs to change; code and output are kept."
+                      : "Approved changes are waiting to reach the branch. You can cancel until the branch update starts; the task becomes Done after delivery."}
+                  </p>
+                  <ResultActions version={version.version}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void recover("cancel")}
+                    >
+                      {version.status === "preparing"
+                        ? "Stop checks"
+                        : "Cancel delivery"}
+                    </Button>
+                  </ResultActions>
+                </>
               )}
             {version.status === "delivered" && (
               <p>

@@ -10,7 +10,7 @@ from flowfield.activity import ActivityCreate
 from flowfield.application import ProjectSetup, TaskPublish, Workspace
 from flowfield.execution import Execution
 from flowfield.execution_models import QueueEdit, SettingsEdit, Usage
-from flowfield.run_activity import ActivityUpdate, RunActivity
+from flowfield.run_activity import ActivityUpdate, ContextUsage, RunActivity
 
 ws = Workspace(Path(sys.argv[1]))
 execution = Execution(ws)
@@ -42,6 +42,15 @@ if sys.argv[2] == "create":
     run = execution.claim("stream-project", "a" * 40, {})
     execution.started("stream-project", run.id)
     execution.queue("stream-project", QueueEdit(expected_revision=3, enabled=False))
+    RunActivity(ws).write(
+        "stream-project",
+        run.id,
+        [
+            ActivityUpdate(
+                key="context", kind="status", text="", context=ContextUsage(used=12345, size=100000)
+            )
+        ],
+    )
 else:
     run = execution.page("stream-project").items[0]
 if sys.argv[2] == "later":

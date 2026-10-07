@@ -655,7 +655,17 @@ test("Needs you carries a free-text answer from browser to coordinator applicati
   await detail
     .getByRole("button", { name: "Send answer", exact: true })
     .click();
-  await expect(detail.getByText("Answer sent.", { exact: true })).toBeVisible();
+  await expect(
+    detail
+      .locator(".conversation-message-body")
+      .getByText(
+        "All filtered rows, capped at 10,000. Explain when the limit is exceeded.",
+        { exact: true },
+      ),
+  ).toBeVisible();
+  await expect(detail.getByText("Answer sent.", { exact: true })).toHaveCount(
+    0,
+  );
   await expect(
     page
       .getByRole("region", {

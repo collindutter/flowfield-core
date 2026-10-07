@@ -97,9 +97,6 @@ export function WorkerActions({
         {(error || resource.error) && (
           <p role="alert">{error || resource.error}</p>
         )}
-        {run?.status === "stopping" && (
-          <p role="status">Stopping worker. Unfinished work is preserved.</p>
-        )}
       </TaskActionContext>
       {run && (active || run.status === "uncertain") && (
         <ConfirmButton

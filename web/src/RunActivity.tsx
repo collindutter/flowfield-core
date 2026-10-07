@@ -42,12 +42,6 @@ export function RunActivity({
   }, [page]);
   return (
     <div className="run-activity content-stack" data-space="tight">
-      {page?.context && (
-        <div className="activity-context">
-          <ContextRing context={page.context} active={page.active} />
-          <span className="detail-metadata">Context</span>
-        </div>
-      )}
       {error && (
         <p role="alert">
           Activity disconnected. Saved output is kept; reconnect to refresh.{" "}
@@ -82,7 +76,15 @@ export function RunActivity({
           <ActivityEntries items={page.items} />{" "}
         </div>
       )}
-      {page && <UsageSummary usage={page.usage} active={page.active} />}
+      {page?.context && (
+        <div className="activity-context">
+          <ContextRing context={page.context} active={page.active} />
+          <span className="detail-metadata">Current tokens</span>
+        </div>
+      )}
+      {page?.usage?.total_tokens != null && (
+        <UsageSummary usage={page.usage} active={page.active} />
+      )}
     </div>
   );
 }

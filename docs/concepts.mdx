@@ -37,13 +37,20 @@ A **milestone** groups related tasks. Dependencies connect tasks, not milestones
 Each task has a feed bringing together its definition and revisions, progress, worker attempts,
 questions, answers, testing observations and results. Open a card to view its feed beside
 the Coordinator. Discuss scope, queue changes and result questions with the coordinator.
-Task inputs answer a specific question or record feedback/testing for an exact result.
+Task inputs answer a specific question, request changes or confirm approval for an exact
+result with an optional testing comment. Saved answers, feedback and approvals appear in
+the feed; the task footer keeps the relevant controls and input errors.
 Definition history highlights changed words and shows before/after values for fields.
 
 Answering a worker question lets the service continue work when the queue permits it.
 Project planning questions are handled by the coordinator when you resume its conversation.
-Asking about a result does not automatically request changes. Recording a test result does
-not approve code. Earlier results remain inspectable.
+Asking about a result does not automatically request changes. Earlier results and testing
+observations remain inspectable.
+
+**Current tokens**, below worker output, shows the agent's latest context-window report.
+Hover or focus the ring for its reported token count and capacity. This measures the current
+context, separately from cumulative tokens consumed by the work. Unavailable cumulative usage
+is omitted from the normal output view.
 
 ## The board and queue
 
