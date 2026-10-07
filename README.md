@@ -8,7 +8,7 @@
   <a href="https://docs.flowfield.sh/getting-started"><img src="https://github.com/flowfield-sh/flowfield-core/actions/workflows/docs.yml/badge.svg?branch=main" alt="Documentation"></a>
 </p>
 
-![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-overview.png)
+![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-hero.png)
 
 **Good software takes shape through collaboration.**
 
