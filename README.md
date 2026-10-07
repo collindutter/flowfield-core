@@ -10,6 +10,8 @@
 
 ![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-hero.png)
 
+## What is Flowfield?
+
 **💬 Plan with the Coordinator**\
 Explore ideas, turn them into milestones and tasks, and refine the plan while workers build.
 Open a card beside the conversation to discuss its scope or results.
