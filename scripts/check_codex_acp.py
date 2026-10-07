@@ -86,9 +86,7 @@ async def probe(
         if value.kind == "text":
             started.set()
 
-    client = AcpSession(
-        event, request_timeout=10, turn_timeout=10, cleanup=quiesce if cleanup else None
-    )
+    client = AcpSession(event, request_timeout=10, cleanup=quiesce if cleanup else None)
     await client.start(
         [node, str(bridge)] if node else [str(bridge)],
         cwd=attempt.workspace.checkout,
@@ -114,7 +112,7 @@ async def probe(
         if scenario == "cancel":
             await asyncio.wait_for(started.wait(), 10)
             await client.close(timeouts=ShutdownTimeouts(native_cleanup=15))
-        result = await prompt
+        result = await asyncio.wait_for(prompt, 10)
     finally:
         stopped = await client.close(timeouts=ShutdownTimeouts(native_cleanup=15))
     if cleanup and stopped.owned_work_stopped is not (scenario != "cleanup-refused"):
@@ -122,7 +120,7 @@ async def probe(
     if scenario == "resume":
         session_id = client.session_id
         events.clear()
-        client = AcpSession(event, request_timeout=10, turn_timeout=10, cleanup=quiesce)
+        client = AcpSession(event, request_timeout=10, cleanup=quiesce)
         await client.start(
             [node, str(bridge)] if node else [str(bridge)],
             cwd=attempt.workspace.checkout,
@@ -140,14 +138,16 @@ async def probe(
         try:
             await client.select("mode", mode)
             await client.select("fast-mode", "off")
-            result = await client.prompt("Continue without replaying the first message")
+            result = await asyncio.wait_for(
+                client.prompt("Continue without replaying the first message"), 10
+            )
             resumed_text = [item.data["text"] for item in events if item.kind == "text"]
             assert resumed_text == ["Offline native history: 2 turns"], resumed_text
             await asyncio.wait_for(client.commands_received.wait(), 10)
             advertised = {item.name for item in client.commands}
             assert {"compact", "status", "skills", "mcp", "rename"} <= advertised
             for command in ("/status", "/skills", "/mcp", "/rename Probe", "/compact"):
-                assert await client.prompt(command) == "end_turn"
+                assert await asyncio.wait_for(client.prompt(command), 10) == "end_turn"
         finally:
             stopped = await client.close(timeouts=ShutdownTimeouts(native_cleanup=15))
         assert stopped.owned_work_stopped is True and stopped.process_group_exited
