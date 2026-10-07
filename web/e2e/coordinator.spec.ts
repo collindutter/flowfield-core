@@ -255,7 +255,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   );
   await page.goto("/projects/chat-browser");
   await expect(
-    page.getByRole("heading", { name: "Coordinator Chat" }),
+    page.getByRole("heading", { name: "Coordinator" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /CHT-1.*Plan the chat experience/ }),

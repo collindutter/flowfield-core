@@ -301,7 +301,7 @@ export function CoordinatorChat({
   return (
     <>
       <header className="workspace-pane-header">
-        <h2>Coordinator Chat</h2>
+        <h2>Coordinator</h2>
       </header>
       <div
         ref={setPane}

@@ -22,7 +22,7 @@ Initial Flowfield release: a shared task feed and workspace for agent software d
   compatible PyPI releases on web startup, hourly or manually, with release links and
   uv/pip upgrade instructions.
 
-Install with `uv tool install --python 3.12 flowfield-core`, or pip in a dedicated Python
+Install with `uv tool install flowfield-core`, or pip in a dedicated Python
 environment. The package bundles its browser UI and agent guidance. macOS and Linux with
 Python 3.12 are the release test targets; managed work requires an installed, signed-in
 Codex CLI. Additional harnesses are planned.

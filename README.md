@@ -1,6 +1,6 @@
 <h1 align="center">Flowfield</h1>
 
-<p align="center"><strong>A workspace for you and your coding agents.</strong></p>
+<p align="center"><strong>Shape software together.</strong></p>
 
 <p align="center">
   <a href="https://pypi.org/project/flowfield-core/"><img src="https://img.shields.io/pypi/v/flowfield-core?logo=pypi&amp;logoColor=white&amp;color=2563eb" alt="PyPI version"></a>
@@ -10,29 +10,17 @@
 
 ![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-overview.png)
 
-**Plan in a conversation. Build in parallel. Review in one place.**
+**Good software takes shape through collaboration.**
 
-Flowfield puts Coordinator Chat beside a visual task board. Turn an idea into a plan,
-prioritize cards, and let workers take on independent tasks while you keep planning.
-Open a card to discuss it with the coordinator and follow its work from definition to review.
+Requirements, design and implementation develop together. Flowfield gives you and the
+Coordinator a visual task board to shape the work while agents build in parallel. As
+results arrive, refine the plan, resolve questions and decide what happens next.
+Dependencies, checks and explicit code approval give that collaboration a dependable structure.
 
-- **Coordinator Chat.** Turn ideas into milestones and tasks, adjust scope, and keep planning while workers build.
+- **Coordinator.** Turn ideas into milestones and tasks, adjust scope, and keep planning while workers build.
 - **Task board and feeds.** See what’s queued, running or ready for review. Each card keeps its definition, progress, questions and results together.
 - **Parallel work.** Independent tasks run in separate checkouts; dependencies hold work until it's ready.
 - **Explicit review.** Review an exact result, request changes when needed, and approve delivery to your project.
-
-## From idea to reviewed code
-
-Start with a concrete request:
-
-> Help me add CSV export. Review the existing code, suggest a first task, and identify what we need to decide before implementing it.
-
-Shape the task with the coordinator, move it to **Up next**, and run the queue. Follow
-progress and answer questions in its feed. When a result is ready, inspect the diff, try
-it locally, and approve it or request changes—all beside the same conversation.
-
-Independent tasks can run together. Dependencies keep follow-up work waiting for the
-code it needs, and **Needs you** brings questions and reviews back to you.
 
 ## Install
 
@@ -54,7 +42,7 @@ Choose **Add project** in the sidebar and select an existing directory, or regis
 flowfield project init
 ```
 
-Start planning in [Coordinator Chat](https://docs.flowfield.sh/coordinator), or connect a
+Start planning in the [Coordinator](https://docs.flowfield.sh/coordinator), or connect a
 [standalone coding agent](https://docs.flowfield.sh/integrations/codex#connect-a-standalone-coordinator).
 Built-in chat and workers use your Codex login through the managed ACP runtime.
 Codex is the first supported harness; further integrations are planned.

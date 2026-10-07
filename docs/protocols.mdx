@@ -14,7 +14,7 @@ Flowfield uses two complementary protocols:
 
 [ACP](https://agentclientprotocol.com/get-started/introduction) standardizes communication
 between coding agents and their client applications. Flowfield acts as the client for
-Coordinator Chat and managed task workers, using a local subprocess connection.
+the Coordinator and managed task workers, using a local subprocess connection.
 
 The Codex adapter connects through an installed ACP bridge. It discovers model capabilities,
 applies model, effort, Access mode and supported Fast settings, streams public text/tool
@@ -23,7 +23,7 @@ Codex session; workers run scoped task attempts in their own workspaces.
 
 Flowfield provides the coordinator commands `/status`, `/compact`, `/mcp` and `/skills` when
 the harness advertises them. Other advertised commands are not exposed. See
-[Coordinator Chat](/coordinator) for the controls and session behavior.
+[Coordinator](/coordinator) for the controls and session behavior.
 
 Codex is the first supported harness. An ACP-compatible agent is not automatically a supported
 Flowfield integration: session continuity, capabilities, cancellation and native cleanup must

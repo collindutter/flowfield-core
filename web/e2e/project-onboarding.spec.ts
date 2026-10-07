@@ -16,9 +16,9 @@ test("directory adoption keeps cancellation harmless and opens project chat", as
     return route.fulfill({ json: { path } });
   });
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "Coordinator Chat" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Coordinator" })).toHaveCount(
+    0,
+  );
   await page
     .getByRole("button", { name: "Choose directory", exact: true })
     .click();
@@ -43,7 +43,7 @@ test("directory adoption keeps cancellation harmless and opens project chat", as
   await setup.getByRole("button", { name: "Add project", exact: true }).click();
   await expect(page).toHaveURL("/projects/native-directory-project");
   await expect(
-    page.getByRole("heading", { name: "Coordinator Chat" }),
+    page.getByRole("heading", { name: "Coordinator" }),
   ).toBeVisible();
   expect(existsSync(join(directory, ".flowfield/config.toml"))).toBe(true);
 

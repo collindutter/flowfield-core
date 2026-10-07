@@ -5,7 +5,8 @@ description: How people, agents, tasks and review fit together.
 
 ## People and agents
 
-You and the **coordinator** shape intent, priorities and review through your coding
+Requirements, design and implementation develop together. You and the **coordinator**
+shape intent, priorities and review through your coding
 conversation. **Workers** implement bounded assignments. The **service** schedules
 ready work, preserves execution facts and delivers explicitly approved code.
 
@@ -20,7 +21,7 @@ supported capabilities; [Integrations](/integrations/overview) covers setup.
 ## Projects, tasks and milestones
 
 A **project** is an existing directory registered through the browser's directory chooser
-or `flowfield project init`. Coordinator Chat belongs to a project. Its settings identify
+or `flowfield project init`. The Coordinator belongs to a project. Its settings identify
 the worker environment, model, checks and code delivery branch.
 
 A **task** expresses an agreed outcome and success criteria. Its stable key, such as
@@ -29,13 +30,13 @@ other tasks in the same project; an incomplete prerequisite blocks execution.
 
 A **milestone** groups related tasks. Dependencies connect tasks, not milestones.
 
-![The board filtered to one milestone beside Coordinator Chat](/images/milestones.png)
+![The board filtered to one milestone beside the Coordinator](/images/milestones.png)
 
 ## The task feed
 
 Each task has a feed bringing together its definition and revisions, progress, worker attempts,
 questions, answers, testing observations and results. Open a card to view its feed beside
-Coordinator Chat. Discuss scope, queue changes and result questions with the coordinator.
+the Coordinator. Discuss scope, queue changes and result questions with the coordinator.
 Task inputs answer a specific question or record feedback/testing for an exact result.
 Definition history highlights changed words and shows before/after values for fields.
 
@@ -70,11 +71,11 @@ or explicit task overrides. Unavailable choices fail explicitly instead of selec
 another model.
 
 Fast mode is available only for models that support it. Workers start with Fast off; enable it
-per task using the lightning button. There is no project-wide speed default. Coordinator Chat
+per task using the lightning button. There is no project-wide speed default. The Coordinator
 has its own Fast choice. Changes affect subsequent attempts and can increase usage;
 historical attempts keep their original choices.
 
-Each project has one built-in [Coordinator Chat](/coordinator), with its model, effort and access mode
+Each project has one [Coordinator](/coordinator), with its model, effort and access mode
 selected beside the chat input. Changes apply to subsequent messages and do not configure
 your standalone coding agent.
 
@@ -83,7 +84,7 @@ Choose an access mode beside the chat input or in Workers settings; its supporte
 include its own approval and review behavior.
 
 Tool permission requests from connected harness sessions have durable answers
-and response controls in Coordinator Chat, the task view and **Needs you**. Requests expire or close when
+and response controls in the Coordinator, the task view and **Needs you**. Requests expire or close when
 their live turn ends; saved answers are never replayed into another session. A tool
 permission decision does not approve a result or authorize code delivery.
 

@@ -28,7 +28,7 @@ export function SetupInstructions({
       <ContentStack space="section">
         <h1>Set up your project</h1>
         <p>
-          Choose an existing project to plan work in Coordinator Chat and follow
+          Choose an existing project to plan work in the Coordinator and follow
           it on the board.
         </p>
         <form
@@ -166,7 +166,7 @@ export function SetupInstructions({
         </p>
         <DetailSection title="Start planning">
           <p>
-            Choose a model in Coordinator Chat. Flowfield uses this machine’s
+            Choose a model in the Coordinator. Flowfield uses this machine’s
             installed, signed-in Codex and managed ACP runtime.
           </p>
           <p>
@@ -198,7 +198,7 @@ export function SetupInstructions({
           </pre>
           <p>
             Review the added guidance and start a fresh Codex session in the
-            project. Built-in Coordinator Chat supplies its own MCP connection.
+            project. The Coordinator supplies its own MCP connection.
           </p>
         </Disclosure>
       </ContentStack>
