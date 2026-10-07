@@ -510,7 +510,7 @@ class Workspace:
         if db.execute("SELECT 1 FROM projects WHERE task_prefix=?", (prefix,)).fetchone():
             raise ApplicationError(
                 "prefix_taken",
-                f"Project prefix {prefix} is already used. Choose another three-letter prefix.",
+                f"Task prefix {prefix} is already used. Choose another three-letter prefix.",
                 409,
             )
 
@@ -559,7 +559,8 @@ class Workspace:
                 ):
                     raise ApplicationError(
                         "project_conflict",
-                        "Existing project identity differs from the requested ID or name.",
+                        "This directory already has a different project ID or name. "
+                        "Use its saved project details.",
                         409,
                     )
                 try:
@@ -569,7 +570,8 @@ class Workspace:
                 except ValidationError as error:
                     raise ApplicationError(
                         "invalid_project",
-                        "Cannot derive a valid project ID/name. Supply --id and --name.",
+                        "Enter a project name and a valid project ID. "
+                        "Use lowercase letters, numbers, hyphens or underscores for the ID.",
                     ) from error
                 if existing and existing.id != chosen.project_id:
                     raise ApplicationError(
@@ -584,8 +586,8 @@ class Workspace:
                 if other and other["path"] != str(path):
                     raise ApplicationError(
                         "project_conflict",
-                        "Project ID is registered at another directory. "
-                        "Choose a unique project ID (CLI: --id) for a new project.",
+                        "This project ID is already used by another directory. "
+                        "Choose a different project ID.",
                         409,
                     )
                 if existing:
@@ -595,8 +597,8 @@ class Workspace:
                     ):
                         raise ApplicationError(
                             "project_conflict",
-                            "Existing prefix differs. Use project edit to change it "
-                            "before creating tasks.",
+                            "This project already uses a different task prefix. "
+                            "Use its saved prefix.",
                             409,
                         )
                     prefix = existing.task_prefix
@@ -625,8 +627,8 @@ class Workspace:
         except OSError as error:
             raise ApplicationError(
                 "project_setup_failed",
-                f"Could not initialize {path}: {error}. "
-                "Existing files were not overwritten; retry with flowfield project init.",
+                f"Could not add the project at {path}: {error}. "
+                "Check directory permissions and try again. Existing files were not overwritten.",
             ) from error
 
     def _project(self, db: sqlite3.Connection, project_id: str) -> Project:

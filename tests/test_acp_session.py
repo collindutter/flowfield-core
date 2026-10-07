@@ -154,6 +154,50 @@ def test_permissions_only_accept_offered_options(tmp_path, choice, expected):
     asyncio.run(exercise())
 
 
+@pytest.mark.parametrize("title", [None, "Updated permission title"])
+def test_partial_permission_reuses_matching_tool_title_and_public_details(title):
+    from acp.schema import PermissionOption, ToolCallStart, ToolCallUpdate
+
+    async def exercise():
+        requests = []
+
+        async def permission(request):
+            requests.append(request)
+            return "allow"
+
+        client = AcpSession(lambda event: None, on_permission=permission)
+        client.session_id = "session"
+        client.state = "running"
+        await client.session_update(
+            "session",
+            ToolCallStart.model_validate(
+                {
+                    "sessionUpdate": "tool_call",
+                    "toolCallId": "read-context",
+                    "title": "Read task context",
+                    "kind": "read",
+                    "status": "in_progress",
+                    "content": [
+                        {"type": "content", "content": {"type": "text", "text": "Task PKT-1"}}
+                    ],
+                    "rawInput": {"secret": "PRIVATE"},
+                }
+            ),
+        )
+        options = [PermissionOption(option_id="allow", name="Allow", kind="allow_once")]
+        for identity in ("read-context", "unrelated"):
+            await client.request_permission(
+                "session", ToolCallUpdate(tool_call_id=identity, title=title), options
+            )
+        assert requests[0].title == (title or "Read task context")
+        assert requests[0].details == "Task PKT-1"
+        assert requests[1].title == (title or "Tool permission")
+        assert requests[1].details == ""
+        assert "PRIVATE" not in str(requests)
+
+    asyncio.run(exercise())
+
+
 def test_stop_cancels_pending_permission_and_blocks_new_work(tmp_path):
     async def exercise():
         requested = asyncio.Event()

@@ -782,6 +782,7 @@ export function TaskConversation({
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={!currentQuestion.data}
                   onClick={() => {
                     if (!currentBinding || !currentQuestion.data) return;
                     beginDraft(

@@ -164,7 +164,7 @@ def test_interrupted_setup_can_finish_from_preserved_config(
 
     with monkeypatch.context() as patch:
         patch.setattr(application, "write_config", interrupted)
-        with pytest.raises(ApplicationError, match="retry with flowfield project init"):
+        with pytest.raises(ApplicationError, match="try again"):
             workspace.setup_project(ProjectSetup(path=str(root)))
     assert workspace.projects() == []
     config = (root / ".flowfield/config.toml").read_bytes()

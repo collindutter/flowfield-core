@@ -387,7 +387,11 @@ class AcpSession:
             return cancelled
         request = PermissionRequest(
             tool_call.tool_call_id,
-            tool_call.title or "Tool permission",
+            bounded_details(
+                tool_call.title
+                or self._tool_activity.get(tool_call.tool_call_id, {}).get("title")
+                or "Tool permission"
+            )[:4000],
             tuple((item.option_id, item.name, item.kind) for item in options),
             bounded_details(
                 "\n\n".join(

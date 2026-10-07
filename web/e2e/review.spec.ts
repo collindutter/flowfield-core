@@ -539,6 +539,11 @@ test("managed answers show durable pause, safe edits and immutable correction in
   await expect(
     page.getByRole("textbox", { name: "Your answer", exact: true }),
   ).toHaveCount(0);
+  // The question loads after eligibility. An early click must wait for its answer.
+  await page.route("**/questions/which-records", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await route.continue();
+  });
   await page.goto("/projects/input-browser/inbox/which-records");
   const detail = page.getByRole("region", {
     name: "Task details",

@@ -234,14 +234,6 @@ export function SetupInstructions({
                     onToggle={(event) => setPreview(event.currentTarget.open)}
                   >
                     <ContentStack space="section">
-                      <p>
-                        <code>AGENTS.md</code> gets a Flowfield reference;{" "}
-                        <code>
-                          .agents/skills/flowfield-coordinator/SKILL.md
-                        </code>{" "}
-                        contains coordinator guidance. Review and commit these
-                        files so workers receive them.
-                      </p>
                       {templates.error && <p role="alert">{templates.error}</p>}
                       {templates.loading && <p>Loading guidance…</p>}
                       {templates.data && (
