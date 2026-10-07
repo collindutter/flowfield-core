@@ -2,7 +2,7 @@ import { fixtureStages } from "./support";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { expect } from "@playwright/test";
-import { test, existingDirectory, state } from "./support";
+import { test, existingDirectory, state, stubModelCatalog } from "./support";
 
 test("queue errors open shared notifications with a direct settings action", async ({
   page,
@@ -263,6 +263,7 @@ test("update notifications persist, dismiss across browsers and share manual dis
   await page.getByRole("button", { name: /Notifications/ }).click();
   await expect(notice).toHaveCount(0);
   const secondContext = await browser.newContext();
+  await stubModelCatalog(secondContext);
   const second = await secondContext.newPage();
   await second.goto("/");
   await second.getByRole("button", { name: /Notifications/ }).click();

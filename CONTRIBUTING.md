@@ -52,14 +52,23 @@ under `src/flowfield/`; harness-specific behavior belongs in `src/flowfield/adap
 
 Ordinary checks use isolated disposable state and never launch live model calls.
 
-Browser journeys live in focused `web/e2e/*.spec.ts` suites and run with two workers.
+Browser journeys live in focused `web/e2e/*.spec.ts` suites and run with two workers
+using the `chromium` channel (full Chromium in headless mode). Keep the browser binary
+paired with the locked Playwright version. Native-tab behavior must use actual clicks
+and page events; a direct `newPage().goto()` does not test link activation.
 Each journey owns its project IDs, task prefixes and directories; tests must not depend
 on another test's records or order. `support.ts` shares CLI/MCP helpers and model-free
 catalog interception. Test the actual app rather than a separate mock interface.
-Notification journeys run afterward because they change service-wide preferences and
-clear shared notices. Scope alert assertions to the relevant form or notification.
+Model catalog interception belongs to the browser context so newly opened tabs inherit
+it before their first request. Notification journeys run afterward because they change
+service-wide preferences and clear shared notices. Scope alert assertions to the relevant
+form or notification.
 After building the UI, run a focused suite with
 `pnpm --dir web exec playwright test e2e/navigation.spec.ts`.
+The native-tab regression allocates separate project IDs and prefixes for repetitions:
+`pnpm --dir web exec playwright test e2e/native-tabs.spec.ts --repeat-each=20`.
+CI also repeats it ten times, with no retries; every repetition must pass. Other suites
+still use fixed fixture IDs, so repeat those through separate Playwright invocations.
 Use `uv run pytest --durations=25` to profile backend checks before optimizing them;
 keep real Git, cleanup, concurrency and exact-approval coverage intact.
 

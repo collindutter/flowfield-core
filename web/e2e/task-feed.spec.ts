@@ -11,6 +11,7 @@ import {
   closeOverlay,
   ensureEditing,
   connectMcp,
+  stubModelCatalog,
 } from "./support";
 
 test("board failures retain readable context and recover through their alert", async ({
@@ -460,6 +461,7 @@ test("priority races preserve agent progress and message drafts; touch can prior
     hasTouch: true,
     viewport: { width: 390, height: 844 },
   });
+  await stubModelCatalog(context);
   const touch = await context.newPage();
   await touch.goto("http://127.0.0.1:8766/projects/race");
   await touch.getByRole("link", { name: /Touch task/ }).tap();

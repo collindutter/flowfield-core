@@ -6,17 +6,23 @@ import {
   expect,
   type Page,
   type APIRequestContext,
+  type BrowserContext,
 } from "@playwright/test";
 
 // Ordinary browser checks never discover or start an installed agent.
 export const test = base.extend({
-  page: async ({ page }, provide) => {
-    await page.route("**/api/worker-models*", (route) =>
-      route.fulfill({ json: [] }),
-    );
-    await provide(page);
+  context: async ({ context }, provide) => {
+    // Register before any page opens: native tabs can load before their page event.
+    await stubModelCatalog(context);
+    await provide(context);
   },
 });
+
+export async function stubModelCatalog(context: BrowserContext) {
+  await context.route("**/api/worker-models*", (route) =>
+    route.fulfill({ json: [] }),
+  );
+}
 
 export function existingDirectory(path: string) {
   mkdirSync(path, { recursive: true });

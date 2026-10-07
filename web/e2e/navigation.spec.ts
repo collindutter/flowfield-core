@@ -11,7 +11,7 @@ import {
   connectMcp,
 } from "./support";
 
-test("task keys link to persistent selections with native tabs, history and draft protection", async ({
+test("task keys link to persistent selections with history and draft protection", async ({
   page,
   request,
 }) => {
@@ -124,20 +124,6 @@ test("task keys link to persistent selections with native tabs, history and draf
     .locator(".work-state")
     .getByRole("link", { name: "NAV-1", exact: true });
   await expect(editor.getByText("Task defined", { exact: true })).toBeVisible();
-  const [tab] = await Promise.all([
-    page.context().waitForEvent("page", { timeout: 5000 }),
-    prerequisite.click({ modifiers: ["ControlOrMeta"] }),
-  ]);
-  await tab.waitForLoadState("domcontentloaded");
-  await expect(tab).toHaveURL(/tasks\/NAV-1$/);
-  await expect(
-    tab.getByRole("heading", {
-      name: "NAV-1 · Prepare the export",
-      exact: true,
-    }),
-  ).toBeVisible();
-  await tab.close();
-  await expect(page).toHaveURL(/tasks\/NAV-2(?:\/dependencies)?$/);
   await prerequisite.click();
   await expect(page).toHaveURL(/tasks\/NAV-1$/);
   await page.goBack();
