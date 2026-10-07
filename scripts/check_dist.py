@@ -56,8 +56,6 @@ def verify(directory: Path, version: str, install_check: Path) -> None:
                     "tool",
                     "install",
                     "--no-config",
-                    "--python",
-                    sys.executable,
                     "--default-index",
                     "https://pypi.org/simple",
                     str(artifact),

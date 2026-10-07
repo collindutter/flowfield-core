@@ -14,11 +14,12 @@ conversation to a completed task.
 Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/). Then install Flowfield with [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```sh
-uv tool install --python 3.12 flowfield-core
+uv tool install flowfield-core
 flowfield harness install codex
 flowfield serve
 ```
 
+The harness command installs Flowfield’s Codex bridge once; Codex itself is installed separately.
 Your browser opens at [localhost:8765](http://127.0.0.1:8765). Keep the terminal open;
 Ctrl-C stops the service. Use `--no-open` to keep the browser closed.
 See [Installation](/installation#alternative-pip) for the pip alternative. Managed workers also need Git.
@@ -52,14 +53,15 @@ Chat is scoped to the selected project.
 Flowfield automatically uses the local machine; worker checks and delivery configuration
 can wait until you are ready to run tasks.
 
-Built-in chat supplies its own MCP connection. To plan from a standalone Codex session,
+Built-in chat supplies its own Flowfield guidance and MCP connection; you can plan before
+installing repository guidance. To plan from a standalone Codex session,
 follow [standalone coordinator setup](/integrations/codex#connect-a-standalone-coordinator)
 instead.
 
 ## Prepare the first task
 
 When you’re ready to run tasks, preview and install project guidance in **Coordinator**
-settings or through the CLI:
+settings or from a terminal in your project directory:
 
 ```sh
 flowfield project guidance preview
@@ -70,10 +72,10 @@ Installation preserves existing instructions and adds a reference to
 `.agents/skills/flowfield-coordinator/SKILL.md`. Review and commit the added files under
 your project's usual rules before running workers.
 
-Ask your coordinator to help choose worker settings for the project: choose the target
-branch, dependency setup, checks and a local run command, then validate the environment.
-Choose a worker model and reasoning effort explicitly. These settings are also available
-under the settings icon beside the project name.
+Ask your coordinator to configure the destination branch, dependency setup and checks,
+then validate setup. Add a run command if you want to try results locally. Choose a worker
+model, reasoning effort and access mode. You can also edit these under the project’s
+settings icon; see [Worker setup and checks](/worker-setup) for the fields and an example.
 
 Project **Workers** settings supply defaults for model, effort and access. Individual
 tasks can override them; changes apply to the next attempt. See [Concepts](/concepts#agent-settings-and-permissions) for the worker environment.

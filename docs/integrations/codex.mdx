@@ -26,7 +26,8 @@ Connect verifies the service and saves a native MCP connection in Codex's user s
 Repeated connections are idempotent. Status checks reachability and tool discovery without
 starting a model turn. Other configured MCP connections remain intact.
 
-In your existing project's directory, install its coordinator guidance:
+[Add your project](/getting-started#add-your-project) first. Then, in its directory,
+install coordinator guidance:
 
 ```sh
 flowfield project guidance preview
@@ -42,9 +43,9 @@ coordinator can actually use the connection and identify the correct project.
 Install the managed runtime with `flowfield harness install codex` (see [runtime installation](/cli#managed-runtime-installation)).
 Native Codex must be installed and authenticated on the machine running Flowfield.
 
-Ask the coordinator to configure the project's target branch, dependency setup, verification
-and run commands in **Integration** settings, then validate setup. In **Workers**, select a model, reasoning effort and access mode from the
-connected harness. Project defaults can be overridden for individual tasks.
+Follow [Worker setup and checks](/worker-setup) to configure and validate delivery.
+In **Workers**, select a model, reasoning effort and access mode from the connected harness.
+Project defaults can be overridden for individual tasks.
 
 Local uses the tools, credentials and native harness configuration available to the Flowfield
 service. Each attempt gets a separate checkout, temporary directory and output directory.
@@ -58,7 +59,6 @@ Native tool permission requests appear in the task and **Needs you**. Result del
 requires explicit approval. Local workspaces protect ordinary parallel edits; they do not
 contain arbitrary daemons or isolate the whole machine.
 
-Historical attempts and inspection copies retain their original configuration.
 If the service cannot find Codex, restart it from a terminal with the correct PATH, then use
 **Reload models**. Installing a bridge does not enable queues.
 

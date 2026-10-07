@@ -10,21 +10,36 @@
 
 ![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-overview.png)
 
-Plan with the built-in Coordinator Chat, run tasks in parallel, and review results beside
-the conversation. Open any card to discuss it with the coordinator while its task feed
-keeps the work, questions, and review together.
+**Plan in a conversation. Build in parallel. Review in one place.**
+
+Flowfield puts Coordinator Chat beside a visual task board. Turn an idea into a plan,
+prioritize cards, and let workers take on independent tasks while you keep planning.
+Open a card to discuss it with the coordinator and follow its work from definition to review.
 
 - **Coordinator Chat.** Turn ideas into milestones and tasks, adjust scope, and keep planning while workers build.
-- **Task feeds.** Each task keeps its intent, progress, questions, feedback and results together.
+- **Task board and feeds.** See what’s queued, running or ready for review. Each card keeps its definition, progress, questions and results together.
 - **Parallel work.** Independent tasks run in separate checkouts; dependencies hold work until it's ready.
 - **Explicit review.** Review an exact result, request changes when needed, and approve delivery to your project.
+
+## From idea to reviewed code
+
+Start with a concrete request:
+
+> Help me add CSV export. Review the existing code, suggest a first task, and identify what we need to decide before implementing it.
+
+Shape the task with the coordinator, move it to **Up next**, and run the queue. Follow
+progress and answer questions in its feed. When a result is ready, inspect the diff, try
+it locally, and approve it or request changes—all beside the same conversation.
+
+Independent tasks can run together. Dependencies keep follow-up work waiting for the
+code it needs, and **Needs you** brings questions and reviews back to you.
 
 ## Install
 
 Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/), then:
 
 ```sh
-uv tool install --python 3.12 flowfield-core
+uv tool install flowfield-core
 flowfield harness install codex
 flowfield serve
 ```
@@ -43,6 +58,15 @@ Start planning in [Coordinator Chat](https://docs.flowfield.sh/coordinator), or 
 [standalone coding agent](https://docs.flowfield.sh/integrations/codex#connect-a-standalone-coordinator).
 Built-in chat and workers use your Codex login through the managed ACP runtime.
 Codex is the first supported harness; further integrations are planned.
+
+## Fits your existing project
+
+Choose an existing repository and use its tools, setup commands and tests. Keep architecture,
+designs and coding conventions in your repository; Flowfield keeps ongoing work on the
+board and execution evidence in task feeds.
+
+Workers use separate Git checkouts. You review an exact code result before Flowfield
+delivers it to your project’s configured branch. Your working changes stay protected.
 
 ## Documentation
 

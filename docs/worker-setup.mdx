@@ -1,0 +1,51 @@
+---
+title: Worker setup and checks
+description: Configure reproducible setup, validation and local result previews.
+---
+
+Open the project’s settings icon, then **Integration**, or ask the coordinator to configure
+these settings. Use the commands your repository already documents.
+
+| Setting | Purpose | Example |
+| --- | --- | --- |
+| Destination branch | Existing local branch where approved code is delivered. | `main` |
+| Setup commands | Install dependencies in each fresh worktree before work or checks. Optional; one shell command per line. | `pnpm install --frozen-lockfile` |
+| Validation commands | Required checks on the proposed code before approval. One shell command per line. | `pnpm test` |
+| Run command | Optional command for **Try result**. Runs only when you launch the prepared copy in your terminal. | `pnpm dev` |
+
+For a pnpm project, those commands are enough if its scripts already define tests and a
+development server. A Python, Rust or other project should use its own setup and check
+commands instead. Flowfield does not choose a language environment for you.
+
+## Validate before running workers
+
+1. Review and commit the [project guidance](/getting-started#prepare-the-first-task), setup
+   scripts and dependency manifests to the destination branch. Commit or deliberately ignore
+   adoption metadata under your repository’s rules; untracked files can block delivery.
+2. Save the Integration settings, then run **Validate setup**. It checks the saved branch
+   in a fresh worktree, runs setup and validation, and reports checkout readiness. It starts
+   no model and does not enable the queue.
+3. In **Workers**, select a model, reasoning effort and access mode. Start with one worker
+   slot; increase it when independent tasks can run without sharing mutable resources.
+4. Move a prepared task to **Up next** and choose **Run queue**.
+
+Setup and validation commands run in the worktree directory. They must leave source files
+unchanged. Keep dependency outputs ignored and put temporary files under
+`FLOWFIELD_RUNTIME_DIR`; `FLOWFIELD_WORKSPACE` identifies the checkout. The service host
+must already provide the required language tools and credentials.
+
+If a check fails, read its output in **Validate setup**, correct the project or commands,
+and validate again. Revalidate after changing setup, checks or the destination branch.
+Checks must finish and return a failing exit code on failure; do not put a development
+server in the validation list.
+
+## Try a result
+
+**Try result** prepares an independent copy of the selected code candidate and supplies a
+launcher. Run that command in your terminal to execute setup followed by the saved run
+command. Preparing or running the copy never approves the result.
+
+Use separate ports, databases and other mutable resources for concurrent workers and
+preview copies, or serialize that work. Git worktrees separate ordinary file edits; Local
+does not isolate the whole machine. Harness access modes govern agent tool requests;
+configured setup and validation commands run directly on the service host.

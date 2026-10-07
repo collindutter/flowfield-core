@@ -8,14 +8,14 @@ description: Install Flowfield with uv or pip and manage its local service.
 With [uv](https://docs.astral.sh/uv/getting-started/installation/) installed:
 
 ```sh
-uv tool install --python 3.12 flowfield-core
-flowfield serve
+uv tool install flowfield-core
 ```
 
 uv keeps Flowfield in its own environment and exposes the `flowfield` command.
 If the command is missing from PATH, run `uv tool update-shell` and open a new terminal.
 The package contains the CLI, service, browser UI and agent guidance. Node and pnpm are
-only needed to develop from source.
+only needed to develop from source. Flowfield requires Python 3.12 or newer. If uv selects
+an older interpreter, use `uv tool install --python 3.12 flowfield-core`.
 
 ## Alternative: pip
 
@@ -24,17 +24,31 @@ Use Python 3.12 or newer in a dedicated virtual environment:
 ```sh
 python3 -m venv ~/.local/share/flowfield-venv
 ~/.local/share/flowfield-venv/bin/python -m pip install flowfield-core
-~/.local/share/flowfield-venv/bin/flowfield serve
 ```
 
 Activate that environment to use the shorter command:
 
 ```sh
 . ~/.local/share/flowfield-venv/bin/activate
-flowfield serve
 ```
 
+## Set up Codex
+
+Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/), then install
+Flowfield’s managed runtime for Coordinator Chat and workers:
+
+```sh
+flowfield harness install codex
+```
+
+This downloads the matching ACP bridge; it does not install Codex or change your login.
+Make sure `codex` is on PATH in the terminal where you start Flowfield. Workers also need Git.
+
 ## Start and stop
+
+```sh
+flowfield serve
+```
 
 The service runs in the foreground at [localhost:8765](http://127.0.0.1:8765).
 An interactive `flowfield serve` opens your browser once the service is ready.
@@ -42,9 +56,8 @@ Use `flowfield serve --no-open` to keep it closed; scripts and noninteractive se
 only print the link. Ctrl-C stops it. Choose another port with `flowfield serve --port 8770`
 and give clients the same port using `flowfield --port 8770 ...`.
 
-Flowfield runs locally on macOS and Linux and binds to loopback. Managed work needs Git
-and an installed, signed-in [Codex CLI](https://developers.openai.com/codex/cli/).
-Installation does not start a service or change your Codex login.
+Flowfield runs locally on macOS and Linux and binds to loopback. Continue with
+[Getting Started](/getting-started#add-your-project) to add a project.
 
 ## Update
 
@@ -67,6 +80,7 @@ Stop the service before upgrading:
 
 ```sh
 uv tool upgrade flowfield-core
+flowfield harness install codex
 flowfield serve
 ```
 
@@ -74,6 +88,7 @@ For the pip environment:
 
 ```sh
 ~/.local/share/flowfield-venv/bin/python -m pip install --upgrade flowfield-core
+~/.local/share/flowfield-venv/bin/flowfield harness install codex
 ~/.local/share/flowfield-venv/bin/flowfield serve
 ```
 

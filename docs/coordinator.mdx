@@ -46,8 +46,8 @@ images up to 2 MiB each. Their contents accompany the message sent to the agent;
 require image support from the connected harness. Coordinator attachments remain part of
 its native session history, subject to Codex's context management. Reattach a file if you
 start a new session or need details that compaction has omitted. Previously sent files
-remain available to download. Worker replies use separate task attempts; reattach files
-when a later reply needs their contents.
+remain available to download. Task-feed answers and feedback accompany separate worker
+attempts; attach files again when later input needs their contents.
 Each project has 128 MiB of attachment storage. Unsent uploads expire after 24 hours.
 
 Type `/` to see the available coordinator commands. Use arrow keys and Enter to select,
@@ -64,8 +64,8 @@ immediately may still show a loading state while Codex starts.
 | `/skills` | List skills discovered by Codex. |
 
 Commands do not accept attachments or arguments. Use the paperclip, model settings and Stop
-buttons for those actions. Worker replies use the same composer controls but do not expose
-session commands.
+buttons for those actions. Task-feed answers and feedback support attachments but do not
+expose session commands.
 
 **Fast mode** appears as a lightning button beside model settings when the selected model
 supports it. Select it to save Fast on or off for subsequent messages. It provides faster

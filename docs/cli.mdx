@@ -138,8 +138,9 @@ Configure the target branch and trusted project checks to match your repository.
 Repeat `--check` for multiple commands; `--setup` adds dependency setup. Your coordinator
 can configure and validate richer environment and run-command settings through MCP.
 Flowfield automatically uses the service host’s tools, credentials and native harness
-configuration. Workers also need a native mode: use `worker models --json` to see choices, then pass `--mode MODE_ID` to
-`worker configure` together with the model and effort.
+configuration. Use `flowfield project workers models --json` to see access modes, then pass
+`--mode MODE_ID` to `flowfield project workers configure` with the model and effort.
+See [Worker setup and checks](/worker-setup) for configuration order and validation.
 
 ## Harness connections
 
