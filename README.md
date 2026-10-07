@@ -10,19 +10,24 @@
 
 ![Flowfield board with priorities, questions and results ready for review](https://raw.githubusercontent.com/flowfield-sh/flowfield-core/main/docs/images/board-hero.png)
 
-**💬 Plan with the Coordinator.** Explore ideas, turn them into milestones and tasks, and refine the plan while workers build.
+**💬 Plan with the Coordinator**\
+Explore ideas, turn them into milestones and tasks, and refine the plan while workers build.
 Open a card beside the conversation to discuss its scope or results.
 
-**📋 Organize work on the board.** Prioritize tasks, track dependencies, and see what’s queued, running or ready for review.
+**📋 Organize work on the board**\
+Prioritize tasks, track dependencies, and see what’s queued, running or ready for review.
 Needs you brings questions, blockers and review requests into one place.
 
-**🧵 Follow each task in its feed.** Keep definitions, progress, tool activity, questions, answers and results together.
+**🧵 Follow each task in its feed**\
+Keep definitions, progress, tool activity, questions, answers and results together.
 See what changed and respond to the work that needs your attention.
 
-**⚡ Run workers in parallel.** Independent tasks run in separate Git checkouts with configurable worker capacity.
+**⚡ Run workers in parallel**\
+Independent tasks run in separate Git checkouts with configurable worker capacity.
 Dependencies hold work until it’s ready, and each worker uses your project’s tools and checks.
 
-**🔎 Review and integrate results.** Inspect code changes, try an exact result, and request revisions or approve delivery to your project.
+**🔎 Review and integrate results**\
+Inspect code changes, try an exact result, and request revisions or approve delivery to your project.
 Flowfield protects your working changes and keeps approval tied to the code you reviewed.
 
 ## Install
