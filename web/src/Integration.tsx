@@ -85,10 +85,7 @@ export function IntegrationSettings({
       className="worker-settings content-stack"
       data-space="section"
     >
-      <p>
-        Configure worker setup, checks and code delivery. Workers use the local
-        machine.
-      </p>
+      <p>Worker setup, checks and local code delivery.</p>
       {(error || resource.error || inspection.error) && (
         <Alert variant="destructive">
           <AlertDescription>

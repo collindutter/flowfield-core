@@ -208,9 +208,7 @@ export function DraftBadge({
           Draft
         </Badge>
       </TooltipTrigger>
-      <TooltipContent>
-        Resume your coordinator to prepare the agreed work.
-      </TooltipContent>
+      <TooltipContent>Ask the coordinator to prepare this task.</TooltipContent>
     </Tooltip>
   );
 }

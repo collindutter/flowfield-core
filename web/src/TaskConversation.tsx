@@ -80,9 +80,7 @@ export function StageHeader({
         <div>
           <StageSequence stages={plan.data.stages} label="Task stages" />
           {plan.data.agreement_revision !== task.agreement_revision && (
-            <p className="muted">
-              Stages need reconciliation with the current task.
-            </p>
+            <p className="muted">Update stages to match the task.</p>
           )}
         </div>
       )}
@@ -623,8 +621,8 @@ export function TaskConversation({
             )}
             {composerAction === "observation" && (
               <p>
-                Record what you tried and what happened. This saves evidence
-                without starting a worker or approving the result.
+                Record what you tested and the outcome. This does not start a
+                worker or approve the result.
               </p>
             )}
             {currentQuestion.error && (
@@ -686,12 +684,12 @@ export function TaskConversation({
               (showComposer || !!gate.data.pending_reply_id) && (
                 <p className="muted">
                   {gate.data.pending_reply_id
-                    ? "Message waiting for the queue, capacity or its original context. Cancel it to send a revised message."
+                    ? "Reply waiting for the queue or a task update. Cancel to revise it."
                     : gate.data.reason === "reconcile_task"
-                      ? "Resume your coordinating conversation to reconcile this task."
+                      ? "Ask the coordinator to update this task before continuing."
                       : gate.data.reason === "answer_pending"
-                        ? "Answer sent. Continuation waits for the queue or coordinating conversation."
-                        : "Work is processing. You can reply when it is idle."}
+                        ? "Answer saved. Waiting for the worker or coordinator to continue."
+                        : "Task busy. Reply when processing finishes."}
                 </p>
               )}
             {stale && (

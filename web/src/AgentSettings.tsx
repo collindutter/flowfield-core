@@ -252,7 +252,7 @@ function useAgentSettingsContent({
         <p>
           {coordinator
             ? "Model and effort for your next message."
-            : "Changes apply to the next worker attempt."}
+            : "Applies to the next worker run."}
         </p>
       )}
       {!coordinator && (
@@ -296,12 +296,6 @@ function useAgentSettingsContent({
             change={change}
             compact={compact}
           />
-          {coordinator && (
-            <p className="muted">
-              Access applies to this project directory. Requested setup changes
-              happen here directly.
-            </p>
-          )}
           <div className="actions">
             <Button
               size="sm"

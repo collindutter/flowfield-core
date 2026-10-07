@@ -6,11 +6,8 @@ import pytest
 from test_coordinator import message, settled, setup
 from test_permissions import pending
 
-from flowfield import migrations
 from flowfield.agent_models import AgentChoice, AgentSettingsEdit
 from flowfield.agent_settings import AgentSettings
-from flowfield.application import Workspace
-from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
 from flowfield.permission_models import PermissionAnswer
 
@@ -118,25 +115,3 @@ def test_coordinator_native_mode_and_permission_lifetime(tmp_path, monkeypatch, 
         await service.close()
 
     asyncio.run(exercise())
-
-
-def test_mode_migration_preserves_restriction_and_frozen_turns(tmp_path, monkeypatch):
-    with monkeypatch.context() as old:
-        old.setattr(
-            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 37)
-        )
-        service, conversation = setup(tmp_path, monkeypatch)
-        with service.workspace.connection(write=True) as db:
-            db.execute(
-                "UPDATE agent_settings SET selection=json_set(selection,'$.mode',NULL) "
-                "WHERE role='coordinator'"
-            )
-        turn, _ = service.coordinator.store.reserve("harbor", conversation.id, message())
-        with service.workspace.connection(write=True) as db:
-            turn.status = "completed"
-            service.coordinator.store._save(db, turn)
-    workspace = Workspace(service.workspace.directory)
-    assert (
-        AgentSettings(workspace).get("harbor", "coordinator").effective.choice.mode == "read-only"
-    )
-    assert CoordinatorStore(workspace).get("harbor", turn.id).settings.choice.mode is None

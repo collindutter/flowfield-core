@@ -136,13 +136,9 @@ def test_invalid_uploads_are_rejected(tmp_path, content, mime):
         upload(Attachments(fixture(tmp_path).workspace), content=content, mime=mime)
 
 
-def test_http_upload_size_limit_and_schema35_upgrade(tmp_path, monkeypatch):
-    with monkeypatch.context() as older:
-        older.setattr(
-            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 35)
-        )
-        workspace = fixture(tmp_path).workspace
-        before = workspace.task("harbor", "task-0")
+def test_http_upload_size_limit_and_restart(tmp_path, monkeypatch):
+    workspace = fixture(tmp_path).workspace
+    before = workspace.task("harbor", "task-0")
     restored = Workspace(workspace.directory)
     assert restored.schema_version == migrations.current_version()
     assert restored.task("harbor", "task-0") == before

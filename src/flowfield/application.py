@@ -301,7 +301,7 @@ class Board(BaseModel):
     awaiting_application_count: int = 0
 
 
-# Immutable schema-29 baseline. New database changes belong in migrations.py.
+# Initialization baseline for schema 44. New database changes belong in migrations.py.
 SCHEMA = """
 CREATE TABLE projects (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL UNIQUE,
@@ -348,13 +348,56 @@ CREATE TABLE question_revisions (
     PRIMARY KEY(project_id, question_id, revision),
     FOREIGN KEY (project_id, question_id) REFERENCES questions(project_id, id)
 );
-PRAGMA user_version = 29;
+PRAGMA user_version = 44;
 """
 SCHEMA += EXECUTION_SCHEMA + INTEGRATION_SCHEMA
 
 SCHEMA += RESULT_SCHEMA + SEARCH_SCHEMA + INSPECTION_SCHEMA + STAGE_SCHEMA
 SCHEMA += REPLY_SCHEMA
 SCHEMA += ACTIVITY_SCHEMA
+SCHEMA += (
+    "\n"
+    "CREATE TABLE storage_metadata (id INTEGER PRIMARY KEY CHECK (id = 1), workspace_id "
+    "TEXT NOT NULL, revision INTEGER NOT NULL CHECK (revision >= 0));\n"
+    "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL,"
+    " app_version TEXT NOT NULL, backup TEXT);\n"
+    "CREATE TABLE notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT NOT NULL "
+    "UNIQUE, source TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL, "
+    "dismissed_at TEXT, resolved_at TEXT);\n"
+    "CREATE TABLE notification_deliveries (notification_id INTEGER NOT NULL REFERENCES "
+    "notifications(id) ON DELETE CASCADE, channel TEXT NOT NULL, claimed_at TEXT NOT NULL, "
+    "PRIMARY KEY(notification_id, channel));\n"
+    "CREATE TABLE notification_state (name TEXT PRIMARY KEY, data TEXT NOT NULL);\n"
+    "CREATE TABLE agent_settings (project_id TEXT NOT NULL REFERENCES projects(id), role "
+    "TEXT NOT NULL CHECK(role IN ('worker','coordinator')), scope TEXT NOT NULL, revision "
+    "INTEGER NOT NULL, selection TEXT, PRIMARY KEY(project_id,role,scope));\n"
+    "CREATE TABLE agent_permissions (number INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT "
+    "NULL UNIQUE, project_id TEXT NOT NULL REFERENCES projects(id), task_id TEXT, binding "
+    "TEXT NOT NULL, status TEXT NOT NULL, data TEXT NOT NULL, FOREIGN "
+    "KEY(project_id,task_id) REFERENCES tasks(project_id,id));\n"
+    "CREATE INDEX permissions_project ON agent_permissions(project_id,task_id,number);\n"
+    "CREATE INDEX permissions_binding ON agent_permissions(binding,status);\n"
+    "CREATE TABLE coordinator_conversations (number INTEGER PRIMARY KEY AUTOINCREMENT, id "
+    "TEXT NOT NULL UNIQUE, project_id TEXT NOT NULL REFERENCES projects(id), created_at "
+    "TEXT NOT NULL);\n"
+    "CREATE TABLE coordinator_turns (number INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT "
+    "NULL UNIQUE, project_id TEXT NOT NULL REFERENCES projects(id), conversation_id TEXT "
+    "NOT NULL REFERENCES coordinator_conversations(id), status TEXT NOT NULL, data TEXT NOT"
+    " NULL);\n"
+    "CREATE INDEX coordinator_projects ON coordinator_conversations(project_id,number);\n"
+    "CREATE INDEX coordinator_history ON coordinator_turns(conversation_id,number);\n"
+    "CREATE UNIQUE INDEX coordinator_active ON coordinator_turns(project_id) WHERE status "
+    "IN ('starting','running','stopping','uncertain');\n"
+    "CREATE INDEX coordinator_project_messages ON coordinator_turns(project_id,number);\n"
+    "CREATE TABLE attachments (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES "
+    "projects(id), task_id TEXT, name TEXT NOT NULL, mime TEXT NOT NULL, created_at TEXT "
+    "NOT NULL, content BLOB NOT NULL, size INTEGER NOT NULL, bound INTEGER NOT NULL DEFAULT"
+    " 0, FOREIGN KEY(project_id,task_id) REFERENCES tasks(project_id,id));\n"
+    "CREATE INDEX attachment_project ON attachments(project_id,task_id);\n"
+    "CREATE TABLE coordinator_sessions (project_id TEXT PRIMARY KEY REFERENCES "
+    "projects(id), harness TEXT NOT NULL, session_id TEXT NOT NULL, cwd TEXT NOT NULL);\n"
+    "INSERT INTO storage_metadata VALUES (1, lower(hex(randomblob(16))), 0);\n"
+)
 
 
 def now() -> str:
@@ -388,7 +431,7 @@ class Workspace:
                 require_current(db, self.schema_version)
                 yield db
                 changed = db.total_changes > 0
-                if changed and self.schema_version >= 30:
+                if changed:
                     db.execute("UPDATE storage_metadata SET revision=revision+1 WHERE id=1")
                 db.commit()
             except BaseException:
@@ -1069,7 +1112,7 @@ class Workspace:
             (task.project_id, task.id, *ACTIVE),
         ).fetchone():
             return ApplicationError(
-                "worker_owns_work", "Resolve the active worker before archiving.", 409
+                "worker_owns_work", "Finish or stop the worker before archiving.", 409
             )
         if db.execute(
             "SELECT 1 FROM task_replies WHERE project_id=? AND task_id=? "
@@ -1077,11 +1120,11 @@ class Workspace:
             (task.project_id, task.id),
         ).fetchone():
             return ApplicationError(
-                "reply_pending", "Cancel the pending message before archiving.", 409
+                "reply_pending", "Wait for the pending reply or cancel it before archiving.", 409
             )
         if task.status in ("in_progress", "in_review"):
             return ApplicationError(
-                "active_task", "Reconcile active work with the coordinator before archiving.", 409
+                "active_task", "Finish the task or return it to Backlog before archiving.", 409
             )
         return None
 

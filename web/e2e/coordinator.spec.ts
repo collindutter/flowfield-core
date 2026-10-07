@@ -530,9 +530,7 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     exact: true,
   });
   page.once("dialog", async (dialog) => {
-    expect(dialog.message()).toContain(
-      "native tool history will not be restored",
-    );
+    expect(dialog.message()).toContain("without previous tool history");
     await dialog.dismiss();
   });
   await reset.click();

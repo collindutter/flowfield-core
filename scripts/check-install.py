@@ -5,7 +5,6 @@ import json
 import os
 import re
 import socket
-import sqlite3
 import subprocess
 import sys
 import sysconfig
@@ -20,10 +19,11 @@ from mcp.client.streamable_http import streamable_http_client
 
 
 def check_storage(executable: str, cwd: str, env: dict[str, str]) -> None:
-    from flowfield.application import SCHEMA, Workspace
+    from flowfield import storage
+    from flowfield.application import Workspace
     from flowfield.migrations import BASELINE_VERSION, current_version
 
-    directory = Path(cwd) / "upgrade-state"
+    directory = (Path(cwd) / "storage-state").resolve()
 
     def command(*args: str) -> dict | list:
         return json.loads(
@@ -37,11 +37,10 @@ def check_storage(executable: str, cwd: str, env: dict[str, str]) -> None:
 
     assert command("status")["schema_version"] is None
     assert not directory.exists()
-    directory.mkdir()
-    with sqlite3.connect(directory / "workspace.sqlite3") as db:
-        db.executescript(SCHEMA)
-    assert command("status")["migration_required"] is True
     Workspace(directory)
+    assert command("status")["migration_required"] is False
+    with storage.maintenance(directory):
+        storage.snapshot(directory, reason="recovery")
     assert command("status")["schema_version"] == current_version()
     saved = command("backups")[0]
     assert saved["schema_version"] == BASELINE_VERSION
@@ -350,7 +349,7 @@ def main() -> None:
     print(
         "Installed package: project setup, CLI/API/MCP/UI, "
         "task board, briefing/handoff, activity, revisions, restart "
-        "offline storage upgrade/recovery, persistent notifications and update status passed."
+        "offline storage recovery, persistent notifications and update status passed."
     )
 
 

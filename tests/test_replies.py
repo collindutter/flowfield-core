@@ -245,54 +245,6 @@ def test_new_worker_discussion_is_rejected_without_scheduling(tmp_path):
     assert execution.claim("harbor", BASE, {}).purpose == "work"
 
 
-def test_upgrade_cancels_only_unassigned_discussions_and_preserves_evidence(tmp_path, monkeypatch):
-    from flowfield import migrations, storage
-    from flowfield.migrations import retire_worker_discussions
-    from flowfield.reply_models import Reply
-
-    with monkeypatch.context() as previous:
-        previous.setattr(
-            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 40)
-        )
-        execution = fixture(tmp_path)
-        request = message(execution.workspace)
-        with execution.workspace.connection(write=True) as db:
-            for index, (action, status) in enumerate(
-                [
-                    ("message", "pending"),
-                    ("message", "assigned"),
-                    ("message", "recorded"),
-                    ("observation", "recorded"),
-                ]
-            ):
-                reply = Reply(
-                    **request.model_dump(exclude={"id", "action"}),
-                    id=f"old-{index}",
-                    project_id="harbor",
-                    task_id="task-0",
-                    created_at="2026-10-06T00:00:00Z",
-                    action=action,
-                    status=status,
-                )
-                db.execute(
-                    "INSERT INTO task_replies VALUES (?,?,?,?,?)",
-                    ("harbor", "task-0", reply.id, reply.created_at, reply.model_dump_json()),
-                )
-    restored = Workspace(execution.workspace.directory)
-    assert storage.backups(restored.directory)[0]["schema_version"] == 40
-    with restored.connection(write=True) as db:
-        retire_worker_discussions(db)
-        retire_worker_discussions(db)
-        saved = [
-            Reply.model_validate_json(row[0])
-            for row in db.execute("SELECT data FROM task_replies ORDER BY id")
-        ]
-    assert [reply.status for reply in saved] == ["cancelled", "assigned", "recorded", "recorded"]
-    assert all(reply.body == request.body for reply in saved)
-    entry = ThreadView(restored).item_view("harbor", "task-0", "reply:old-0")
-    assert entry.body == request.body
-
-
 def test_retained_worker_discussion_cannot_be_retried(tmp_path):
     from flowfield.execution_models import RunAction
 

@@ -27,7 +27,7 @@ BACKUP_TIMEOUT = 60.0
 
 
 class Backup(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
     format: int = 1
     source_directory: str
     created_at: str
@@ -35,7 +35,6 @@ class Backup(BaseModel):
     workspace_id: str | None
     revision: int | None
     sha256: str
-    baseline_digest: str | None = None
 
 
 def acquire_lock(directory: Path, name: str, *, shared: bool = False) -> BinaryIO:
@@ -114,8 +113,6 @@ def integrity(db: sqlite3.Connection) -> None:
 
 
 def identity(db: sqlite3.Connection) -> tuple[str | None, int | None]:
-    if version(db) == migrations.BASELINE_VERSION:
-        return None, None
     row = db.execute("SELECT workspace_id, revision FROM storage_metadata WHERE id=1").fetchone()
     if row is None:
         raise ApplicationError("invalid_database", "Database storage identity is missing.", 409)
@@ -125,14 +122,6 @@ def identity(db: sqlite3.Connection) -> tuple[str | None, int | None]:
 def digest(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
-
-
-def baseline_digest(db: sqlite3.Connection) -> str:
-    result = hashlib.sha256()
-    for line in db.iterdump():
-        result.update(line.encode())
-        result.update(b"\n")
-    return result.hexdigest()
 
 
 def copy_database(source: sqlite3.Connection, target: Path) -> None:
@@ -180,7 +169,6 @@ def snapshot(directory: Path, *, reason: str) -> str:
                 workspace_id=workspace_id,
                 revision=revision,
                 sha256=digest(temporary / DATABASE),
-                baseline_digest=baseline_digest(saved) if saved_version == 29 else None,
             )
         manifest = temporary / "manifest.json"
         with manifest.open("x") as stream:
@@ -287,10 +275,19 @@ def validate_baseline(db: sqlite3.Connection, schema: str) -> None:
     )
     with closing(sqlite3.connect(":memory:")) as expected:
         expected.executescript(schema)
-        if db.execute(query).fetchall() != expected.execute(query).fetchall():
+
+        def definitions(connection: sqlite3.Connection) -> list[tuple[Any, ...]]:
+            # SQLite preserves DDL formatting. Compare tokens while keeping quoted
+            # values intact so equivalent table definitions share one baseline.
+            return [
+                (*row[:3], re.findall(r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|\w+|\S", row[3]))
+                for row in connection.execute(query)
+            ]
+
+        if definitions(db) != definitions(expected):
             raise ApplicationError(
                 "invalid_database",
-                "Schema 29 does not match the Flowfield baseline. Existing data is preserved.",
+                "Database does not match the Flowfield baseline. Existing data is preserved.",
                 409,
             )
 
@@ -432,15 +429,7 @@ def restore(directory: Path, name: str) -> dict[str, str]:
             current = version(db)
             require_supported(current)
             workspace_id, revision = identity(db)
-            if current == 29:
-                safe = info.schema_version == 29 and baseline_digest(db) == info.baseline_digest
-            elif info.schema_version == 29:
-                first = db.execute(
-                    "SELECT backup FROM schema_migrations WHERE version=30"
-                ).fetchone()
-                safe = revision == 0 and first is not None and first[0] == name
-            else:
-                safe = workspace_id == info.workspace_id and revision == info.revision
+            safe = workspace_id == info.workspace_id and revision == info.revision
             if not safe:
                 raise ApplicationError(
                     "restore_conflict",

@@ -352,22 +352,19 @@ function QuestionDetail({
               >
                 Open the new input
               </a>{" "}
-              and resume your coordinator to reconcile it.
+              and ask the coordinator to apply it.
             </p>
           )}
           {loaded.delivery && loaded.status !== "open" && (
             <p>{loaded.delivery.message}</p>
           )}
           {!loaded.delivery && loaded.status === "answered" && (
-            <p>
-              Your answer is saved. Resume your coordinator to reconcile it with
-              the project.
-            </p>
+            <p>Answer saved. Ask the coordinator to apply it.</p>
           )}
           {correcting && (
             <p>
-              This is new input. Your coordinator must reconcile it with work
-              already underway; the earlier answer stays unchanged.
+              Ask the coordinator to apply this correction to ongoing work. The
+              earlier answer stays unchanged.
             </p>
           )}
           {loaded.affected_task_keys.length > 0 && (

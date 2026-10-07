@@ -5,7 +5,6 @@ import pytest
 from fastapi.testclient import TestClient
 from project_fixtures import adopt, task_request
 
-from flowfield import migrations, storage
 from flowfield.api import create_app
 from flowfield.application import ProjectSetup, Workspace
 from flowfield.notification_api import NotificationService
@@ -104,18 +103,6 @@ def test_attention_is_persistent_without_desktop_opt_in_and_resolves_from_work(t
         assert db.execute(
             "SELECT resolved_at FROM notifications WHERE id=?", (saved.id,)
         ).fetchone()[0]
-
-
-def test_schema_30_upgrade_preserves_work_and_adds_empty_notification_state(tmp_path, monkeypatch):
-    with monkeypatch.context() as old:
-        old.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:1])
-        workspace = Workspace(tmp_path / "state")
-        adopt(workspace, ProjectSetup(path=str(tmp_path / "repo"), id="project"))
-        task = workspace.create_task("project", task_request(title="Keep me"))
-    workspace = Workspace(workspace.directory)
-    assert workspace.task("project", task.id) == task
-    assert not Notifications(workspace).page().items
-    assert storage.backups(workspace.directory)[0]["schema_version"] == 30
 
 
 def test_api_persistence_settings_dismissal_and_input_validation(tmp_path):

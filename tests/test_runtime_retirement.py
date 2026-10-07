@@ -4,7 +4,6 @@ import asyncio
 import json
 from pathlib import Path
 
-import pytest
 from test_managed_local import configured
 from test_results import current, fixture
 
@@ -31,82 +30,6 @@ def make_legacy(service, *, inventory=False):
             "UPDATE integration_settings SET data=? WHERE project_id='harbor'", (json.dumps(raw),)
         )
     return service.integrations.settings("harbor")
-
-
-@pytest.mark.parametrize("override", [True, False])
-def test_schema34_upgrades_local_and_unifies_chat_without_rewriting_history(
-    tmp_path, monkeypatch, override
-):
-    from flowfield import migrations
-    from flowfield.agent_models import AgentChoice, AgentSettingsEdit
-    from flowfield.agent_settings import AgentSettings
-    from flowfield.application import Workspace, now
-    from flowfield.coordinator_models import CoordinatorSend
-    from flowfield.coordinator_store import CoordinatorStore
-    from flowfield.execution import Execution
-    from flowfield.integration import Integrations
-
-    with monkeypatch.context() as older:
-        older.setattr(
-            migrations, "MIGRATIONS", [m for m in migrations.MIGRATIONS if m.version <= 34]
-        )
-        service, repo, run = fixture(tmp_path)
-        old = make_legacy(service, inventory=True)
-        settings = AgentSettings(service.workspace)
-        settings.edit(
-            "harbor",
-            "coordinator",
-            AgentSettingsEdit(
-                expected_revision=1, selection=AgentChoice(model="default", effort="low")
-            ),
-        )
-        store = CoordinatorStore(service.workspace)
-        first = store.new("harbor")
-        turn, _ = store.reserve(
-            "harbor", first.id, CoordinatorSend(id="old-message-123456", text="Keep this")
-        )
-        with service.workspace.connection(write=True) as db:
-            turn.status = "completed"
-            turn.native_started = True
-            store._save(db, turn)
-            db.execute(
-                "INSERT INTO coordinator_conversations(id,project_id,created_at) "
-                "VALUES ('second','harbor',?)",
-                (now(),),
-            )
-            db.execute(
-                "INSERT INTO agent_settings VALUES ('harbor','coordinator','second',3,?)",
-                (
-                    AgentChoice(model="selected", effort="high").model_dump_json()
-                    if override
-                    else None,
-                ),
-            )
-            db.execute(
-                "UPDATE runs SET data=json_set(data,'$.runtime','legacy') WHERE id=?", (run.id,)
-            )
-        second, _ = store.reserve(
-            "harbor", "second", CoordinatorSend(id="second-message-123456", text="Keep this too")
-        )
-        with service.workspace.connection(write=True) as db:
-            second.status = "completed"
-            store._save(db, second)
-        before = Execution(service.workspace).get("harbor", run.id)
-    upgraded = Workspace(service.workspace.directory)
-    current_settings = Integrations(upgraded).settings("harbor")
-    assert current_settings.runtime == "local" and current_settings.revision == old.revision + 1
-    assert current_settings.environment == old.environment
-    assert Execution(upgraded).get("harbor", run.id) == before
-    assert AgentSettings(upgraded).get("harbor", "coordinator").selection.model == (
-        "selected" if override else "default"
-    )
-    restored = CoordinatorStore(upgraded)
-    assert restored.get("harbor", turn.id) == turn
-    assert [item.id for item in restored.page("harbor").items] == [turn.id, second.id]
-    assert restored.page("harbor").active is None
-    assert restored.new("harbor").id == "second"
-    # Reopening is idempotent; messages and original native/turn settings survive.
-    assert Integrations(Workspace(upgraded.directory)).settings("harbor") == current_settings
 
 
 def test_historical_workspaces_and_saved_inspections_remain_readable(tmp_path):

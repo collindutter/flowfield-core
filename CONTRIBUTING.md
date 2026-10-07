@@ -65,9 +65,11 @@ keep real Git, cleanup, concurrency and exact-approval coverage intact.
 
 ## Database changes
 
-Schema 29 is the immutable initialization baseline, captured in
-`tests/fixtures/schema_29.sql`. Append each schema change to the ordered registry in
+Schema 44 is the initialization baseline, captured in
+`tests/fixtures/schema_44.sql`. Append each schema change to the ordered registry in
 `src/flowfield/migrations.py`; do not edit previous migrations or the baseline SQL.
+The 0.1.0 rehearsal and intermediate development schemas are unsupported. New workspaces
+start at this baseline; startup never resets an older workspace.
 Migration callbacks change only the database using `execute`/`executemany`. The storage
 owner controls the transaction, version, migration history and pre-upgrade snapshot;
 callbacks must not commit, use `executescript`, or mutate project files or artifacts.

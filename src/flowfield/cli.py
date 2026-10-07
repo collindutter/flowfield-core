@@ -339,7 +339,7 @@ def readiness_text(task: dict[str, Any]) -> str:
     if task.get("readiness") == "needs_reconciliation" and not task.get("reconciliation_reason"):
         return "Changed requirements need reconciliation"
     if task.get("reconciliation_reason"):
-        return f"Needs reconciliation: {task['reconciliation_reason']}"
+        return f"Needs update: {task['reconciliation_reason']}"
     if task.get("blocking_question_count") or task.get("blocking_questions"):
         return "Awaiting input application; use inbox list for the questions"
     if task.get("blocked_count") and not task.get("blocked_by"):
@@ -484,7 +484,7 @@ def display(result: Any) -> None:
                 publication_labels = {
                     "published": "Published",
                     "draft": "Draft",
-                    "needs_reconciliation": "Needs reconciliation",
+                    "needs_reconciliation": "Needs update",
                 }
                 typer.echo(f"Publication: {publication_labels[result['publication_status']]}")
             typer.echo(readiness_text(result))

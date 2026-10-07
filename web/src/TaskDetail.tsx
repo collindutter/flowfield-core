@@ -193,7 +193,7 @@ export function TaskDetail({
                 variant="outline"
                 disabled={busy || !!archiveReason}
                 title={`Archive ${task.key}?`}
-                description="This removes the task from the board without marking it Done. You can restore it from Archive."
+                description="Remove this task from the board? Its status stays the same. Restore it from Archive anytime."
                 action={() => void archive()}
               >
                 Archive

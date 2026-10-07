@@ -6,14 +6,10 @@ import pytest
 from test_coordinator import message, settled, setup
 from test_execution import BASE, fixture
 
-from flowfield import migrations
 from flowfield.adapters.codex_agent import CodexAgent
 from flowfield.agent_models import AgentChoice, AgentSettingsEdit
 from flowfield.agent_settings import AgentSettings
-from flowfield.application import Workspace
-from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
-from flowfield.execution import Execution
 from flowfield.execution_models import SettingsEdit
 
 
@@ -80,52 +76,3 @@ def test_worker_speed_defaults_off_with_task_overrides_and_frozen_history(tmp_pa
     settings.edit("harbor", "worker", AgentSettingsEdit(expected_revision=2), "task-0")
     assert settings.get("harbor", "worker", "task-0").effective.choice.fast is False
     assert execution.get("harbor", run.id).agent_settings.choice.fast is True
-
-
-def test_fast_migration_preserves_unknown_historical_settings(tmp_path, monkeypatch):
-    with monkeypatch.context() as old:
-        old.setattr(
-            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 38)
-        )
-        service, conversation = setup(tmp_path, monkeypatch)
-        with service.workspace.connection(write=True) as db:
-            db.execute("UPDATE agent_settings SET selection=json_remove(selection,'$.fast')")
-        turn, _ = service.coordinator.store.reserve("harbor", conversation.id, message())
-        assert turn.settings.choice.fast is None
-        with service.workspace.connection(write=True) as db:
-            turn.status = "completed"
-            service.coordinator.store._save(db, turn)
-    workspace = Workspace(service.workspace.directory)
-    assert AgentSettings(workspace).get("harbor", "coordinator").effective.choice.fast is False
-    assert CoordinatorStore(workspace).get("harbor", turn.id).settings.choice.fast is None
-
-
-def test_removing_project_speed_preserves_task_choices_and_frozen_attempts(tmp_path, monkeypatch):
-    with monkeypatch.context() as old:
-        old.setattr(
-            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 39)
-        )
-        execution = fixture(tmp_path, count=2)
-        settings = AgentSettings(execution.workspace)
-        settings.edit(
-            "harbor",
-            "worker",
-            AgentSettingsEdit(
-                expected_revision=1,
-                selection=AgentChoice(model="test-model", effort="low", fast=True),
-            ),
-            "task-0",
-        )
-        run = execution.claim("harbor", BASE, {BASE: set()})
-        revision = execution.settings("harbor").revision
-        with execution.workspace.connection(write=True) as db:
-            db.execute("UPDATE worker_settings SET data=json_set(data,'$.fast',json('true'))")
-    workspace = Workspace(execution.workspace.directory)
-    restored = Execution(workspace)
-    assert restored.settings("harbor").revision == revision + 1
-    assert "fast" not in restored.settings("harbor").model_dump()
-    assert AgentSettings(workspace).get("harbor", "worker", "task-0").effective.choice.fast is True
-    assert AgentSettings(workspace).get("harbor", "worker", "task-1").effective.choice.fast is False
-    assert restored.get("harbor", run.id).agent_settings.choice.fast is True
-    with workspace.connection() as db:
-        assert '"fast"' not in db.execute("SELECT data FROM worker_settings").fetchone()[0]

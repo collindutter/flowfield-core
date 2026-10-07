@@ -1091,9 +1091,7 @@ function ArchiveList({
                 <span className="archive-task">
                   <TaskIdentity task={task} />
                   {task.reconciliation_reason && (
-                    <span className="readiness blocked">
-                      Needs reconciliation
-                    </span>
+                    <span className="readiness blocked">Needs update</span>
                   )}
                   {task.milestone_id && (
                     <span className="archive-labels">

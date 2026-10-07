@@ -371,28 +371,6 @@ def test_local_commits_capture_original_base_without_moving_shared_branch(tmp_pa
     assert baseline(repo) == base
 
 
-def test_schema32_upgrade_retains_legacy_runtime_and_live_ownership(tmp_path, monkeypatch):
-    from flowfield import migrations
-    from flowfield.application import Workspace
-    from flowfield.execution import Execution
-
-    with monkeypatch.context() as older:
-        older.setattr(
-            migrations, "MIGRATIONS", [m for m in migrations.MIGRATIONS if m.version <= 32]
-        )
-        execution = fixture(tmp_path)
-        run = execution.claim("harbor", "a" * 40, {"a" * 40: set()})
-        execution.save_local(run.id, {"pid": 1234567, "commands": ["retained-tool"]})
-        with execution.workspace.connection(write=True) as db:
-            db.execute("UPDATE runs SET data=json_remove(data,'$.runtime','$.applied_agent')")
-        identity = execution.workspace.directory
-    upgraded = Workspace(identity)
-    current = Execution(upgraded).get("harbor", run.id)
-    assert current.runtime == "legacy" and current.status == "preparing"
-    assert Execution(upgraded).local(run.id) == {"pid": 1234567, "commands": ["retained-tool"]}
-    assert Supervisor(upgraded).integrations.settings("harbor").runtime == "local"
-
-
 def test_public_permission_projection_keeps_commands_and_diff_but_not_private_inputs():
     from acp.schema import ToolCallUpdate
 

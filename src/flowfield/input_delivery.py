@@ -113,12 +113,12 @@ def question_delivery(
         or (run.completion == "code" and target != run.target_branch)
     ):
         return state(
-            "Needs reconciliation",
+            "Needs update",
             (
                 task["reconciliation_reason"]
                 or "The task's assignment, ownership or destination changed since this question."
             )
-            + " Resume your coordinator to confirm whether this answer still applies.",
+            + " Ask the coordinator whether this answer still applies.",
         )
     if row["status"] == "open":
         return state("Needs your answer", "Send an answer to continue this task.", stop=True)

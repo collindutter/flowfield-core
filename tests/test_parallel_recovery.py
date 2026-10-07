@@ -39,7 +39,7 @@ def test_changed_stage_agreement_blocks_only_its_task_until_coordinator_reconcil
     brief = ContextReads(workspace).task("harbor", task.id)
     assert task.readiness == card.readiness == brief["readiness"] == "needs_reconciliation"
     assert task.preparation_issue == card.preparation_issue == brief["preparation_issue"]
-    assert "reconcile the stages" in task.preparation_issue
+    assert "update its stages" in task.preparation_issue
     assert card.state.label == "Reconcile stages"
     board = BrowserReads(workspace).board("harbor")
     assert next(item for item in board.tasks if item.id == task.id).state == card.state

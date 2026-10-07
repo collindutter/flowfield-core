@@ -77,12 +77,10 @@ def preparation_issue(
     if task.status != "done" and stages_need_reconciliation(
         db, task.project_id, task.id, task.agreement_revision
     ):
-        return (
-            "Stages describe an older agreement. Resume your coordinator to reconcile the stages."
-        )
+        return "Task changed. Ask the coordinator to update its stages."
     state = publication_status(task)
     if state == "needs_reconciliation":
-        return "Requirements changed. Resume your coordinator to reconcile this work."
+        return "Task changed. Review it with the coordinator before continuing."
     if state == "published" or task.status not in ("backlog", "up_next"):
         return None
     has_description = db.execute(
@@ -93,5 +91,5 @@ def preparation_issue(
     if not has_description:
         return "Describe the requested outcome with your coordinator."
     if task.publication:
-        return "Requirements changed. Resume your coordinator to prepare this work."
-    return "Resume your coordinator to prepare the agreed work." if include_draft_hint else None
+        return "Task changed. Ask the coordinator to prepare it again."
+    return "Ask the coordinator to prepare this task." if include_draft_hint else None

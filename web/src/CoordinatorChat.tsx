@@ -258,7 +258,7 @@ export function CoordinatorChat({
     if (
       operation === "reset-session" &&
       !window.confirm(
-        "Start a new agent session? Your saved chat stays here. Only a bounded recent chat handoff will be carried into the new session; native tool history will not be restored.",
+        "Start a new agent session? Your chat stays here. The agent receives recent messages, without previous tool history.",
       )
     )
       return;
@@ -365,9 +365,7 @@ export function CoordinatorChat({
                   ),
                 )}
                 {turn.activity.omitted && (
-                  <p className="muted">
-                    Earlier output was omitted to keep this turn bounded.
-                  </p>
+                  <p className="muted">Earlier output was omitted.</p>
                 )}
                 {turn.notice && <p role="status">{turn.notice}</p>}
                 <div className="detail-metadata" role="status">

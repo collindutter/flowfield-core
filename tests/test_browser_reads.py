@@ -134,7 +134,9 @@ def test_archive_availability_shares_write_policy_and_rechecks_races(tmp_path: P
     active = workspace.record_progress(
         project.id, active.id, TaskProgress(expected_revision=active.revision, status="in_progress")
     )
-    assert "Reconcile active work" in (reads.task(project.id, active.id).archive_blocker or "")
+    assert "Finish the task or return it to Backlog" in (
+        reads.task(project.id, active.id).archive_blocker or ""
+    )
     with TestClient(create_app(data_dir=tmp_path / "state"), base_url="http://127.0.0.1") as client:
         edited = client.put(
             f"/api/projects/{project.id}/view/tasks/{active.id}",

@@ -33,8 +33,7 @@ export function PermissionControl({
       {record.status === "pending" ? (
         <>
           <p>
-            The harness is waiting for your decision. This does not approve code
-            delivery.
+            The agent needs permission to continue. Code approval is separate.
           </p>
           <div className="actions">
             {record.options.map((option) => (

@@ -117,9 +117,7 @@ export function RunActivity({
             }}
           >
             {page.omitted && (
-              <p className="muted">
-                Earlier activity omitted to keep this feed bounded.
-              </p>
+              <p className="muted">Earlier activity was omitted.</p>
             )}
             <ActivityEntries items={page.items} />{" "}
           </div>

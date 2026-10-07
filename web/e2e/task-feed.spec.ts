@@ -868,7 +868,7 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
   await expect(draft).toBeVisible();
   await draft.focus();
   await expect(page.getByRole("tooltip")).toContainText(
-    "Resume your coordinator to prepare the agreed work.",
+    "Ask the coordinator to prepare this task.",
   );
   await page.keyboard.press("Escape");
   await expect(page.getByRole("tooltip")).toHaveCount(0);

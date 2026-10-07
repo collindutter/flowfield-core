@@ -124,7 +124,7 @@ def task_state(
     if question:
         return question_state(db, project, question["id"])
     if task["reason"]:
-        return WorkState(label="Reconcile task", tone="attention", href=href)
+        return WorkState(label="Update task", tone="attention", href=href)
     if (
         not task["archived"]
         and task["status"] != "done"

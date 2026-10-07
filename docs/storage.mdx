@@ -17,6 +17,9 @@ Choose another workspace directory with `FLOWFIELD_DATA_DIR` or `flowfield --dat
 
 ## Upgrades
 
+The current storage baseline is schema 44. Earlier rehearsal schemas are unsupported;
+Flowfield leaves them untouched. Use a separate data directory to start fresh.
+
 On startup, Flowfield upgrades supported databases automatically. Before changing an
 existing database, it saves a verified snapshot in `~/.flowfield/backups/` (or your chosen
 data directory). Migration steps run in one transaction. An error or interrupted process

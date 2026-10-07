@@ -105,7 +105,7 @@ def result_action(
             return ResultAction(
                 owner="coordinator",
                 action="coordinator",
-                label="Reconcile task",
+                label="Update task",
                 reason=(
                     "Requirements or prerequisites changed. Resume the "
                     "coordinator with this task link before requesting revised work."
@@ -130,11 +130,8 @@ def result_action(
         return ResultAction(
             owner="coordinator",
             action="coordinator",
-            label="Reconcile task",
-            reason=(
-                "Resume the coordinator to reconcile the agreed outcome and "
-                "destination with this result."
-            ),
+            label="Update task",
+            reason="Ask the coordinator to align the task and destination with this result.",
         )
     if value.problem_code == "partial_outcome":
         return ResultAction(

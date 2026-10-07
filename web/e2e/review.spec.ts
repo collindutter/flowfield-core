@@ -811,14 +811,14 @@ test("inspection preserves exact versions, preview edits and direct approval", a
     .filter({ hasText: /^Try result$/ })
     .click();
   await expect(
-    preview().getByText("Local changes are present.", { exact: false }),
+    preview().getByText("excluding edits in this copy.", { exact: false }),
   ).toBeVisible();
   await expect(
-    preview().getByText("A newer result or attempt exists.", { exact: false }),
+    preview().getByText("A newer result or run exists.", { exact: false }),
   ).toBeVisible();
   await preview().getByRole("button", { name: "Prepare another copy" }).click();
   await expect(
-    preview().getByText("Local changes are present.", { exact: false }),
+    preview().getByText("excluding edits in this copy.", { exact: false }),
   ).toHaveCount(0);
   expect(readFileSync(join(copy.workspace, "app.py"), "utf8")).toContain(
     "Preview edit",

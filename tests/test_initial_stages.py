@@ -6,7 +6,6 @@ import pytest
 from project_fixtures import adopt
 from pydantic import ValidationError
 
-from flowfield import migrations
 from flowfield.application import ProjectSetup, TaskCreate, TaskEdit, TaskPreparation, Workspace
 from flowfield.errors import ApplicationError
 from flowfield.stage_models import Stage, StageChange
@@ -78,33 +77,3 @@ def test_stages_required_and_atomic_preparation_rollback(tmp_path):
             ][0]["outcome"]
             == "Identify the cause"
         )
-
-
-def test_initial_stage_migration_preserves_existing_plans_and_task_history(tmp_path, monkeypatch):
-    directory = tmp_path / "state"
-    with monkeypatch.context() as old:
-        old.setattr(
-            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 42)
-        )
-        workspace = Workspace(directory)
-        adopt(workspace, ProjectSetup(path=str(tmp_path / "project")))
-        existing = workspace.create_task("project", request(id="existing"))
-        missing = workspace.create_task("project", request(id="missing"))
-        done = workspace.create_task("project", request(id="done"))
-        before = Stages(workspace).get("project", existing.id)
-        with workspace.connection(write=True) as db:
-            db.execute("DELETE FROM stage_plans WHERE task_id IN (?,?)", (missing.id, done.id))
-            db.execute(
-                "UPDATE tasks SET data=json_set(data,'$.status','done') WHERE id=?", (done.id,)
-            )
-            revisions = db.execute("SELECT * FROM task_revisions").fetchall()
-    upgraded = Workspace(directory)
-    stages = Stages(upgraded)
-    assert stages.get("project", existing.id) == before
-    assert stages.get("project", missing.id).stages[0].status == "planned"
-    assert stages.get("project", done.id).stages[0].status == "completed"
-    with upgraded.connection() as db:
-        assert db.execute("SELECT * FROM task_revisions").fetchall() == revisions
-    assert Stages(Workspace(directory)).get("project", missing.id) == stages.get(
-        "project", missing.id
-    )

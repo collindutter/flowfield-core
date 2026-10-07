@@ -89,7 +89,7 @@ export function TaskNeeds({
                 {q.delivery
                   ? q.delivery.message
                   : q.status === "answered"
-                    ? "Resume your coordinator to use the saved answer:"
+                    ? "Ask the coordinator to apply your answer:"
                     : "Needs your answer before work can continue:"}
               </p>
             )}
@@ -103,7 +103,7 @@ export function TaskNeeds({
                   : q.delivery
                     ? q.delivery.state
                     : q.status === "answered"
-                      ? "Resume coordinator to use your answer"
+                      ? "Ask coordinator to apply answer"
                       : "Needs your answer"}
               </WorkspaceLink>
             ) : (

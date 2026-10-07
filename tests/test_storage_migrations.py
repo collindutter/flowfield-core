@@ -50,7 +50,7 @@ def logical_data(directory):
 
 
 def test_frozen_baseline_and_fresh_initialization(tmp_path):
-    frozen = Path(__file__).with_name("fixtures") / "schema_29.sql"
+    frozen = Path(__file__).with_name("fixtures") / "schema_44.sql"
     assert SCHEMA == frozen.read_text()  # Editing baseline would invalidate existing upgrades.
     workspace = Workspace(tmp_path / "state")
     with raw(workspace.directory) as db:
@@ -61,6 +61,37 @@ def test_frozen_baseline_and_fresh_initialization(tmp_path):
         ]
     assert storage.backups(workspace.directory) == []
     assert Workspace(workspace.directory).projects() == []
+
+
+def test_current_workspace_reopens_without_rewriting_records(tmp_path):
+    workspace = execution_fixture(tmp_path).workspace
+    workspace.add_activity("harbor", ActivityCreate(task_id="task-0", body="Keep this observation"))
+    with raw(workspace.directory) as db:
+        db.execute("INSERT INTO schema_migrations VALUES (44, '2026-10-06', '0.1.0', NULL)")
+    before = logical_data(workspace.directory)
+    for _ in range(2):
+        Workspace(workspace.directory)
+        assert logical_data(workspace.directory) == before
+    assert storage.backups(workspace.directory) == []
+
+
+def test_baseline_upgrade_accepts_ddl_spacing_but_not_changed_constraints(tmp_path, monkeypatch):
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
+    for name, kinds, supported in (
+        ("equivalent", "'note',  'handoff','event'", True),
+        ("different", "'note','event'", False),
+    ):
+        directory = tmp_path / name
+        directory.mkdir()
+        with sqlite3.connect(directory / storage.DATABASE) as db:
+            db.executescript(SCHEMA.replace("'note', 'handoff', 'event'", kinds))
+        before = logical_data(directory)
+        if supported:
+            assert Workspace(directory).schema_version == CURRENT + 1
+        else:
+            with pytest.raises(ApplicationError, match="does not match"):
+                Workspace(directory)
+            assert logical_data(directory) == before
 
 
 def test_baseline_upgrade_preserves_approved_result_and_real_git_delivery(tmp_path, monkeypatch):
@@ -78,12 +109,13 @@ def test_baseline_upgrade_preserves_approved_result_and_real_git_delivery(tmp_pa
         assignment = service.execution.assignment("harbor", run.id)
         database_before = logical_data(service.workspace.directory)
     directory = service.workspace.directory
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
     upgraded = Supervisor(Workspace(directory))
     assert current(upgraded) == saved_result
     assert upgraded.workspace.activity("harbor", task_id="work") == activity
     assert upgraded.execution.assignment("harbor", run.id) == assignment
     backup = storage.backups(directory)[0]
-    assert backup["schema_version"] == 29
+    assert backup["schema_version"] == CURRENT
     with closing(
         storage.connect(storage.backup_path(directory, backup["id"]) / storage.DATABASE)
     ) as db:
@@ -111,6 +143,7 @@ def test_answer_and_interrupted_run_survive_upgrade_and_continue_once(tmp_path, 
         execution.started("harbor", independent.id)
         saved_answer = answer(Questions(execution.workspace), q)
         execution.finish("harbor", run.id, "waiting_for_input", input_checkpoint=RESULT)
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
     recovered = Execution(Workspace(execution.workspace.directory))
     recovered.restart()
     assert not recovered.settings("harbor").enabled
@@ -145,7 +178,7 @@ def test_multi_step_failure_rolls_back_data_ddl_versions_and_bounds_backups(tmp_
     assert len(storage.backups(workspace.directory)) == storage.BACKUP_LIMIT
     with raw(workspace.directory) as db:
         assert storage.version(db) == CURRENT
-        assert db.execute("SELECT max(version) FROM schema_migrations").fetchone() == (CURRENT,)
+        assert db.execute("SELECT version FROM schema_migrations").fetchall() == []
 
 
 def test_backup_failure_prevents_any_upgrade(tmp_path, monkeypatch):
@@ -241,7 +274,7 @@ def test_upgrade_between_construction_and_service_start_is_refused(tmp_path, mon
         pass
 
 
-@pytest.mark.parametrize("schema_version", [0, 999])
+@pytest.mark.parametrize("schema_version", [0, 29, 43, 999])
 def test_unversioned_nonempty_and_newer_databases_are_unchanged(tmp_path, schema_version):
     with sqlite3.connect(tmp_path / storage.DATABASE) as db:
         db.execute("CREATE TABLE saved (value TEXT)")
@@ -254,10 +287,11 @@ def test_unversioned_nonempty_and_newer_databases_are_unchanged(tmp_path, schema
     assert storage.backups(tmp_path) == []
 
 
-def test_wrong_baseline_is_not_adopted(tmp_path):
+def test_wrong_baseline_is_not_adopted(tmp_path, monkeypatch):
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
     with sqlite3.connect(tmp_path / storage.DATABASE) as db:
         db.execute("CREATE TABLE unrelated (value TEXT)")
-        db.execute("PRAGMA user_version=29")
+        db.execute(f"PRAGMA user_version={CURRENT}")
     with pytest.raises(ApplicationError, match="does not match"):
         Workspace(tmp_path)
     assert storage.backups(tmp_path) == []
@@ -295,12 +329,13 @@ def test_baseline_recovery_and_invalid_backup_guard(tmp_path, monkeypatch):
     with monkeypatch.context() as baseline:
         baseline.setattr(migrations, "MIGRATIONS", ())
         workspace = Workspace(tmp_path / "state")
+    later(monkeypatch, Migration(CURRENT + 1, add_column))
     Workspace(workspace.directory)
     saved = storage.backups(workspace.directory)[0]["id"]
     with pytest.raises(ApplicationError, match="Choose a backup"):
         storage.restore(workspace.directory, "../workspace.sqlite3")
     storage.restore(workspace.directory, saved)
-    assert storage.status(workspace.directory)["schema_version"] == 29
+    assert storage.status(workspace.directory)["schema_version"] == CURRENT
     Workspace(workspace.directory)
     newest = storage.backups(workspace.directory)[0]["id"]
     target = storage.backup_path(workspace.directory, newest) / storage.DATABASE

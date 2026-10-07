@@ -289,7 +289,7 @@ export function Result({
                     <p>{version.next_action.reason}</p>
                     {version.next_action.action === "coordinator" && (
                       <p>
-                        Continue your coordinating conversation with{" "}
+                        Ask the coordinator about{" "}
                         <WorkspaceLink
                           to={taskHref(projectId, { key: taskKey })}
                         >

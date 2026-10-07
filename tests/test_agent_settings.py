@@ -5,12 +5,10 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from test_execution import BASE, fixture
 
-from flowfield import migrations
 from flowfield.agent_models import AgentChoice, AgentSettingsEdit
 from flowfield.agent_settings import AgentSettings
 from flowfield.application import Workspace
 from flowfield.errors import ApplicationError
-from flowfield.execution import Execution
 from flowfield.execution_models import SettingsEdit
 
 
@@ -75,27 +73,6 @@ def test_concurrent_edits_have_one_winner(tmp_path):
         results = list(pool.map(save, ["first", "second"]))
     assert results.count("revision_conflict") == 1
     assert settings.get("harbor", "worker", "task-0").revision == 2
-
-
-def test_schema31_upgrade_preserves_worker_settings_and_run(tmp_path, monkeypatch):
-    with monkeypatch.context() as old:
-        old.setattr(migrations, "MIGRATIONS", migrations.MIGRATIONS[:2])
-        execution = fixture(tmp_path)
-        before = execution.settings("harbor")
-        run = execution.claim("harbor", BASE, {BASE: set()})
-        # Actual historical records have no provenance field.
-        with execution.workspace.connection(write=True) as db:
-            db.execute("UPDATE runs SET data=json_remove(data,'$.agent_settings')")
-    upgraded = Workspace(execution.workspace.directory)
-    assert upgraded.schema_version == migrations.current_version()
-    assert Execution(upgraded).settings("harbor") == before
-    saved = Execution(upgraded).get("harbor", run.id)
-    assert saved.model == run.model and saved.agent_settings is None
-    settings = AgentSettings(upgraded)
-    assert settings.get("harbor", "worker", "task-0").effective.choice.model == before.model
-    assert settings.get("harbor", "coordinator").effective is None
-    with upgraded.connection() as db:
-        assert db.execute("SELECT count(*) FROM agent_permissions").fetchone()[0] == 0
 
 
 def test_worker_retry_resolves_override_again(tmp_path):

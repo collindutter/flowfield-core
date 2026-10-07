@@ -91,15 +91,12 @@ export function Inspection({
           </p>
           {value.source_changed && (
             <p>
-              A newer result or attempt exists. This copy still contains the
-              selected earlier review.
+              A newer result or run exists. This copy contains the selected
+              review.
             </p>
           )}
           {value.locally_changed && (
-            <p>
-              Local changes are present. Approval still uses the saved
-              candidate; it does not include edits in this copy.
-            </p>
+            <p>Approval uses the saved result, excluding edits in this copy.</p>
           )}
           {value.instructions_changed && (
             <p>
@@ -113,10 +110,7 @@ export function Inspection({
             </Alert>
           )}
           {value.status === "preparing" && (
-            <p>
-              Preparation has not finished. Retry preparation if the service was
-              interrupted.
-            </p>
+            <p>Still preparing. Retry if the service was interrupted.</p>
           )}
           {value.workspace && (
             <p>
@@ -159,8 +153,7 @@ export function Inspection({
                 <WorkspaceLink to={`/projects/${projectId}/edit/integration`}>
                   Integration settings
                 </WorkspaceLink>
-                , then prepare another copy. Your coordinator can help choose
-                it.
+                , then prepare another copy.
               </p>
             ))}
           {(value.locally_changed ||

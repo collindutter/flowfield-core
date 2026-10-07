@@ -57,7 +57,7 @@ class CoordinatorStore:
                 )
             db.execute("DELETE FROM coordinator_sessions WHERE project_id=?", (project,))
             turn = self._get(db, project, failed_turn)
-            turn.notice += " You chose a new native session; saved chat remains."
+            turn.notice += " New agent session selected. Your chat is saved."
             self._save(db, turn)
 
     @staticmethod

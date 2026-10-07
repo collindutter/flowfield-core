@@ -202,18 +202,14 @@ def test_missing_native_session_requires_explicit_bound_reset(tmp_path, monkeypa
     asyncio.run(exercise())
 
 
-def test_schema36_history_is_preserved_for_one_time_native_bootstrap(tmp_path, monkeypatch):
-    with monkeypatch.context() as older:
-        older.setattr(
-            migrations, "MIGRATIONS", tuple(m for m in migrations.MIGRATIONS if m.version <= 36)
-        )
-        service, conversation = setup(tmp_path, monkeypatch)
-        old, _ = service.coordinator.store.reserve(
-            "harbor", conversation.id, message("Keep existing intent")
-        )
-        with service.workspace.connection(write=True) as db:
-            old.status = "completed"
-            service.coordinator.store._save(db, old)
+def test_saved_history_bootstraps_native_session_once(tmp_path, monkeypatch):
+    service, conversation = setup(tmp_path, monkeypatch)
+    old, _ = service.coordinator.store.reserve(
+        "harbor", conversation.id, message("Keep existing intent")
+    )
+    with service.workspace.connection(write=True) as db:
+        old.status = "completed"
+        service.coordinator.store._save(db, old)
     restored = Supervisor(Workspace(service.workspace.directory))
     assert restored.workspace.schema_version == migrations.current_version()
     assert restored.coordinator.store.get("harbor", old.id) == old
@@ -333,11 +329,9 @@ def test_atomic_reservation_frozen_settings_and_bounded_late_output(tmp_path, mo
         store.reserve("harbor", conversation.id, CoordinatorSend(id=turn.id, text="changed"))
 
 
-def test_crash_recovery_never_replays_and_schema33_upgrade(tmp_path, monkeypatch):
-    with monkeypatch.context() as old:
-        old.setattr(migrations, "MIGRATIONS", [m for m in migrations.MIGRATIONS if m.version <= 33])
-        workspace = fixture(tmp_path).workspace
-        project = workspace.project("harbor")
+def test_crash_recovery_never_replays(tmp_path, monkeypatch):
+    workspace = fixture(tmp_path).workspace
+    project = workspace.project("harbor")
     upgraded = Workspace(workspace.directory)
     assert (
         upgraded.schema_version == migrations.current_version()

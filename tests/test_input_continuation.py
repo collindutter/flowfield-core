@@ -129,7 +129,7 @@ def test_answers_do_not_override_execution_gates(tmp_path, gate):
     assert current.delivery.state in (
         "Paused",
         "Continuation blocked",
-        "Needs reconciliation",
+        "Needs update",
         "Check execution",
     )
 
