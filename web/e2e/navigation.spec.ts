@@ -546,6 +546,14 @@ test("entity identity and drafts persist across task and project tabs", async ({
   await expect(creation.getByLabel("Title", { exact: true })).toBeVisible();
   await expect(creation.getByLabel("Add prerequisite")).toHaveCount(0);
   await page.keyboard.press("Escape");
+  let releaseSettings!: () => void;
+  const settingsReady = new Promise<void>((resolve) => {
+    releaseSettings = resolve;
+  });
+  await page.route(`**/api/projects/${project}/workers`, async (route) => {
+    await settingsReady;
+    await route.continue();
+  });
   await page
     .getByRole("button", { name: "Project details", exact: true })
     .click();
@@ -553,6 +561,8 @@ test("entity identity and drafts persist across task and project tabs", async ({
   await expect(page).toHaveURL(
     new RegExp(`/projects/${project}/edit/workers$`),
   );
+  await expect(page.getByLabel("Maximum parallel workers")).toBeDisabled();
+  releaseSettings();
   await page.getByLabel("Maximum parallel workers").fill("3");
   await page.getByRole("tab", { name: "Integration", exact: true }).click();
   await page

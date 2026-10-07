@@ -444,10 +444,9 @@ test("existing-project adoption previews and preserves coordinator guidance", as
   await expect(
     page.getByRole("region", { name: "Project setup instructions" }),
   ).toBeVisible();
-  await page.getByText("Add a project from the CLI", { exact: true }).click();
   await expect(
-    page.getByText("flowfield --port 8766 project init", { exact: true }),
-  ).toBeVisible();
+    page.getByText("Add a project from the CLI", { exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByLabel("Existing project directory")).toHaveCount(0);
   const adopted = cli(["project", "init", root]);
   await page.goto("/projects/" + adopted.id + "/edit/coordinator");

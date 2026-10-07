@@ -231,7 +231,7 @@ export function WorkerSettings({
         }}
       >
         <fieldset
-          disabled={busy}
+          disabled={busy || !resource.data}
           className="content-stack"
           data-space="section"
         >

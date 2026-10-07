@@ -10,11 +10,6 @@ import { Label } from "@/components/ui/label";
 import { ContentStack, DetailSection, Disclosure } from "./DetailLayout";
 import { request, type Project } from "./workspace";
 
-export function serviceCommand(command: string) {
-  const port = import.meta.env.DEV ? "8765" : window.location.port || "8765";
-  return `flowfield${port === "8765" ? "" : ` --port ${port}`} ${command}`;
-}
-
 export function SetupInstructions({
   added,
 }: {
@@ -33,6 +28,11 @@ export function SetupInstructions({
   const [prefix, setPrefix] = useState("");
   const [busy, setBusy] = useState<"choosing" | "adding" | null>(null);
   const [error, setError] = useState("");
+  const errorFeedback = error && (
+    <Alert variant="destructive">
+      <AlertDescription>{error}</AlertDescription>
+    </Alert>
+  );
   return (
     <section className="setup-page" aria-label="Project setup instructions">
       <ContentStack space="section" className="welcome">
@@ -48,6 +48,7 @@ export function SetupInstructions({
                 ? "Installing project guidance…"
                 : "Your project was added. Guidance installation needs attention; your existing files are preserved."}
             </p>
+            {errorFeedback}
             {!busy && <ProjectGuidance projectId={registered.id} active />}
             <Button disabled={!!busy} onClick={() => added(registered)}>
               Continue to project
@@ -165,35 +166,41 @@ export function SetupInstructions({
                         onChange={(event) => setName(event.target.value)}
                       />
                     </Label>
-                    <Label className="field block">
-                      Project ID
-                      <Input
-                        required
-                        value={id}
-                        maxLength={64}
-                        pattern={"[a-z0-9][a-z0-9_\\-]{0,63}"}
-                        onChange={(event) => setId(event.target.value)}
-                      />
-                    </Label>
-                    <p className="detail-metadata">
-                      A unique ID used in project links.
-                    </p>
-                    <Label className="field block">
-                      Task prefix
-                      <Input
-                        required
-                        value={prefix}
-                        minLength={3}
-                        maxLength={3}
-                        pattern="[A-Za-z]{3}"
-                        onChange={(event) =>
-                          setPrefix(event.target.value.toUpperCase())
-                        }
-                      />
-                    </Label>
-                    <p className="detail-metadata">
-                      Three unique letters for task IDs, such as FOL-1.
-                    </p>
+                    <ContentStack space="flush">
+                      <Label className="field block">
+                        Project ID
+                        <Input
+                          required
+                          aria-describedby="project-id-help"
+                          value={id}
+                          maxLength={64}
+                          pattern={"[a-z0-9][a-z0-9_\\-]{0,63}"}
+                          onChange={(event) => setId(event.target.value)}
+                        />
+                      </Label>
+                      <p id="project-id-help" className="detail-metadata">
+                        A unique ID used in project links.
+                      </p>
+                    </ContentStack>
+                    <ContentStack space="flush">
+                      <Label className="field block">
+                        Task prefix
+                        <Input
+                          required
+                          aria-describedby="project-prefix-help"
+                          value={prefix}
+                          minLength={3}
+                          maxLength={3}
+                          pattern="[A-Za-z]{3}"
+                          onChange={(event) =>
+                            setPrefix(event.target.value.toUpperCase())
+                          }
+                        />
+                      </Label>
+                      <p id="project-prefix-help" className="detail-metadata">
+                        Three unique letters for task IDs, such as FOL-1.
+                      </p>
+                    </ContentStack>
                   </ContentStack>
                 </DetailSection>
               )}
@@ -209,10 +216,19 @@ export function SetupInstructions({
                     />{" "}
                     Install project guidance
                   </Label>
-                  <p className="detail-metadata">
-                    Helps standalone agents coordinate work and prepares
-                    workers. Existing instructions are preserved.
-                  </p>
+                  <ContentStack space="flush">
+                    <p className="detail-metadata">
+                      Helps standalone agents coordinate work and prepares
+                      workers. Existing instructions are preserved.
+                    </p>
+                    {!installGuidance && (
+                      <p className="detail-metadata">
+                        Install later in Project settings → Coordinator. The
+                        built-in Coordinator can already help you set up
+                        workers.
+                      </p>
+                    )}
+                  </ContentStack>
                   <Disclosure
                     summary="Preview project guidance"
                     onToggle={(event) => setPreview(event.currentTarget.open)}
@@ -244,14 +260,9 @@ export function SetupInstructions({
                       )}
                     </ContentStack>
                   </Disclosure>
-                  {!installGuidance && (
-                    <p className="detail-metadata">
-                      Install later in Project settings → Coordinator. The
-                      built-in Coordinator can already help you set up workers.
-                    </p>
-                  )}
                 </ContentStack>
               )}
+              {errorFeedback}
               {path && (
                 <div className="actions">
                   <Button type="submit">
@@ -262,42 +273,6 @@ export function SetupInstructions({
             </fieldset>
           </form>
         )}
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        <p>
-          Registration adds <code>.flowfield/config.toml</code>. Flowfield does
-          not create directories or initialize Git.
-        </p>
-        <Disclosure summary="Add a project from the CLI">
-          <p>
-            Run this in your existing project directory while Flowfield is
-            running:
-          </p>
-          <pre className="evidence-output font-sans text-sm">
-            {serviceCommand("project init")}
-          </pre>
-          <p>The project appears in the sidebar.</p>
-        </Disclosure>
-        <Disclosure summary="Use a standalone coding agent">
-          <p>
-            To plan from a separate Codex session, preview and install project
-            guidance, then connect it to Flowfield:
-          </p>
-          <pre className="evidence-output font-sans text-sm">
-            {[
-              serviceCommand("project guidance preview"),
-              serviceCommand("project guidance install"),
-              serviceCommand("integration connect codex"),
-            ].join("\n")}
-          </pre>
-          <p>
-            Review the added guidance and start a fresh Codex session in the
-            project. The Coordinator supplies its own MCP connection.
-          </p>
-        </Disclosure>
       </ContentStack>
     </section>
   );

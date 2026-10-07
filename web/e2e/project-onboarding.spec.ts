@@ -64,6 +64,48 @@ test("directory adoption keeps cancellation harmless and opens project chat", as
   await expect(
     setup.getByRole("heading", { name: "Start planning", exact: true }),
   ).toHaveCount(0);
+  await expect(
+    setup.getByText("Add a project from the CLI", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    setup.getByText("Use a standalone coding agent", { exact: true }),
+  ).toHaveCount(0);
+  await expect(setup.getByText(/Registration adds/)).toHaveCount(0);
+  for (const label of ["Project ID", "Task prefix"]) {
+    const field = setup.getByRole("textbox", { name: label, exact: true });
+    const description = setup.locator(
+      `#${await field.getAttribute("aria-describedby")}`,
+    );
+    const fieldBox = (await field.boundingBox())!;
+    expect(
+      Math.abs(
+        (await description.boundingBox())!.y - fieldBox.y - fieldBox.height,
+      ),
+    ).toBeLessThan(1);
+  }
+  await setup.getByLabel("Install project guidance", { exact: true }).uncheck();
+  const explanation = setup.getByText(
+    "Helps standalone agents coordinate work and prepares workers. Existing instructions are preserved.",
+    { exact: true },
+  );
+  const skipped = setup.getByText(
+    "Install later in Project settings → Coordinator. The built-in Coordinator can already help you set up workers.",
+    { exact: true },
+  );
+  const explanationBox = (await explanation.boundingBox())!;
+  const skippedBox = (await skipped.boundingBox())!;
+  expect(
+    Math.abs(skippedBox.y - explanationBox.y - explanationBox.height),
+  ).toBeLessThan(1);
+  const previewBox = (await setup
+    .getByText("Preview project guidance", { exact: true })
+    .boundingBox())!;
+  expect(previewBox.y).toBeGreaterThanOrEqual(skippedBox.y + skippedBox.height);
+  await setup.evaluate((el) => el.scrollTo({ top: 0 }));
+  await page.screenshot({
+    path: testInfo.outputPath("project-form-guidance-skipped.png"),
+  });
+  await setup.getByLabel("Install project guidance", { exact: true }).check();
   await setup.getByText("Preview project guidance", { exact: true }).click();
   await expect(
     setup.locator("pre").filter({ hasText: "<!-- flowfield:begin -->" }),
