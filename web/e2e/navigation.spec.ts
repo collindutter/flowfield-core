@@ -123,9 +123,10 @@ test("task keys link to persistent selections with native tabs, history and draf
   const prerequisite = editor
     .locator(".work-state")
     .getByRole("link", { name: "NAV-1", exact: true });
+  await expect(editor.getByText("Task defined", { exact: true })).toBeVisible();
   const [tab] = await Promise.all([
-    page.context().waitForEvent("page"),
-    prerequisite.click({ button: "middle" }),
+    page.context().waitForEvent("page", { timeout: 5000 }),
+    prerequisite.click({ modifiers: ["ControlOrMeta"] }),
   ]);
   await tab.waitForLoadState("domcontentloaded");
   await expect(tab).toHaveURL(/tasks\/NAV-1$/);

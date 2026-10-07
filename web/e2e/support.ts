@@ -83,7 +83,13 @@ export async function ensureEditing(page: Page) {
 }
 
 export async function connectMcp(request: APIRequestContext) {
-  const headers = { Accept: "application/json, text/event-stream" };
+  // Browser interactions can leave this separate Node client idle at the server's
+  // keep-alive deadline. Do not pool fixture-write sockets across those gaps or
+  // retry mutations after an ambiguous connection reset.
+  const headers = {
+    Accept: "application/json, text/event-stream",
+    Connection: "close",
+  };
   const initialized = await request.post("/mcp/", {
     headers,
     data: {
