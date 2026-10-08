@@ -39,6 +39,7 @@ from flowfield.application import (
     Workspace,
     health,
 )
+from flowfield.artifact_api import artifact_router
 from flowfield.attachments import attachment_router
 from flowfield.attention import attention_counts
 from flowfield.browser import browser_router
@@ -270,6 +271,7 @@ def create_app(*, web_dir: Path | None = None, data_dir: Path | None = None) -> 
     app.include_router(agent_router(supervisor))
     app.include_router(coordinator_router(supervisor))
     app.include_router(attachment_router(workspace))
+    app.include_router(artifact_router(workspace))
     app.include_router(integration_router(supervisor))
     app.include_router(result_router(supervisor))
     app.include_router(inspection_router(lambda: supervisor().workspace))

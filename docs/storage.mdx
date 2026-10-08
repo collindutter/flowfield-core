@@ -8,6 +8,7 @@ Flowfield stores its workspace separately from the installed application and you
 | Location | Contents |
 | --- | --- |
 | `~/.flowfield/` | Workspace database, execution artifacts and service-owned workspaces |
+| `~/.flowfield/artifacts/` | Published screenshots, videos and files |
 | `project/.flowfield/config.toml` | Portable project identity |
 | `project/.flowfield/guidance.json` | Ownership of installed guidance |
 | `project/.agents/skills/flowfield-coordinator/SKILL.md` | Coordinator instructions |
@@ -17,9 +18,9 @@ Choose another workspace directory with `FLOWFIELD_DATA_DIR` or `flowfield --dat
 
 ## Upgrades
 
-Flowfield 0.2.0 supports schema 44. Databases from 0.1.0 and earlier development builds
-cannot be upgraded to it. Preserve the old workspace and use a separate data directory
-for a fresh start. Existing schema-44 workspaces open unchanged.
+Schema 44 is the upgrade baseline. Older databases cannot be upgraded; preserve the old
+workspace and use a separate data directory for a fresh start. Schema-44 workspaces upgrade
+automatically to add artifact metadata.
 
 On startup, Flowfield upgrades supported databases automatically. Before changing an
 existing database, it saves a verified snapshot in `~/.flowfield/backups/` (or your chosen
@@ -66,6 +67,9 @@ path when using these recovery snapshots.
 Flowfield retains up to three database snapshots, including snapshots made before recovery.
 These are for migration recovery: they do not contain execution artifacts, managed
 workspaces or your project repositories, and cannot repair an unreadable current database.
+
+Published artifact metadata lives in SQLite; file contents live under `artifacts/`. Keep
+both. Deleting an attempt's worktree does not delete its published files.
 
 For a full backup, stop the service and copy the whole workspace directory together with
 the relevant project repositories. Preserve those files together when recovering from disk

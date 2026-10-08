@@ -24,6 +24,9 @@ dependencies = [
   "uvicorn>=0.34,<1",
 ]
 
+[project.optional-dependencies]
+browser = ["playwright>=1.51,<2"]
+
 [project.urls]
 Documentation = "https://docs.flowfield.sh"
 Repository = "https://github.com/flowfield-sh/flowfield-core"

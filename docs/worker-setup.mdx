@@ -43,6 +43,43 @@ and validate again. Revalidate after changing setup, checks or the destination b
 Checks must finish and return a failing exit code on failure; do not put a development
 server in the validation list.
 
+## Browser view and artifacts
+
+Workers can publish screenshots, videos and files with `publish_artifact(path, title,
+description)`. Paths must be inside the attempt's checkout or runtime directory. Flowfield
+copies published files into workspace storage; later edits or worktree cleanup do not
+change them. Find them under **Artifacts** on the task or attempt.
+
+Browser viewing needs the optional Playwright dependency and Chromium. For a uv tool install,
+stop Flowfield, then run:
+
+```sh
+uv tool install --force 'flowfield-core[browser]'
+"$(uv tool dir)/flowfield-core/bin/python" -m playwright install chromium
+```
+
+For a pip install, use the service's Python environment:
+
+```sh
+python -m pip install 'flowfield-core[browser]'
+python -m playwright install chromium
+```
+
+Restart Flowfield after installation. From source, use `uv sync --extra browser` and
+`uv run --extra browser playwright install chromium`.
+
+The worker calls `browser_open`, then connects its browser automation tools to the returned
+CDP endpoint. Only that managed browser appears in **Live**; unrelated browsers do not.
+Viewing is read-only and captures frames only while the panel is open and visible. Browser
+control stays with the agent. No personal browser profile is used.
+
+`browser_screenshot` publishes a PNG. `browser_open(record_video=true)` opts into video;
+`browser_close` finalizes and publishes it. Attempt cleanup also finalizes recordings.
+Recording closes the browser after five minutes or an 80 MiB recording-directory threshold,
+checked once per second; final files may exceed that threshold. Non-recorded browsers have
+no recording deadline. Keep clips short and avoid displaying secrets: published media is
+retained, not redacted. A live view is not itself a saved recording.
+
 ## Try a result
 
 **Try result** prepares an independent copy of the selected code candidate and supplies a

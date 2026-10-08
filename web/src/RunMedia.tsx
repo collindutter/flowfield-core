@@ -5,26 +5,10 @@ import { Timestamp } from "./Timestamp";
 import { useResource } from "./useResource";
 import "./media.css";
 
-// Local API types until the generated schema includes media endpoints.
-export type Artifact = {
-  id: string;
-  project_id: string;
-  task_id: string;
-  run_id: string;
-  name: string;
-  title: string | null;
-  description: string | null;
-  mime: string;
-  size: number;
-  created_at: string;
-  href: string;
-};
-export type BrowserStatus = {
-  active: boolean;
-  recording: boolean;
-  url: string | null;
-  problem: string | null;
-};
+import type { components } from "./api-schema";
+
+export type Artifact = components["schemas"]["Artifact"];
+export type BrowserStatus = components["schemas"]["BrowserInfo"];
 
 export function ArtifactGallery({
   projectId,

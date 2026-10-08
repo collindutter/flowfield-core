@@ -6,8 +6,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import APIRouter, Query
+from fastapi.responses import Response
 
 from flowfield.adapters.agents import HarnessStatus, harness_options
+from flowfield.adapters.browser_session import BrowserInfo, BrowserSessionError
 from flowfield.adapters.git_review import changed_files, file_patch
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import (
@@ -76,6 +78,31 @@ def execution_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     @router.get("/projects/{project_id}/runs/{run_id}/activity")
     def activity(project_id: str, run_id: str, after: int = Query(-1, ge=-1)) -> RunActivityPage:
         return RunActivity(supervisor().workspace).read(project_id, run_id, after)
+
+    @router.get("/projects/{project_id}/runs/{run_id}/browser")
+    async def browser(project_id: str, run_id: str) -> BrowserInfo:
+        service = supervisor()
+        service.execution.get(project_id, run_id)
+        info = service.browsers.info(run_id)
+        metadata = service.execution.local(run_id)
+        if (
+            not info.active
+            and not info.problem
+            and metadata.get("browser_launch_started")
+            and not metadata.get("browser_cleanup_confirmed")
+        ):
+            info.problem = "Browser unavailable. Cleanup has not been confirmed."
+        return info
+
+    @router.get("/projects/{project_id}/runs/{run_id}/browser/frame")
+    async def browser_frame(project_id: str, run_id: str) -> Response:
+        service = supervisor()
+        service.execution.get(project_id, run_id)
+        try:
+            frame = await service.browsers.frame(run_id)
+        except BrowserSessionError as error:
+            raise ApplicationError("browser_unavailable", str(error), 409) from error
+        return Response(frame, media_type="image/jpeg")
 
     def comparison(project_id: str, run_id: str) -> tuple[Path, str, str]:
         service = supervisor()

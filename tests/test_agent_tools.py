@@ -452,6 +452,10 @@ def test_coordinator_controls_workers_and_preserves_worker_scope(tmp_path, monke
             "update_stages",
             "ask_question",
             "submit_result",
+            "publish_artifact",
+            "browser_open",
+            "browser_screenshot",
+            "browser_close",
         }
         for name in set(grant.tools) - set(worker.tools):
             denied = await worker.call(name, {})

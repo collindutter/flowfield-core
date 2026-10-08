@@ -78,6 +78,10 @@ class FakeWorker:
             "update_stages",
             "ask_question",
             "submit_result",
+            "publish_artifact",
+            "browser_open",
+            "browser_screenshot",
+            "browser_close",
         }
         assert model == "test-model" and effort == "low"
         (self.cwd / "result.txt").write_text("implemented")

@@ -1154,6 +1154,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/projects/{project_id}/runs/{run_id}/browser": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Browser */
+    get: operations["browser_api_projects__project_id__runs__run_id__browser_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/runs/{run_id}/browser/frame": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Browser Frame */
+    get: operations["browser_frame_api_projects__project_id__runs__run_id__browser_frame_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/projects/{project_id}/runs/{run_id}/diff": {
     parameters: {
       query?: never;
@@ -1490,6 +1524,57 @@ export interface paths {
     };
     /** Download */
     get: operations["download_api_projects__project_id__attachments__identity__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/runs/{run_id}/artifacts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Run Artifacts */
+    get: operations["run_artifacts_api_projects__project_id__runs__run_id__artifacts_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/tasks/{task_id}/artifacts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Task Artifacts */
+    get: operations["task_artifacts_api_projects__project_id__tasks__task_id__artifacts_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/projects/{project_id}/artifacts/{artifact_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Media */
+    get: operations["media_api_projects__project_id__artifacts__artifact_id__get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -2140,6 +2225,31 @@ export interface components {
        */
       author: string;
     };
+    /** Artifact */
+    Artifact: {
+      /** Id */
+      id: string;
+      /** Project Id */
+      project_id: string;
+      /** Task Id */
+      task_id: string;
+      /** Run Id */
+      run_id: string;
+      /** Name */
+      name: string;
+      /** Title */
+      title: string;
+      /** Description */
+      description: string;
+      /** Mime */
+      mime: string;
+      /** Size */
+      size: number;
+      /** Created At */
+      created_at: string;
+      /** Href */
+      href: string;
+    };
     /** Attachment */
     Attachment: {
       /** Id */
@@ -2236,6 +2346,23 @@ export interface components {
        * @default true
        */
       deliver: boolean;
+    };
+    /** BrowserInfo */
+    BrowserInfo: {
+      /**
+       * Active
+       * @default false
+       */
+      active: boolean;
+      /**
+       * Recording
+       * @default false
+       */
+      recording: boolean;
+      /** Url */
+      url?: string | null;
+      /** Problem */
+      problem?: string | null;
     };
     /** ChangedFile */
     ChangedFile: {
@@ -7408,6 +7535,70 @@ export interface operations {
       };
     };
   };
+  browser_api_projects__project_id__runs__run_id__browser_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BrowserInfo"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  browser_frame_api_projects__project_id__runs__run_id__browser_frame_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   diff_api_projects__project_id__runs__run_id__diff_get: {
     parameters: {
       query?: {
@@ -8203,6 +8394,104 @@ export interface operations {
       path: {
         project_id: string;
         identity: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  run_artifacts_api_projects__project_id__runs__run_id__artifacts_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Artifact"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  task_artifacts_api_projects__project_id__tasks__task_id__artifacts_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        project_id: string;
+        task_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Artifact"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  media_api_projects__project_id__artifacts__artifact_id__get: {
+    parameters: {
+      query?: {
+        download?: boolean;
+      };
+      header?: never;
+      path: {
+        project_id: string;
+        artifact_id: string;
       };
       cookie?: never;
     };

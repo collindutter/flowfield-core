@@ -13,6 +13,7 @@ from flowfield.adapters import git_integration as gitops
 from flowfield.adapters import local_checks
 from flowfield.adapters.acp_permissions import permission_handler
 from flowfield.adapters.agents import Agent, create_agent, get_harness, model_options
+from flowfield.adapters.browser_session import BrowserSessions
 from flowfield.adapters.git_workspace import GitWorkspace, contains
 from flowfield.adapters.local_execution import LocalAttempt, LocalHost
 from flowfield.agent_models import AgentChoice
@@ -35,6 +36,7 @@ from flowfield.integration import Integrations
 from flowfield.permissions import Permissions
 from flowfield.results import Results
 from flowfield.run_activity import ActivityRecorder, ActivityUpdate
+from flowfield.run_media import AttemptMedia
 from flowfield.setup_validation import SetupValidation
 from flowfield.storage import acquire_lock
 from flowfield.worker_context import brief_context
@@ -56,6 +58,7 @@ class Supervisor:
         self.setup_validation = SetupValidation(workspace)
         self.delivery_jobs: dict[str, asyncio.Task[None]] = {}
         self.clients: dict[str, Agent] = {}
+        self.browsers = BrowserSessions()
         self.permissions = Permissions(workspace)
         from flowfield.coordinator import Coordinator
 
@@ -233,6 +236,7 @@ class Supervisor:
         environment: LocalAttempt | None = None
         scope_stack = contextlib.AsyncExitStack()
         activity: ActivityRecorder | None = None
+        media: AttemptMedia | None = None
         applied_agent: AgentChoice | None = None
         terminal: RunStatus = "failed"
         problem: str | None = None
@@ -281,7 +285,8 @@ class Supervisor:
                 environment.launch_environment(),
             )
             self.clients[run.id] = client
-            bridge = WorkerBridge(self.execution, run, client)
+            media = AttemptMedia(self.execution, run, environment, self.browsers)
+            bridge = WorkerBridge(self.execution, run, client, media=media)
             server = await scope_stack.enter_async_context(serve_scope(worker_scope(bridge)))
             # Persist before launch: after a crash, missing PID is not a cleanup receipt.
             metadata["native_launch_started"] = True
@@ -365,6 +370,13 @@ class Supervisor:
                     "sections in pages; search_context searches only this frozen assignment. "
                     "New discoveries are observations, not authority to change intent. "
                     "Use the local host's installed tools and native harness permissions. "
+                    "For browser work, call browser_open and connect native browser tools to its "
+                    "cdp_url so the human can watch. Do not launch an unrelated browser. "
+                    "browser_screenshot publishes a PNG; browser_close publishes "
+                    "opt-in recordings. "
+                    "Disconnect automation clients without closing the managed context. "
+                    "Use publish_artifact for files in this checkout or FLOWFIELD_RUNTIME_DIR. "
+                    "Artifacts are immutable evidence, not proof of passing checks. Avoid secrets. "
                     "Do not daemonize commands or leave detached/background jobs running. "
                     "Discover commands on PATH; install project dependencies "
                     "in "
@@ -489,7 +501,10 @@ class Supervisor:
                 )
         finally:
             if client:
-                await client.close()
+                try:
+                    await client.close()
+                except (Exception, asyncio.CancelledError):
+                    terminal, problem = "uncertain", "Native shutdown could not be confirmed."
                 self.execution.save_local(
                     run.id,
                     {
@@ -501,6 +516,22 @@ class Supervisor:
                 await scope_stack.aclose()
             except (Exception, asyncio.CancelledError):
                 terminal, problem = "uncertain", "Scoped tool shutdown could not be confirmed."
+            if media:
+                try:
+                    await media.close()
+                except (Exception, asyncio.CancelledError):
+                    metadata = self.execution.local(run.id)
+                    if metadata.get("browser_launch_started") and not metadata.get(
+                        "browser_cleanup_confirmed"
+                    ):
+                        terminal, problem = "uncertain", "Browser cleanup could not be confirmed."
+                    else:
+                        warning = "Browser recordings could not be published; runtime files remain."
+                        problem = f"{problem} {warning}" if problem else warning
+                    if activity:
+                        activity.emit(
+                            ActivityUpdate(key="browser-cleanup", kind="status", text=problem)
+                        )
             if activity:
                 captured = commit or input_checkpoint
                 if environment and captured:
@@ -544,7 +575,14 @@ class Supervisor:
                 with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(asyncio.shield(task), 20)
             current = self.execution.get(project_id, run_id)
+            if task and not task.done():
+                return current  # Browser finalization and result capture still own the attempt.
             if current.status == "stopping":
+                metadata = self.execution.local(run_id)
+                confirmed = confirmed and (
+                    not metadata.get("browser_launch_started")
+                    or metadata.get("browser_cleanup_confirmed") is True
+                )
                 return self.execution.finish(
                     project_id,
                     run_id,
@@ -556,8 +594,13 @@ class Supervisor:
             return run  # Preparation sees the stop before starting a model turn.
         metadata = self.execution.local(run_id)
         if metadata.get("runtime_kind") == "local" and metadata.get("native_launch_started"):
-            confirmed = metadata.get("native_cleanup_confirmed") is True and not metadata.get(
-                "setup_process"
+            confirmed = (
+                metadata.get("native_cleanup_confirmed") is True
+                and not metadata.get("setup_process")
+                and (
+                    not metadata.get("browser_launch_started")
+                    or metadata.get("browser_cleanup_confirmed") is True
+                )
             )
             return self.execution.finish(
                 project_id,
@@ -569,8 +612,16 @@ class Supervisor:
                 "its tools stopped. Work and capacity remain reserved; inspect the local "
                 "processes before recovery. No process was signalled from a saved PID.",
             )
-        if metadata.get("setup_process") or (
-            metadata.get("native_launch_started") and not metadata.get("native_cleanup_confirmed")
+        if (
+            metadata.get("setup_process")
+            or (
+                metadata.get("native_launch_started")
+                and not metadata.get("native_cleanup_confirmed")
+            )
+            or (
+                metadata.get("browser_launch_started")
+                and not metadata.get("browser_cleanup_confirmed")
+            )
         ):
             return self.execution.finish(
                 project_id,
@@ -633,6 +684,9 @@ class Supervisor:
             await asyncio.gather(*list(self.jobs.values()), return_exceptions=True)
         if self.delivery_jobs:
             await asyncio.gather(*list(self.delivery_jobs.values()), return_exceptions=True)
-        if self.lock:
-            self.lock.close()
-            self.lock = None
+        try:
+            await self.browsers.close_all()
+        finally:
+            if self.lock:
+                self.lock.close()
+                self.lock = None

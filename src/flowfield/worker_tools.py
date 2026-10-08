@@ -10,6 +10,7 @@ from flowfield.execution import Execution
 from flowfield.execution_models import Record, Run, WorkerResult, WorkerSubmission
 from flowfield.questions import QuestionCreate
 from flowfield.run_activity import ActivityUpdate
+from flowfield.run_media import AttemptMedia
 from flowfield.stage_models import StageUpdate
 from flowfield.stages import Stages
 
@@ -30,6 +31,26 @@ class WorkerQuestion(Record):
     recommendation: str = Field(min_length=1, max_length=8000)
 
 
+class PublishArtifact(Record):
+    path: str = Field(min_length=1, max_length=4096)
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=8000)
+
+
+class BrowserOpen(Record):
+    url: str = Field(default="about:blank", max_length=4096)
+    record_video: bool = False
+
+
+class BrowserScreenshot(Record):
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=8000)
+
+
+class BrowserClose(Record):
+    pass
+
+
 def worker_tools() -> list[dict[str, Any]]:
     return [
         {
@@ -39,6 +60,33 @@ def worker_tools() -> list[dict[str, Any]]:
             "inputSchema": model.model_json_schema(),
         }
         for name, description, model in (
+            (
+                "publish_artifact",
+                "Publish an immutable copy of a screenshot, video or file from this attempt's "
+                "checkout/runtime. Relative paths use the checkout. Up to 100 MiB per file. "
+                "Provide a short title and evidence description. Avoid publishing secrets.",
+                PublishArtifact,
+            ),
+            (
+                "browser_open",
+                "Open this attempt's managed Chromium browser for read-only viewing in Flowfield. "
+                "Connect native browser tools to the returned cdp_url, not a separate browser. "
+                "Requires the browser extra and installed Chromium. Recording is opt-in on first "
+                "open; recording closes the browser at five minutes or an 80 MiB disk threshold. "
+                "Use browser_close to publish finalized recordings before submit_result.",
+                BrowserOpen,
+            ),
+            (
+                "browser_screenshot",
+                "Capture the managed browser's current page and publish a PNG artifact.",
+                BrowserScreenshot,
+            ),
+            (
+                "browser_close",
+                "Close the managed browser and publish its recorded videos, if any. "
+                "Disconnect native browser clients without closing the managed context first.",
+                BrowserClose,
+            ),
             (
                 "read_context",
                 (
@@ -91,8 +139,11 @@ def worker_tools() -> list[dict[str, Any]]:
 class WorkerBridge:
     """Fixed server-side run identity; worker input cannot select another task/project."""
 
-    def __init__(self, execution: Execution, run: Run, client: Any):
+    def __init__(
+        self, execution: Execution, run: Run, client: Any, *, media: AttemptMedia | None = None
+    ):
         self.execution, self.run, self.client = execution, run, client
+        self.media = media
         self.result: WorkerResult | None = None
         self.question_id: str | None = None
 
@@ -110,11 +161,36 @@ class WorkerBridge:
             "update_stages": "Updating progress",
             "ask_question": "Asking a question",
             "submit_result": "Submitting an outcome",
+            "publish_artifact": "Publishing an artifact",
+            "browser_open": "Opening the managed browser",
+            "browser_screenshot": "Publishing a browser screenshot",
+            "browser_close": "Closing the managed browser",
         }
         if activity and name in titles:
             from uuid import uuid4
 
             activity(ActivityUpdate(key=uuid4().hex, kind="tool", text=titles[name]))
+        if name in {"publish_artifact", "browser_open", "browser_screenshot", "browser_close"}:
+            if self.media is None:
+                raise ApplicationError("media_unavailable", "Attempt media is unavailable.", 409)
+            if name == "publish_artifact":
+                artifact = PublishArtifact.model_validate(arguments)
+                return (
+                    await self.media.publish(artifact.path, artifact.title, artifact.description)
+                ).model_dump_json()
+            if name == "browser_open":
+                browser = BrowserOpen.model_validate(arguments)
+                info = await self.media.open(browser.url, browser.record_video)
+                return json.dumps({**info.model_dump(), "cdp_url": info.cdp_url})
+            if name == "browser_screenshot":
+                screenshot = BrowserScreenshot.model_validate(arguments)
+                return (
+                    await self.media.screenshot(screenshot.title, screenshot.description)
+                ).model_dump_json()
+            BrowserClose.model_validate(arguments)
+            return json.dumps(
+                {"artifacts": [item.model_dump() for item in await self.media.close()]}
+            )
         if name == "update_stages":
             return (
                 Stages(self.execution.workspace)
