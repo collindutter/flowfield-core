@@ -115,7 +115,7 @@ def test_baseline_upgrade_preserves_approved_result_and_real_git_delivery(tmp_pa
     assert upgraded.workspace.activity("harbor", task_id="work") == activity
     assert upgraded.execution.assignment("harbor", run.id) == assignment
     backup = storage.backups(directory)[0]
-    assert backup["schema_version"] == CURRENT
+    assert backup["schema_version"] == migrations.BASELINE_VERSION
     with closing(
         storage.connect(storage.backup_path(directory, backup["id"]) / storage.DATABASE)
     ) as db:
@@ -178,7 +178,11 @@ def test_multi_step_failure_rolls_back_data_ddl_versions_and_bounds_backups(tmp_
     assert len(storage.backups(workspace.directory)) == storage.BACKUP_LIMIT
     with raw(workspace.directory) as db:
         assert storage.version(db) == CURRENT
-        assert db.execute("SELECT version FROM schema_migrations").fetchall() == []
+        assert db.execute("SELECT version FROM schema_migrations").fetchall() == [
+            (migration.version,)
+            for migration in migrations.MIGRATIONS
+            if migration.version <= CURRENT
+        ]
 
 
 def test_backup_failure_prevents_any_upgrade(tmp_path, monkeypatch):
@@ -291,7 +295,7 @@ def test_wrong_baseline_is_not_adopted(tmp_path, monkeypatch):
     later(monkeypatch, Migration(CURRENT + 1, add_column))
     with sqlite3.connect(tmp_path / storage.DATABASE) as db:
         db.execute("CREATE TABLE unrelated (value TEXT)")
-        db.execute(f"PRAGMA user_version={CURRENT}")
+        db.execute(f"PRAGMA user_version={migrations.BASELINE_VERSION}")
     with pytest.raises(ApplicationError, match="does not match"):
         Workspace(tmp_path)
     assert storage.backups(tmp_path) == []
@@ -335,7 +339,7 @@ def test_baseline_recovery_and_invalid_backup_guard(tmp_path, monkeypatch):
     with pytest.raises(ApplicationError, match="Choose a backup"):
         storage.restore(workspace.directory, "../workspace.sqlite3")
     storage.restore(workspace.directory, saved)
-    assert storage.status(workspace.directory)["schema_version"] == CURRENT
+    assert storage.status(workspace.directory)["schema_version"] == migrations.BASELINE_VERSION
     Workspace(workspace.directory)
     newest = storage.backups(workspace.directory)[0]["id"]
     target = storage.backup_path(workspace.directory, newest) / storage.DATABASE
@@ -455,3 +459,31 @@ def test_cancelled_restart_keeps_ownership_until_its_thread_exits(tmp_path, monk
             pass
 
     asyncio.run(scenario())
+
+
+def test_artifact_migration_45_matches_fresh_schema_and_preserves_attempt(tmp_path, monkeypatch):
+    from flowfield.artifacts import Artifacts
+
+    with monkeypatch.context() as baseline:
+        baseline.setattr(migrations, "MIGRATIONS", ())
+        execution = execution_fixture(tmp_path / "old")
+        run = execution.claim("harbor", BASE, {BASE: set()})
+        assignment = execution.assignment("harbor", run.id)
+    upgraded = Workspace(execution.workspace.directory)
+    fresh = Workspace(tmp_path / "fresh")
+    assert Execution(upgraded).get("harbor", run.id) == run
+    assert Execution(upgraded).assignment("harbor", run.id) == assignment
+    assert storage.backups(upgraded.directory)[0]["schema_version"] == 44
+    query = "SELECT name,sql FROM sqlite_master WHERE name LIKE 'artifacts%' ORDER BY name"
+    with raw(upgraded.directory) as old_db, raw(fresh.directory) as new_db:
+        assert old_db.execute(query).fetchall() == new_db.execute(query).fetchall()
+        assert old_db.execute("SELECT version FROM schema_migrations").fetchall() == [(45,)]
+        assert new_db.execute("SELECT version FROM schema_migrations").fetchall() == [(45,)]
+        assert storage.version(old_db) == storage.version(new_db) == 45
+        assert old_db.execute("PRAGMA foreign_key_check").fetchall() == []
+    output = tmp_path / "evidence.txt"
+    output.write_text("Retained after upgrade")
+    files = Artifacts(upgraded)
+    artifact = files.publish("harbor", run.id, output, roots=(tmp_path,), title="Evidence")
+    assert files.list("harbor", run_id=run.id) == [artifact]
+    assert Artifacts(Workspace(upgraded.directory)).get("harbor", artifact.id) == artifact

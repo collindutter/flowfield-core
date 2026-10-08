@@ -13,7 +13,21 @@ class Migration:
     apply: Callable[[sqlite3.Connection], None]
 
 
-MIGRATIONS: tuple[Migration, ...] = ()
+def artifact_storage(db: sqlite3.Connection) -> None:
+    db.execute(
+        "CREATE TABLE artifacts ("
+        "id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), "
+        "task_id TEXT NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), "
+        "name TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, "
+        "mime TEXT NOT NULL, size INTEGER NOT NULL CHECK(size >= 0 AND size <= 104857600), "
+        "created_at TEXT NOT NULL, "
+        "FOREIGN KEY(project_id,task_id) REFERENCES tasks(project_id,id))"
+    )
+    db.execute("CREATE INDEX artifacts_run ON artifacts(project_id,run_id,created_at,id)")
+    db.execute("CREATE INDEX artifacts_task ON artifacts(project_id,task_id,created_at,id)")
+
+
+MIGRATIONS: tuple[Migration, ...] = (Migration(45, artifact_storage),)
 
 
 def current_version() -> int:

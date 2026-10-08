@@ -331,7 +331,8 @@ class Board(BaseModel):
     awaiting_application_count: int = 0
 
 
-# Initialization baseline for schema 44. New database changes belong in migrations.py.
+# Frozen schema-44 baseline. initialize() applies migrations (including artifact storage)
+# to both fresh databases and upgrades; never append new tables to this baseline.
 SCHEMA = """
 CREATE TABLE projects (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL UNIQUE,
@@ -453,7 +454,10 @@ class Workspace:
         self.database = self.directory / "workspace.sqlite3"
         self.schema_version = current_version()
         initialize(self.directory, SCHEMA)
-        (self.directory / "artifacts").mkdir(mode=0o700, exist_ok=True)
+        artifacts = self.directory / "artifacts"
+        if artifacts.is_symlink():
+            raise ApplicationError("artifact_path", "Artifact storage must not be a symlink.")
+        artifacts.mkdir(mode=0o700, exist_ok=True)
 
     @contextmanager
     def connection(
