@@ -15,7 +15,7 @@ import {
 
 test("managed review keeps its URL, binds the result, and preserves feedback on conflict", async ({
   page,
-}) => {
+}, testInfo) => {
   cli([
     "project",
     "init",
@@ -140,40 +140,45 @@ test("managed review keeps its URL, binds the result, and preserves feedback on 
     if (path.endsWith("/diff"))
       return route.fulfill({
         json: {
-          files: [
-            {
-              id: 0,
-              old_path: null,
-              new_path: "loader.py",
-              change: "added",
-              old_mode: "000000",
-              new_mode: "100644",
-            },
-          ],
-          total_files: 1,
+          files: Array.from({ length: 40 }, (_, id) => ({
+            id,
+            old_path: null,
+            new_path: id === 0 ? "loader.py" : `file-${id}.py`,
+            change: "added",
+            old_mode: "000000",
+            new_mode: "100644",
+          })),
+          total_files: 40,
           next_offset: null,
           base_commit: run.base_commit,
           result_commit: run.result_commit,
         },
       });
-    if (path.endsWith("/diff/0"))
+    const fileId = path.match(/\/diff\/(\d+)$/)?.[1];
+    if (fileId !== undefined) {
+      const id = Number(fileId);
+      const filename = id === 0 ? "loader.py" : `file-${id}.py`;
+      const lines = id === 1 ? 160 : 1;
+      // Exercise the loading frame as well as the short and long rendered patches.
+      await new Promise((resolve) => setTimeout(resolve, 150));
       return route.fulfill({
         json: {
           file: {
-            id: 0,
+            id,
             old_path: null,
-            new_path: "loader.py",
+            new_path: filename,
             change: "added",
             old_mode: "000000",
             new_mode: "100644",
           },
-          text: "diff --git a/loader.py b/loader.py\nnew file mode 100644\n--- /dev/null\n+++ b/loader.py\n@@ -0,0 +1 @@\n+print('implemented code')\n",
+          text: `diff --git a/${filename} b/${filename}\nnew file mode 100644\n--- /dev/null\n+++ b/${filename}\n@@ -0,0 +1,${lines} @@\n${Array.from({ length: lines }, () => "+print('implemented code')\n").join("")}`,
           binary: false,
           omitted_reason: null,
           base_commit: run.base_commit,
           result_commit: run.result_commit,
         },
       });
+    }
     if (path.endsWith("/tasks/one/results"))
       return route.fulfill({
         json: {
@@ -231,6 +236,110 @@ test("managed review keeps its URL, binds the result, and preserves feedback on 
   await expect(runs.locator(".diff-code-insert")).toContainText(
     "implemented code",
   );
+  const browser = runs.locator(".diff-browser");
+  const preview = browser.locator(".file-preview");
+  const files = browser.getByRole("navigation", { name: "Changed files" });
+  const pane = page.locator(".entity-overlay-body");
+  const geometry = () =>
+    browser.evaluate((el) => el.getBoundingClientRect().height);
+  const height = await geometry();
+  const clickFile = async (name: string) => {
+    const button = files.getByRole("button", { name, exact: true });
+    expect(
+      await button.evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        return el.contains(
+          document.elementFromPoint(
+            box.x + box.width / 2,
+            box.y + box.height / 2,
+          ),
+        );
+      }),
+    ).toBe(true);
+    const box = await button.boundingBox();
+    expect(box).not.toBeNull();
+    // Use a real pointer without Playwright scrolling the whole button into view.
+    await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  };
+  expect(await files.evaluate((el) => el.clientHeight)).toBe(
+    await preview.evaluate((el) => el.clientHeight),
+  );
+  expect(await files.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
+    true,
+  );
+  for (const offset of [100, 160]) {
+    await browser.evaluate((el, offset) => {
+      const pane = el.closest(".entity-overlay-body")!;
+      pane.scrollTop +=
+        el.getBoundingClientRect().top -
+        pane.getBoundingClientRect().top -
+        offset;
+    }, offset);
+    // Let the feed capture the deliberate reading movement before measuring it.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    const top = await pane.evaluate((el) => el.scrollTop);
+    await clickFile("Added file-1.py");
+    await expect(preview).toContainText("Loading file…");
+    expect(await geometry()).toBe(height);
+    await expect(preview.locator(".diff-code-insert")).toHaveCount(160);
+    await expect
+      .poll(() => preview.evaluate((el) => el.scrollHeight > el.clientHeight))
+      .toBe(true);
+    expect(await geometry()).toBe(height);
+    expect(await pane.evaluate((el) => el.scrollTop)).toBe(top);
+    await preview.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await clickFile("Added file-2.py");
+    await expect(preview.locator(".diff-code-insert")).toHaveCount(1);
+    expect(await preview.evaluate((el) => el.scrollTop)).toBe(0);
+    expect(await geometry()).toBe(height);
+    expect(await pane.evaluate((el) => el.scrollTop)).toBe(top);
+  }
+  await page.screenshot({
+    path: testInfo.outputPath("code-preview-desktop.png"),
+  });
+  await files.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await files
+    .getByRole("button", { name: "Added file-39.py", exact: true })
+    .scrollIntoViewIfNeeded();
+  await expect(
+    files.getByRole("button", { name: "Added file-39.py", exact: true }),
+  ).toBeInViewport();
+  await page.setViewportSize({ width: 390, height: 640 });
+  await files.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  const mobileHeight = await geometry();
+  await files
+    .getByRole("button", { name: "Added file-1.py", exact: true })
+    .click();
+  await expect(preview.locator(".diff-code-insert")).toHaveCount(160);
+  expect(await geometry()).toBe(mobileHeight);
+  expect(
+    await preview.evaluate(
+      (el) => el.clientHeight > 0 && el.scrollHeight > el.clientHeight,
+    ),
+  ).toBe(true);
+  await runs.getByRole("button", { name: "Split", exact: true }).click();
+  expect(await geometry()).toBe(mobileHeight);
+  await preview.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: testInfo.outputPath("code-preview-mobile.png"),
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page
     .getByRole("button", { name: "Request changes", exact: true })
     .click();

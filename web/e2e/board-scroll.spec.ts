@@ -2,6 +2,8 @@ import { join } from "node:path";
 import { expect } from "@playwright/test";
 import { test, existingDirectory, state, fixtureStages } from "./support";
 
+test.use({ launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] } });
+
 test("board columns scroll independently with fixed headings and reachable cards", async ({
   page,
   request,
@@ -57,6 +59,16 @@ test("board columns scroll independently with fixed headings and reachable cards
     "Queue paused · 1/2 active",
   );
   await expect(backlog.getByRole("link")).toHaveCount(14);
+  // Force scrollbars that consume layout space, even on an overlay-scrollbar host.
+  await page.addStyleTag({
+    content: `* { scrollbar-width: auto; }
+      ::-webkit-scrollbar { width: 14px; height: 14px; }`,
+  });
+  expect(
+    await board.evaluate(
+      (node) => (node as HTMLElement).offsetHeight - node.clientHeight,
+    ),
+  ).toBeGreaterThan(0);
   const headers = page.locator(".board .column > h2");
   const positions = () =>
     headers.evaluateAll((nodes) =>
@@ -73,6 +85,15 @@ test("board columns scroll independently with fixed headings and reachable cards
   ).toBeInViewport();
   expect(await upNext.evaluate((node) => node.scrollTop)).toBe(0);
   expect(await positions()).toEqual(initial);
+  expect(
+    await board.evaluate((node) =>
+      [...node.querySelectorAll(".column")].every(
+        (column) =>
+          column.getBoundingClientRect().bottom <=
+          node.getBoundingClientRect().top + node.clientHeight,
+      ),
+    ),
+  ).toBe(true);
   await upNext.hover();
   await page.mouse.wheel(0, 700);
   await expect
@@ -99,6 +120,9 @@ test("board columns scroll independently with fixed headings and reachable cards
   await expect(
     page.getByText("Finished outcomes", { exact: true }),
   ).toBeInViewport();
+  expect(
+    await board.evaluate((node) => node.scrollHeight <= node.clientHeight),
+  ).toBe(true);
   expect(
     await page
       .locator(".workspace-work-content")

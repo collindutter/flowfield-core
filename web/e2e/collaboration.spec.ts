@@ -1718,7 +1718,7 @@ test("review journey preserves feedback, navigates complete files and reviews a 
     exact: true,
   });
 
-  await runs.locator(".diff-scroll").scrollIntoViewIfNeeded();
+  await runs.locator(".file-preview").scrollIntoViewIfNeeded();
 
   await runs.getByRole("button", { name: "More files", exact: true }).click();
   await expect(runs).toContainText("More files temporarily unavailable");

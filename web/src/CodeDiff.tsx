@@ -207,7 +207,7 @@ export default function CodeDiff({
               </Alert>
             )}
           </nav>
-          <div className="file-preview" aria-live="polite">
+          <div key={selected} className="file-preview" aria-live="polite">
             {patch.loading && <p className="muted">Loading file…</p>}
             {patch.error && (
               <Alert variant="destructive">
@@ -290,18 +290,16 @@ function HighlightedDiff({
     }
   }, [file, path]);
   return (
-    <div className="diff-scroll">
-      <Diff
-        viewType={mode}
-        diffType={file.type}
-        hunks={file.hunks}
-        tokens={tokens}
-      >
-        {(hunks) =>
-          hunks.map((hunk) => <HunkBlock key={hunk.content} hunk={hunk} />)
-        }
-      </Diff>
-    </div>
+    <Diff
+      viewType={mode}
+      diffType={file.type}
+      hunks={file.hunks}
+      tokens={tokens}
+    >
+      {(hunks) =>
+        hunks.map((hunk) => <HunkBlock key={hunk.content} hunk={hunk} />)
+      }
+    </Diff>
   );
 }
 function HunkBlock({
