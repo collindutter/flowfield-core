@@ -23,8 +23,12 @@ setup/check commands, result-preview settings and setup validation. Validation r
 separate checkout without starting a model or enabling the worker queue. You can also ask it
 to configure the project or local environment directly, within its selected access mode.
 These setup changes affect the project directory immediately; they do not produce a task
-result for approval. Agreed implementation work belongs to task workers. Answer worker
-questions and approve exact code results in their task feeds.
+result for approval. Agreed implementation work belongs to task workers.
+
+Ask the Coordinator to configure workers, run or pause the queue, answer worker questions,
+request changes, try results or recover blocked work. You can explicitly approve a specific
+code result in chat; the Coordinator records that exact approval and Flowfield delivers it
+without a second confirmation. These actions are also available in task feeds.
 
 Use the model button beside the input to change model, effort or access. Changes apply to the next
 message; a running turn keeps its saved choice. Standalone coding-agent settings are separate.

@@ -15,10 +15,11 @@ from flowfield.adapters.git_workspace import baseline, git
 from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import ProjectSetup, TaskCreate, TaskPublish, Workspace
 from flowfield.execution import Execution
-from flowfield.execution_models import QueueEdit, ReviewAction, SettingsEdit, Usage, WorkerResult
+from flowfield.execution_models import QueueEdit, SettingsEdit, Usage, WorkerResult
 from flowfield.integration import Integrations
 from flowfield.integration_models import IntegrationConfig
 from flowfield.questions import QuestionCreate, Questions
+from flowfield.result_models import ResultReview
 from flowfield.results import Results
 from flowfield.stage_models import StageUpdate
 from flowfield.stages import Stages
@@ -174,12 +175,14 @@ def main() -> None:
         )
 
     first = capture()
-    execution.review(
+    results = Results(execution.workspace)
+    version = results.page(project.id, first.task_id).items[0]
+    results.review(
         project.id,
-        first.id,
-        ReviewAction(
-            expected_revision=first.revision,
-            result_commit=first.result_commit,
+        version.id,
+        ResultReview(
+            expected_revision=version.revision,
+            candidate_commit=first.result_commit,
             action="request_changes",
             note="Include the source path in validation errors.",
             author="fixture-human",

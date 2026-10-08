@@ -13,7 +13,6 @@ from flowfield.execution_models import (
     ACTIVE,
     CheckResult,
     QueueEdit,
-    ReviewAction,
     Run,
     RunAction,
     RunPage,
@@ -730,40 +729,6 @@ class Execution:
             run.status = "stopping"
             self._save(db, run)
             return run
-
-    def review(self, project_id: str, run_id: str, request: ReviewAction) -> Run:
-        from flowfield.result_models import ResultReview
-        from flowfield.results import Results
-
-        run = self.get(project_id, run_id)
-        self.workspace._current(run.revision, request.expected_revision)
-        if run.status != "in_review" or run.result_commit != request.result_commit:
-            raise ApplicationError(
-                "review_changed",
-                "Read the current review and inspect its exact code result first.",
-                409,
-            )
-        if request.action == "accept" and run.completion == "code":
-            raise ApplicationError(
-                "candidate_approval_required",
-                "Review the prepared result version and approve its delivery; "
-                "worker acceptance cannot complete code work.",
-                409,
-            )
-        results = Results(self.workspace)
-        version = results.page(project_id, run.task_id, limit=1).items[0]
-        results.review(
-            project_id,
-            version.id,
-            ResultReview(
-                expected_revision=version.revision,
-                candidate_commit=version.candidate_commit or version.source_commit,
-                action="approve" if request.action == "accept" else "request_changes",
-                note=request.note,
-                author=request.author,
-            ),
-        )
-        return self.get(project_id, run_id)
 
     def retry(self, project_id: str, run_id: str, request: RunAction) -> Run:
         with self.workspace.connection(write=True, project_id=project_id) as db:

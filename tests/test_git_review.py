@@ -170,13 +170,14 @@ def test_review_api_files_and_successor_use_captured_commits(tmp_path: Path, mon
                 "result_commit": base,
             },
         )
-        assert stale.status_code == 409
+        assert stale.status_code == 404
+        version = client.get("/api/projects/harbor/tasks/task-0/results").json()["items"][0]
         requested = client.post(
-            path + "/review",
+            f"/api/projects/harbor/results/{version['id']}/review",
             json={
-                "expected_revision": first.revision,
+                "expected_revision": version["revision"],
                 "action": "request_changes",
-                "result_commit": first.result_commit,
+                "candidate_commit": version["candidate_commit"] or version["source_commit"],
                 "note": "Use value 3.",
             },
         )

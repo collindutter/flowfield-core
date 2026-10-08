@@ -168,7 +168,8 @@ def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
                 break
             await asyncio.sleep(0.05)
         assert service.workspace.task("harbor", run.task_id).status == "done"
-        assert (await service.check_integration("harbor", run.id)).code_available
+        service.integrations.refresh_availability("harbor")
+        assert service.execution.get("harbor", run.id).code_available
         await service.close()
         resumed = Supervisor(execution.workspace)
         await resumed.start()

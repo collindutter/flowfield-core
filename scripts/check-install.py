@@ -60,7 +60,7 @@ async def check_mcp(base: str, task: dict) -> None:
 
         assert initialized.instructions == template("mcp-instructions.md").strip()
         tools = {tool.name for tool in (await session.list_tools()).tools}
-        assert {"get_task", "get_workers", "get_runs", "review_run", "set_queue"} <= tools
+        assert {"get_task", "get_workers", "get_runs", "review_result", "set_queue"} <= tools
         assert {"get_project_guidance", "update_project_guidance"} <= tools
         assert {
             "get_task_conversation",

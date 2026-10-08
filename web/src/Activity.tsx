@@ -1,3 +1,4 @@
+import { authorLabel } from "./workspace";
 import { Disclosure } from "./DetailLayout";
 import { Timestamp } from "./Timestamp";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -35,7 +36,7 @@ export function RelatedActivity({
       {entry ? (
         <>
           <p className="detail-metadata">
-            {entry.author} · <Timestamp date={entry.created_at} />
+            {authorLabel(entry.author)} · <Timestamp date={entry.created_at} />
           </p>
           <Markdown>{entry.body}</Markdown>
         </>

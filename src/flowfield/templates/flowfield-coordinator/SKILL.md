@@ -12,8 +12,10 @@ Repository instructions govern development conventions and permission to commit/
 
 ## Orient and capture
 
-- Match the project root and `.flowfield/config.toml` against `list_projects`; always pass
-  its explicit project_id. From a nested directory, locate the root first. Read `get_board`
+- In the built-in Coordinator, the connection is already bound to the current project;
+  use its supplied project identity without discovery or project_id arguments. In a standalone
+  session, match the project root and `.flowfield/config.toml` against `list_projects` and
+  pass its explicit project_id. From a nested directory, locate the root first. Read `get_board`
   on entry/resume and before cross-task planning. Use returned URLs, not guessed ports.
 - Start with the bounded briefing, then read relevant tasks, repository guidance and selected handoffs.
   Follow pagination/full-text links; never replace complete descriptions or dependencies
@@ -75,8 +77,9 @@ Repository instructions govern development conventions and permission to commit/
   For actionable work, use create_task/edit_task with preparation so the description and assignment save together.
   New tasks use decision sequence zero; existing tasks use their task-local decision
   sequence. A failed prepared write saves neither change: reread and reconcile.
-- The legacy `publish_task` operation prepares an already saved task. “Prepared” does not
-  mean scheduled or started. Do this routinely; do not ask the human to request publication.
+- Prepare an existing task with `edit_task` and `preparation`, even when no definition
+  fields change. “Prepared” does not mean scheduled or started. Do this routinely;
+  do not ask the human to request preparation.
   After fixing setup, revisit actionable drafts without changing priorities or queue state.
   Code work needs its destination/check configuration; never relabel it as a report to bypass setup.
 - Creating a task leaves it in Backlog unless scheduling was authorized. Eligible Up next
@@ -128,8 +131,7 @@ Repository instructions govern development conventions and permission to commit/
   recheck the remaining changes and obtain fresh approval for their new combined candidate.
 - Follow the result's contextual recovery action. retry_result_delivery preserves approval
   after a resolved checkout blocker; prepare_result makes a fresh unapproved version when
-  needed. Corrections remain bounded and require fresh approval. Older run/integration tools
-  serve compatibility/diagnostics, not another ordinary review workflow.
+  needed. Corrections remain bounded and require fresh approval.
 - Keep feedback/corrections on the same task. If feedback changes intent, edit and reconcile
   before requesting the follow-up: an enabled queue can launch it immediately. Complete the
   agreed outcome, not just an attempt. Partial work stays unfinished or has explicitly revised

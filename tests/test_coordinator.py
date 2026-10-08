@@ -117,7 +117,7 @@ def test_real_acp_capture_continuity_and_duplicate_send(tmp_path, monkeypatch):
             service.coordinator.store.session("harbor", "codex", str(tmp_path / "elsewhere"))
         assert completed.applied.choice.mode == "read-only"
         assert completed.settings.choice.mode == "read-only"
-        assert service.workspace.task("harbor", "chat-task").updated_by == "agent"
+        assert service.workspace.task("harbor", "chat-task").updated_by == f"coordinator:{turn.id}"
         assert not (tmp_path / "harbor" / "result.txt").exists()
         public = completed.model_dump_json()
         assert "finished" in public and "PRIVATE" not in public and "WRONG SESSION" not in public
@@ -234,7 +234,7 @@ def test_planning_before_worker_delivery_configuration(tmp_path, monkeypatch):
     async def exercise():
         turn = service.coordinator.send("harbor", conversation.id, message())
         assert (await settled(service, turn)).status == "completed"
-        assert service.workspace.task("harbor", "chat-task").updated_by == "agent"
+        assert service.workspace.task("harbor", "chat-task").updated_by == f"coordinator:{turn.id}"
         await service.close()
 
     asyncio.run(exercise())
@@ -407,7 +407,7 @@ def test_history_pages_and_duplicate_retry_at_capacity(tmp_path, monkeypatch):
     assert store.new("harbor").id == conversation.id
 
 
-def test_scoped_coordinator_applies_saved_answer_without_code_approval(tmp_path):
+def test_scoped_coordinator_applies_saved_answer_without_granting_code_approval(tmp_path):
     from test_questions import ask
     from test_questions import setup as questions_setup
 
@@ -426,12 +426,8 @@ def test_scoped_coordinator_applies_saved_answer_without_code_approval(tmp_path)
 
     async def exercise():
         grant = await coordinator_scope(Supervisor(workspace), "harbor")
-        assert not {
-            "review_result",
-            "answer_question",
-            "configure_workers",
-            "initialize_project",
-        } & set(grant.tools)
+        assert {"review_result", "answer_question", "configure_workers"} <= grant.tools.keys()
+        assert "initialize_project" not in grant.tools
         result = await grant.call(
             "apply_answer",
             {

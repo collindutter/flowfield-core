@@ -8,9 +8,7 @@ import typer
 def register(project_app: typer.Typer) -> None:
     from flowfield.cli import Json, ProjectOption, output, project_path
 
-    app = typer.Typer(
-        no_args_is_help=True, help="Configure, validate and apply accepted code locally."
-    )
+    app = typer.Typer(no_args_is_help=True, help="Configure delivery and inspect its checks.")
     project_app.add_typer(app, name="integration")
 
     def show(value: Any) -> None:
@@ -126,50 +124,3 @@ def register(project_app: typer.Typer) -> None:
             json_output,
             show,
         )
-
-    @app.command("prepare")
-    def prepare(
-        ctx: typer.Context,
-        run_id: str,
-        expected_revision: int = typer.Option(..., min=1),
-        project: ProjectOption = None,
-        json_output: Json = False,
-    ) -> None:
-        """Validate an accepted result in isolation; the target stays unchanged."""
-
-        def perform() -> Any:
-            saved = ctx.obj.request(
-                "POST",
-                project_path(project) + "/runs/" + run_id + "/integrations",
-                {"expected_revision": expected_revision, "author": "human"},
-                timeout=660,
-            )
-            return ctx.obj.request("GET", project_path(project) + "/integrations/" + saved["id"])
-
-        output(perform, json_output, show)
-
-    @app.command("apply")
-    def apply(
-        ctx: typer.Context,
-        integration_id: str,
-        expected_revision: int = typer.Option(..., min=1),
-        commit: str = typer.Option(...),
-        project: ProjectOption = None,
-        json_output: Json = False,
-    ) -> None:
-        """Apply the exact validated candidate if its target is unchanged. Never push."""
-
-        def perform() -> Any:
-            path = project_path(project) + "/integrations/" + integration_id
-            ctx.obj.request(
-                "POST",
-                path + "/apply",
-                {
-                    "expected_revision": expected_revision,
-                    "candidate_commit": commit,
-                    "author": "human",
-                },
-            )
-            return ctx.obj.request("GET", path)
-
-        output(perform, json_output, show)

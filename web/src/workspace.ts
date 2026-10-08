@@ -15,6 +15,9 @@ export const taskTypes = [
 export type WorkStatus = (typeof columns)[number];
 export const label = (value: string) =>
   value.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
+
+export const authorLabel = (author: string | null) =>
+  author?.startsWith("coordinator:") ? "Coordinator" : author;
 export type Project = components["schemas"]["Project"];
 export type Milestone = components["schemas"]["Milestone"];
 export type TaskRevision = components["schemas"]["TaskRevision"];

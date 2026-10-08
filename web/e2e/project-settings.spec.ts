@@ -1,3 +1,4 @@
+import { fixtureProgress } from "./support";
 import { fixtureStages } from "./support";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -98,7 +99,7 @@ test("milestones group tasks with linked details and long project intent stays o
       milestone_id: "M-1",
     },
   });
-  await call("record_progress", {
+  await fixtureProgress(request, {
     project_id,
     task_id: "serializer",
     progress: { expected_revision: 1, status: "done", completion: "report" },

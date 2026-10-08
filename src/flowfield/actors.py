@@ -30,5 +30,9 @@ class Actor(Record):
 def actor(identity: str) -> Actor:
     # agent is the legacy coordinator-interface default. Managed attempts use worker
     # or worker:<attempt>; keep the original identity rather than rewriting evidence.
-    role = ACTOR_ROLES.get(identity, "worker" if identity.startswith("worker:") else "other")
+    role = ACTOR_ROLES.get(identity, "other")
+    if identity.startswith("worker:"):
+        role = "worker"
+    elif identity.startswith("coordinator:"):
+        role = "coordinator"
     return Actor(role=role, label=ACTOR_LABELS.get(role, identity), identity=identity)

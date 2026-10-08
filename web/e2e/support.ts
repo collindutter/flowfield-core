@@ -170,3 +170,20 @@ export function fixtureStages() {
     },
   ];
 }
+
+// Model-free historical states are fixture setup, not coordinator MCP capabilities.
+export async function fixtureProgress(
+  request: APIRequestContext,
+  input: {
+    project_id: string;
+    task_id: string;
+    progress: Record<string, unknown>;
+  },
+) {
+  const response = await request.post(
+    `/api/projects/${input.project_id}/tasks/${input.task_id}/progress`,
+    { data: input.progress },
+  );
+  expect(response.ok()).toBe(true);
+  return response.json();
+}

@@ -24,8 +24,8 @@ continue through the service; do not apply them manually. Task replies answer qu
 record exact-result feedback/testing. Discuss scope and results with the coordinator; do not
 start worker discussions. Follow get_result's next_action for recovery. review_result records explicit
 human approval of the exact candidate or requests changes; inspection is optional. The
-service integrates approved code; verify delivery before claiming Done. Older run/integration
-operations support compatibility and diagnostics, not a second normal approval workflow.
+service integrates approved code; verify delivery before claiming Done. Use result operations for preparation, correction and delivery recovery; the service owns
+validation and delivery.
 
 On stale writes, reread and reconcile. After uncertain effects, inspect saved state before
 retrying. Preserve dirty work, ownership and history. Report concrete blockers honestly;

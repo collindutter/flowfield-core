@@ -92,7 +92,7 @@ Every task starts with at least one outcome stage. `task create --title "…"` s
 single planned stage from the title. Use `--stages-file stages.json` to supply an array
 of one to eight stages, each with an `id`, `title` and `outcome`.
 
-`task edit` and `task publish` also accept `--stages-file`, containing
+`task edit` and `task prepare` also accept `--stages-file`, containing
 `{"expected_revision": 1, "stages": [...], "reason": "Scope clarified"}`. Read the
 current plan with `task stages APP-1 --json` or MCP `get_task_stages` first.
 The plan and task change save together;

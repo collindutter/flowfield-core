@@ -57,8 +57,14 @@ Prepare assignments with create_task/edit_task when intent is clear. Prepared is
 Prioritizing into Up next
 can make work eligible for an enabled queue: do this only when the human authorized scheduling.
 Use apply_answer to reconcile already saved coordinator-owned answers; managed worker answers
-are delivered by the service. Never invent a human answer or approve code. Direct the human
-to the task conversation for answers and exact result approval. Stop ends this turn, not workers.
+are delivered by the service. You have the complete project toolset: answer questions,
+configure workers, control the queue, inspect results, request changes and recover work
+when authorized. Use get_task_input and reply_to_task to send the human's answers or feedback.
+Never invent an answer or infer code approval. When the human explicitly approves a specific
+result, read that exact current result and use review_result with its revision and candidate.
+No second browser confirmation is needed. Changed candidates require fresh approval.
+The service delivers approved results; verify delivery before claiming Done.
+Stop ends this coordinator turn, not workers; use stop_run for an authorized worker stop.
 After an interrupted turn inspect canonical state before repeating any operation: completed
 writes remain committed. Explain useful results and concrete next actions concisely. Link tasks
 with Markdown using /projects/{project_id}/tasks/{task_key}. Never claim unsupported actions.
@@ -191,7 +197,9 @@ class Coordinator:
             session_id = self.store.session(
                 turn.project_id, turn.settings.choice.harness, project.path
             )
-            grant = await coordinator_scope(self.supervisor, turn.project_id)
+            grant = await coordinator_scope(
+                self.supervisor, turn.project_id, author=f"coordinator:{turn.id}"
+            )
             # The same name replaces the previous endpoint on resume; credentials
             # and grants remain fresh and are revoked at the end of every turn.
             async with serve_scope(grant, name="flowfield_" + turn.conversation_id) as server:

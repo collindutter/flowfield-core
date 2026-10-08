@@ -1,7 +1,7 @@
 """Revocable, role-scoped MCP tools over canonical Flowfield operations.
 
 These grants are created by the service, never from agent-supplied role/scope.
-They do not replace the standalone MCP interface or authorize code approval.
+Coordinators receive the complete project interface; workers have explicit run-bound tools.
 """
 
 import asyncio
@@ -10,6 +10,7 @@ import json
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.lowlevel import Server
 from mcp.types import CallToolResult, TextContent, Tool
 from pydantic import ValidationError
@@ -20,47 +21,6 @@ from flowfield.worker_tools import WorkerBridge, worker_tools
 
 if TYPE_CHECKING:
     from flowfield.supervisor import Supervisor
-
-# Explicit authority, not "anything with a project_id argument". Human answer,
-# result approval, worker settings, queue and project adoption are absent.
-COORDINATOR_TOOLS = frozenset(
-    {
-        "get_project",
-        "get_integration_settings",
-        "configure_integration",
-        "get_inspection_settings",
-        "configure_inspection",
-        "get_setup_validation",
-        "validate_project_setup",
-        "get_board",
-        "search_context",
-        "list_milestones",
-        "get_milestone",
-        "create_milestone",
-        "edit_milestone",
-        "list_tasks",
-        "get_task",
-        "create_task",
-        "edit_task",
-        "prioritize_task",
-        "publish_task",
-        "reconcile_task",
-        "list_task_relationships",
-        "list_task_revisions",
-        "get_text",
-        "get_activity",
-        "list_activity",
-        "list_questions",
-        "get_question",
-        "ask_question",
-        "apply_answer",
-        "follow_up_question",
-        "get_task_conversation",
-        "get_conversation_source",
-        "get_task_stages",
-        "update_task_stages",
-    }
-)
 
 
 class ScopedTools:
@@ -152,18 +112,30 @@ def worker_scope(bridge: WorkerBridge) -> ScopedTools:
     )
 
 
-async def coordinator_scope(supervisor: "Supervisor", project_id: str) -> ScopedTools:
+async def coordinator_scope(
+    supervisor: "Supervisor", project_id: str, *, author: str = "agent"
+) -> ScopedTools:
     workspace = supervisor.workspace
     workspace.project(project_id)
-    canonical = create_mcp(lambda: workspace, lambda: supervisor, origin="")
+    canonical = create_mcp(
+        lambda: workspace, lambda: supervisor, origin="", include_workspace_tools=False
+    )
     scoped = []
+    project_tools = set()
+    authored_arguments: dict[str, list[str]] = {}
     for tool in await canonical.list_tools():
-        if tool.name not in COORDINATOR_TOOLS:
-            continue
         schema = copy.deepcopy(tool.inputSchema)
-        if "project_id" not in schema.get("properties", {}):
-            raise RuntimeError("Coordinator tool lacks a project binding")
-        del schema["properties"]["project_id"]
+        properties = schema.get("properties", {})
+        if "project_id" in properties:
+            project_tools.add(tool.name)
+            del properties["project_id"]
+        elif not tool.annotations or not tool.annotations.readOnlyHint:
+            raise RuntimeError("Project mutation lacks a project binding")
+        authored_arguments[tool.name] = []
+        for key, value in properties.items():
+            definition = schema.get("$defs", {}).get(value.get("$ref", "").split("/")[-1], value)
+            if "author" in definition.get("properties", {}):
+                authored_arguments[tool.name].append(key)
         schema["required"] = [key for key in schema.get("required", []) if key != "project_id"]
         schema["additionalProperties"] = False
         scoped.append(tool.model_copy(update={"inputSchema": schema}))
@@ -172,13 +144,22 @@ async def coordinator_scope(supervisor: "Supervisor", project_id: str) -> Scoped
         if "project_id" in arguments:
             raise ApplicationError("scope_mismatch", "Project is fixed by the service.", 403)
         bound = copy.deepcopy(arguments)
-        bound["project_id"] = project_id
-        # Coordinator-created evidence must not impersonate human authorship.
-        for value in bound.values():
-            if isinstance(value, dict) and "author" in value:
-                value["author"] = "agent"
+        if name in project_tools:
+            bound["project_id"] = project_id
+        # Attribute every authored request, including omitted model defaults, to
+        # its service-owned coordinator turn rather than impersonating the human.
+        for key in authored_arguments[name]:
+            if isinstance(bound.get(key), dict):
+                bound[key]["author"] = author
         # FastMCP's annotation omits its CallToolResult and structured tuple variants.
-        result: Any = await canonical.call_tool(name, bound)
+        try:
+            result: Any = await canonical.call_tool(name, bound)
+        except ToolError as error:
+            # FastMCP wraps exceptions from execution tools. Preserve ordinary
+            # application/validation failures as tool results, not failed turns.
+            if isinstance(error.__cause__, (ApplicationError, ValidationError)):
+                raise error.__cause__ from error
+            raise
         if isinstance(result, CallToolResult):
             return result
         if isinstance(result, tuple):

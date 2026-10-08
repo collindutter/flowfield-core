@@ -11,7 +11,6 @@ from flowfield.errors import ApplicationError
 from flowfield.execution_models import (
     ModelOption,
     QueueEdit,
-    ReviewAction,
     Run,
     RunAction,
     RunLocation,
@@ -101,16 +100,8 @@ def execution_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     async def stop(project_id: str, run_id: str, request: RunAction) -> Run:
         return await supervisor().stop(project_id, run_id, request)
 
-    @router.post("/projects/{project_id}/runs/{run_id}/review")
-    def review(project_id: str, run_id: str, request: ReviewAction) -> Run:
-        return supervisor().execution.review(project_id, run_id, request)
-
     @router.post("/projects/{project_id}/runs/{run_id}/retry")
     def retry(project_id: str, run_id: str, request: RunAction) -> Run:
         return supervisor().execution.retry(project_id, run_id, request)
-
-    @router.post("/projects/{project_id}/runs/{run_id}/integration")
-    async def integration(project_id: str, run_id: str) -> Run:
-        return await supervisor().check_integration(project_id, run_id)
 
     return router

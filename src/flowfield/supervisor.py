@@ -599,15 +599,6 @@ class Supervisor:
             else RunLocation()
         )
 
-    async def check_integration(self, project_id: str, run_id: str) -> Run:
-        run = self.execution.get(project_id, run_id)
-        if run.status != "accepted":
-            raise ApplicationError(
-                "not_accepted", "Accept the result before checking availability.", 409
-            )
-        await asyncio.to_thread(self.integrations.refresh_availability, project_id)
-        return self.execution.get(project_id, run_id)
-
     async def close(self) -> None:
         self.closing = True
         await self.coordinator.close()

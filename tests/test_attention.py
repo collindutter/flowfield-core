@@ -5,8 +5,9 @@ from pathlib import Path
 from test_execution import BASE, RESULT, fixture, result, validate_report
 
 from flowfield.attention import attention_page
-from flowfield.execution_models import ReviewAction, WorkerResult
+from flowfield.execution_models import WorkerResult
 from flowfield.questions import QuestionAnswer, QuestionCreate, Questions, QuestionWithdraw
+from flowfield.result_models import ResultReview
 from flowfield.results import Results
 
 
@@ -37,14 +38,17 @@ def test_mixed_attention_lifecycle_and_bounded_history(tmp_path: Path) -> None:
     )
     assert [item.id for item in page("waiting").items] == [question.id]
     assert page("action").total == 1
-    execution.review(
+    results = Results(execution.workspace)
+    version = results.page("harbor", first.task_id).items[0]
+    results.review(
         "harbor",
-        first.id,
-        ReviewAction(
-            expected_revision=first.revision,
-            result_commit=RESULT,
+        version.id,
+        ResultReview(
+            expected_revision=version.revision,
+            candidate_commit=RESULT,
             action="request_changes",
             note="Add a check",
+            author="human",
         ),
     )
     assert {item.id for item in page("waiting").items} == {first_version.id, question.id}

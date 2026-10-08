@@ -1,3 +1,4 @@
+import { fixtureProgress } from "./support";
 import { fixtureStages } from "./support";
 import { join } from "node:path";
 
@@ -90,7 +91,7 @@ test("coordinator dependencies update blockers, links and reconciliation without
     detail.getByRole("link", { name: "DEP-2", exact: true }),
   ).toBeVisible();
   await page.goBack();
-  await call("record_progress", {
+  await fixtureProgress(request, {
     ...identity,
     task_id: one.id,
     progress: { expected_revision: 1, status: "done", completion: "report" },
@@ -209,7 +210,7 @@ test("three-letter prefix setup, coordinator dependencies and immediate accessib
   await expect(
     dependencies.getByText("Waiting on UIT-2", { exact: true }),
   ).toBeVisible();
-  await call("record_progress", {
+  await fixtureProgress(request, {
     ...identity,
     task_id: prerequisite.key,
     progress: { expected_revision: 1, status: "done", completion: "report" },

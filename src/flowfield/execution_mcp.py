@@ -8,8 +8,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from flowfield.execution_history import ExecutionHistory
-from flowfield.execution_models import QueueEdit, ReviewAction, RunAction, SettingsEdit
-from flowfield.integration_models import IntegrationApply, IntegrationConfig, IntegrationPrepare
+from flowfield.execution_models import QueueEdit, RunAction, SettingsEdit
+from flowfield.integration_models import IntegrationConfig
 from flowfield.reads import ContextReads, receipt
 from flowfield.result_models import ResultReview
 from flowfield.setup_validation import SetupCheckRequest
@@ -171,26 +171,11 @@ def add_execution_tools(
         return (await supervisor().stop(project_id, run_id, request)).model_dump()
 
     @mcp.tool(annotations=write)
-    def review_run(project_id: str, run_id: str, review: ReviewAction) -> dict[str, Any]:
-        """Legacy requested changes against the exact worker commit.
-        Prefer review_result and its contextual action. Complete reports finish automatically;
-        code approval requires the validated candidate. Never infer human approval.
-        """
-        return supervisor().execution.review(project_id, run_id, review).model_dump()
-
-    @mcp.tool(annotations=write)
     def retry_run(project_id: str, run_id: str, request: RunAction) -> dict[str, Any]:
         """Explicitly select a fresh attempt after a confirmed failure/stop/input
         resolution. Preserve prior files; no automatic retry.
         """
         return supervisor().execution.retry(project_id, run_id, request).model_dump()
-
-    @mcp.tool(annotations=write)
-    async def check_run_integration(project_id: str, run_id: str) -> dict[str, Any]:
-        """Refresh accepted-code availability against the validated target. Does not merge or
-        modify source.
-        """
-        return (await supervisor().check_integration(project_id, run_id)).model_dump()
 
     @mcp.tool(annotations=read)
     def get_integration_settings(project_id: str) -> dict[str, Any]:
@@ -204,7 +189,7 @@ def add_execution_tools(
                 "runtime": "local",
                 "description": "Service host tools, credentials and native harness settings; "
                 "per-attempt "
-                "checkout and temporary/output paths. Legacy inventory is not applied.",
+                "checkout and temporary/output paths.",
             },
         }
 
@@ -246,17 +231,6 @@ def add_execution_tools(
         explicit adoption/setup intent; reports missing tools and stale configuration."""
         return (await supervisor().setup_validation.check(project_id, request)).model_dump()
 
-    @mcp.tool(annotations=write)
-    async def prepare_integration(
-        project_id: str, run_id: str, request: IntegrationPrepare
-    ) -> dict[str, Any]:
-        """Inspect/finish the current result's preparation in an isolated checkout.
-        The service normally performs this automatically. Never updates the target.
-        Conflict fixes require a new reviewed result."""
-        return (
-            await asyncio.to_thread(supervisor().integrations.prepare, project_id, run_id, request)
-        ).model_dump()
-
     @mcp.tool(annotations=read)
     def get_integrations(
         project_id: str, run_id: str | None = None, before: int | None = None, limit: int = 10
@@ -272,17 +246,3 @@ def add_execution_tools(
     def get_integration(project_id: str, integration_id: str) -> dict[str, Any]:
         """Inspect one candidate, target-before/after, validation output and preserved checkout."""
         return supervisor().integrations.get(project_id, integration_id).model_dump()
-
-    @mcp.tool(annotations=write)
-    async def apply_integration(
-        project_id: str, integration_id: str, request: IntegrationApply
-    ) -> dict[str, Any]:
-        """Finish delivery already authorized through review_result; normally service-owned.
-        Requires persisted exact-version approval. Preserves dirty checkouts and rejects
-        stale validation.
-        Never pushes or deploys."""
-        return (
-            await asyncio.to_thread(
-                supervisor().integrations.apply, project_id, integration_id, request
-            )
-        ).model_dump()

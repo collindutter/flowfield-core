@@ -315,10 +315,14 @@ def test_browser_api_exposes_bounded_evidence_and_attention(tmp_path, monkeypatc
     with TestClient(
         create_app(data_dir=execution.workspace.directory), base_url="http://127.0.0.1"
     ) as client:
-        prepared = client.post(
+        Results(execution.workspace).process("harbor")
+        version = Results(execution.workspace).page("harbor", run.task_id).items[0]
+        prepared = client.get(f"/api/projects/harbor/integrations/{version.integration_id}")
+        removed = client.post(
             f"/api/projects/harbor/runs/{run.id}/integrations",
             json={"expected_revision": run.revision},
         )
+        assert removed.status_code == 404
         assert prepared.status_code == 200, prepared.text
         record = prepared.json()
         assert record["status"] == "ready"
@@ -347,7 +351,12 @@ def test_browser_api_exposes_bounded_evidence_and_attention(tmp_path, monkeypatc
                 "candidate_commit": record["candidate_commit"],
             },
         )
-        assert done.status_code == 200 and done.json()["status"] == "integrated"
+        assert done.status_code == 404
+        Results(execution.workspace).process("harbor")
+        assert (
+            client.get(f"/api/projects/harbor/integrations/{record['id']}").json()["status"]
+            == "integrated"
+        )
         assert client.get("/api/projects/other/integrations/" + record["id"]).status_code == 404
         assert client.get("/api/projects/harbor/integrations?limit=51").status_code == 422
 

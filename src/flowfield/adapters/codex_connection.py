@@ -174,7 +174,7 @@ async def probe(url: str) -> list[str]:
                     "edit_task",
                     "get_board",
                     "prioritize_task",
-                    "record_progress",
+                    "review_result",
                 }.issubset(tools):
                     raise ValueError("Missing Flowfield tools")
                 return tools

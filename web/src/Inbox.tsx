@@ -1,3 +1,4 @@
+import { authorLabel } from "./workspace";
 import { Disclosure, DetailSection, DetailHeading } from "./DetailLayout";
 import { Timestamp } from "./Timestamp";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -78,7 +79,8 @@ function PreviousAnswers({
               title={q.question}
               metadata={
                 <>
-                  {q.updated_by} · <Timestamp date={q.updated_at} />
+                  {authorLabel(q.updated_by)} ·{" "}
+                  <Timestamp date={q.updated_at} />
                 </>
               }
             />

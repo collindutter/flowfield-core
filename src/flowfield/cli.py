@@ -849,8 +849,8 @@ def task_prioritize(
     )
 
 
-@task_app.command("publish")
-def task_publish(
+@task_app.command("prepare")
+def task_prepare(
     ctx: typer.Context,
     task: str,
     completion: Annotated[str, typer.Option(help="Completion requirement: code or report.")],
@@ -862,7 +862,7 @@ def task_publish(
     author: Author = "coordinator",
     json_output: Json = False,
 ) -> None:
-    """Coordinator: publish a clarified assignment after checking requirements.
+    """Prepare an existing assignment after checking requirements.
 
     Clarify gaps first. This does not start work or accept code.
     """
@@ -875,11 +875,10 @@ def task_publish(
             path,
             {
                 **({"stages": stages_value(stages_file)} if stages_file else {}),
-                "completion": completion,
+                "preparation": {"completion": completion},
             },
             expected_revision if expected_revision is not None else current["revision"],
             author,
-            operation="publish",
         )
 
     output(run, json_output)

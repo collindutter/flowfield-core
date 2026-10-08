@@ -60,17 +60,6 @@ class RunAction(Record):
     author: str = Field(default="human", min_length=1, max_length=200)
 
 
-class ReviewAction(RunAction):
-    action: Literal["accept", "request_changes"]
-    result_commit: str = Field(min_length=40, max_length=64)
-
-    @model_validator(mode="after")
-    def require_feedback(self) -> Self:
-        if self.action == "request_changes" and not self.note.strip():
-            raise ValueError("Describe the requested change.")
-        return self
-
-
 class WorkerResult(Record):
     summary: str = Field(min_length=1, max_length=8000)
     checks: str = Field(min_length=1, max_length=8000)

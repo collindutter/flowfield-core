@@ -1,4 +1,4 @@
-"""Explicit coordinator-assisted integration, with browser-readable evidence."""
+"""Service-owned integration settings and browser-readable evidence."""
 
 import asyncio
 from collections.abc import Callable
@@ -10,10 +10,8 @@ from flowfield.adapters.git_review import changed_files, file_patch
 from flowfield.errors import ApplicationError
 from flowfield.integration_models import (
     Integration,
-    IntegrationApply,
     IntegrationConfig,
     IntegrationPage,
-    IntegrationPrepare,
     IntegrationSettings,
 )
 from flowfield.review_models import ChangedFiles, FilePatch
@@ -40,12 +38,6 @@ def integration_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     async def validate_setup(project_id: str, request: SetupCheckRequest) -> SetupCheck:
         return await supervisor().setup_validation.check(project_id, request)
 
-    @router.post("/runs/{run_id}/integrations")
-    async def prepare(project_id: str, run_id: str, request: IntegrationPrepare) -> Integration:
-        return await asyncio.to_thread(
-            supervisor().integrations.prepare, project_id, run_id, request
-        )
-
     @router.get("/integrations")
     def listing(
         project_id: str,
@@ -58,12 +50,6 @@ def integration_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     @router.get("/integrations/{identity}")
     def detail(project_id: str, identity: str) -> Integration:
         return supervisor().integrations.get(project_id, identity)
-
-    @router.post("/integrations/{identity}/apply")
-    async def apply(project_id: str, identity: str, request: IntegrationApply) -> Integration:
-        return await asyncio.to_thread(
-            supervisor().integrations.apply, project_id, identity, request
-        )
 
     def comparison(project_id: str, identity: str) -> tuple[Path, str, str]:
         record = supervisor().integrations.get(project_id, identity)

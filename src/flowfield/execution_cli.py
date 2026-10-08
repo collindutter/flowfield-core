@@ -10,7 +10,7 @@ def register(project_app: typer.Typer, task_app: typer.Typer) -> None:
     from flowfield.cli import Json, ProjectOption, output, project_path
 
     workers = typer.Typer(no_args_is_help=True, help="Configure workers and run/pause the queue.")
-    runs = typer.Typer(no_args_is_help=True, help="Inspect, review and recover task attempts.")
+    runs = typer.Typer(no_args_is_help=True, help="Inspect, stop and retry task attempts.")
     project_app.add_typer(workers, name="workers")
     task_app.add_typer(runs, name="runs")
     results = typer.Typer(no_args_is_help=True, help="Review proposed results and their delivery.")
@@ -251,34 +251,6 @@ def register(project_app: typer.Typer, task_app: typer.Typer) -> None:
 
         output(perform, json_output, show)
 
-    @runs.command("review")
-    def review(
-        ctx: typer.Context,
-        run_id: str,
-        action: str,
-        commit: str = typer.Option(..., help="Exact result commit you inspected."),
-        expected_revision: int = typer.Option(..., min=1),
-        note: str = "",
-        author: str = "human",
-        project: ProjectOption = None,
-        json_output: Json = False,
-    ) -> None:
-        """Record accept or request_changes against the exact inspected result."""
-        output(
-            lambda: ctx.obj.request(
-                "POST",
-                project_path(project) + "/runs/" + run_id + "/review",
-                {
-                    "expected_revision": expected_revision,
-                    "result_commit": commit,
-                    "action": action,
-                    "note": note,
-                    "author": author,
-                },
-            ),
-            json_output,
-        )
-
     def mutate(
         ctx: typer.Context, run_id: str, project: str | None, action: str, json_output: bool
     ) -> None:
@@ -305,9 +277,3 @@ def register(project_app: typer.Typer, task_app: typer.Typer) -> None:
         ctx: typer.Context, run_id: str, project: ProjectOption = None, json_output: Json = False
     ) -> None:
         mutate(ctx, run_id, project, "retry", json_output)
-
-    @runs.command("check-integration")
-    def integration(
-        ctx: typer.Context, run_id: str, project: ProjectOption = None, json_output: Json = False
-    ) -> None:
-        mutate(ctx, run_id, project, "integration", json_output)

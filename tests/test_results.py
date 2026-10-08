@@ -12,7 +12,7 @@ from flowfield.adapters.git_workspace import baseline, git
 from flowfield.adapters.local_execution import LocalHost
 from flowfield.application import ProjectSetup, TaskProgress, TaskPublish, Workspace
 from flowfield.errors import ApplicationError
-from flowfield.execution_models import QueueEdit, ReviewAction, SettingsEdit, WorkerResult
+from flowfield.execution_models import QueueEdit, SettingsEdit, WorkerResult
 from flowfield.integration_models import IntegrationApply, IntegrationConfig
 from flowfield.result_models import ResultReview
 from flowfield.supervisor import Supervisor
@@ -176,14 +176,8 @@ def approve(service, version):
 def test_validate_approve_deliver_and_idempotent_receipt(tmp_path):
     service, repo, run = fixture(tmp_path)
     assert current(service).status == "preparing"
-    with pytest.raises(ApplicationError, match="worker acceptance"):
-        service.execution.review(
-            "harbor",
-            run.id,
-            ReviewAction(
-                expected_revision=run.revision, result_commit=run.result_commit, action="accept"
-            ),
-        )
+    with pytest.raises(ApplicationError, match="successful candidate validation"):
+        approve(service, current(service))
     service.results.process("harbor")
     ready = current(service)
     assert ready.status == "ready", ready.problem

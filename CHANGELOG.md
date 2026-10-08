@@ -15,6 +15,8 @@ Plan, run and review work together with the Coordinator beside your board.
 - Follow task stages and streaming worker output in the feed. Ongoing output stays at
   the bottom; completed output remains with its attempt. View Current tokens below output.
 - Run workers without the previous 15-minute execution cap; use Stop worker when needed.
+- Give the built-in Coordinator the complete project toolset, including worker/queue controls,
+  answers, feedback, result inspection, recovery and explicitly authorized chat approval.
 - Confirm exact-result approval in the task composer, with an optional testing or approval
   comment, and request changes from the same task feed.
 - Simplify navigation with a permanent project rail, persistent project views, task context
@@ -33,7 +35,10 @@ data directory for a fresh start. Existing schema-44 workspaces open unchanged.
 
 Install the matching managed bridge with `flowfield harness install codex`; keep native
 Codex installed and signed in. Update installed project guidance and start a fresh standalone
-coding conversation afterward. Restart Flowfield after upgrading; the worker queue starts paused.
+coding conversation afterward. MCP task preparation now uses `create_task`/`edit_task` with
+`preparation`; result review and recovery replace the older run-review and manual integration
+tools. The CLI uses `task prepare` in place of `task publish`. Restart Flowfield after upgrading;
+the worker queue starts paused.
 See the [installation](https://docs.flowfield.sh/installation) and
 [storage](https://docs.flowfield.sh/storage) guides.
 

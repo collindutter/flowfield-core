@@ -1,3 +1,4 @@
+import { authorLabel } from "./workspace";
 import { UsageSummary } from "./UsageSummary";
 import {
   ContentStack,
@@ -157,7 +158,7 @@ function ExecutionDetail({
           </p>
           {item.kind === "delivery" && result.data && (
             <p>
-              Approved by {result.data.approved_by} ·{" "}
+              Approved by {authorLabel(result.data.approved_by)} ·{" "}
               {result.data.approved_at && (
                 <Timestamp date={result.data.approved_at} />
               )}{" "}

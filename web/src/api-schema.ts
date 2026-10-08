@@ -1188,23 +1188,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/projects/{project_id}/runs/{run_id}/review": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Review */
-    post: operations["review_api_projects__project_id__runs__run_id__review_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/projects/{project_id}/runs/{run_id}/retry": {
     parameters: {
       query?: never;
@@ -1216,23 +1199,6 @@ export interface paths {
     put?: never;
     /** Retry */
     post: operations["retry_api_projects__project_id__runs__run_id__retry_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/projects/{project_id}/runs/{run_id}/integration": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Integration */
-    post: operations["integration_api_projects__project_id__runs__run_id__integration_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1551,23 +1517,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/projects/{project_id}/runs/{run_id}/integrations": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Prepare */
-    post: operations["prepare_api_projects__project_id__runs__run_id__integrations_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/projects/{project_id}/integrations": {
     parameters: {
       query?: never;
@@ -1596,23 +1545,6 @@ export interface paths {
     get: operations["detail_api_projects__project_id__integrations__identity__get"];
     put?: never;
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/projects/{project_id}/integrations/{identity}/apply": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Apply */
-    post: operations["apply_api_projects__project_id__integrations__identity__apply_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2886,18 +2818,6 @@ export interface components {
       /** Setup Checks */
       setup_checks: components["schemas"]["CheckResult"][];
     };
-    /** IntegrationApply */
-    IntegrationApply: {
-      /** Expected Revision */
-      expected_revision: number;
-      /** Candidate Commit */
-      candidate_commit: string;
-      /**
-       * Author
-       * @default agent
-       */
-      author: string;
-    };
     /** IntegrationConfig */
     IntegrationConfig: {
       /** Expected Revision */
@@ -2929,16 +2849,6 @@ export interface components {
       items: components["schemas"]["IntegrationSummary"][];
       /** Next Before */
       next_before: number | null;
-    };
-    /** IntegrationPrepare */
-    IntegrationPrepare: {
-      /** Expected Revision */
-      expected_revision: number;
-      /**
-       * Author
-       * @default agent
-       */
-      author: string;
     };
     /** IntegrationSettings */
     IntegrationSettings: {
@@ -3772,28 +3682,6 @@ export interface components {
       next_action: components["schemas"]["ResultAction"] | null;
       /** Recheck Of */
       recheck_of: number | null;
-    };
-    /** ReviewAction */
-    ReviewAction: {
-      /** Expected Revision */
-      expected_revision: number;
-      /**
-       * Note
-       * @default
-       */
-      note: string;
-      /**
-       * Author
-       * @default human
-       */
-      author: string;
-      /**
-       * Action
-       * @enum {string}
-       */
-      action: "accept" | "request_changes";
-      /** Result Commit */
-      result_commit: string;
     };
     /** Run */
     Run: {
@@ -7560,42 +7448,6 @@ export interface operations {
       };
     };
   };
-  review_api_projects__project_id__runs__run_id__review_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        project_id: string;
-        run_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ReviewAction"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Run"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   retry_api_projects__project_id__runs__run_id__retry_post: {
     parameters: {
       query?: never;
@@ -7611,38 +7463,6 @@ export interface operations {
         "application/json": components["schemas"]["RunAction"];
       };
     };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Run"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  integration_api_projects__project_id__runs__run_id__integration_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        project_id: string;
-        run_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
     responses: {
       /** @description Successful Response */
       200: {
@@ -8476,42 +8296,6 @@ export interface operations {
       };
     };
   };
-  prepare_api_projects__project_id__runs__run_id__integrations_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        project_id: string;
-        run_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["IntegrationPrepare"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Integration"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   listing_api_projects__project_id__integrations_get: {
     parameters: {
       query?: {
@@ -8558,42 +8342,6 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Integration"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  apply_api_projects__project_id__integrations__identity__apply_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        project_id: string;
-        identity: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["IntegrationApply"];
-      };
-    };
     responses: {
       /** @description Successful Response */
       200: {

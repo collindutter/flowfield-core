@@ -1,3 +1,4 @@
+import { authorLabel } from "./workspace";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -81,7 +82,7 @@ export function Attribution({
 }) {
   return (
     <span className="record-attribution">
-      {author} · <Timestamp date={date} tooltip={false} />
+      {authorLabel(author)} · <Timestamp date={date} tooltip={false} />
     </span>
   );
 }

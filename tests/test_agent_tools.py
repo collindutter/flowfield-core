@@ -11,7 +11,8 @@ from test_execution import BASE, fixture
 
 from flowfield.adapters.acp_session import AcpSession
 from flowfield.adapters.agent_mcp import serve_scope
-from flowfield.agent_tools import COORDINATOR_TOOLS, coordinator_scope, worker_scope
+from flowfield.agent_tools import coordinator_scope, worker_scope
+from flowfield.mcp import create_mcp
 from flowfield.supervisor import Supervisor, WorkerBridge
 
 
@@ -78,7 +79,9 @@ def test_coordinator_captures_work_in_fixed_project(tmp_path):
 
     async def exercise():
         grant = await coordinator_scope(Supervisor(execution.workspace), "harbor")
-        assert set(grant.tools) == COORDINATOR_TOOLS
+        canonical = create_mcp(lambda: execution.workspace, lambda: Supervisor(execution.workspace))
+        names = {tool.name for tool in await canonical.list_tools()}
+        assert set(grant.tools) == names - {"list_projects", "initialize_project"}
         for tool in grant.tools.values():
             assert "project_id" not in tool.inputSchema["properties"]
         events = await journey(
@@ -282,7 +285,207 @@ def test_coordinator_configures_and_validates_only_its_project(tmp_path, monkeyp
         assert (
             await grant.call("configure_integration", {"project_id": "other", "settings": {}})
         ).isError
-        for name in ("set_queue", "review_result", "configure_workers", "apply_integration"):
-            assert (await grant.call(name, {})).isError
+        assert {
+            "set_queue",
+            "review_result",
+            "configure_workers",
+            "list_worker_models",
+        } <= grant.tools.keys()
 
     asyncio.run(exercise())
+
+
+def test_new_project_tools_are_available_without_changing_coordinator_scope(tmp_path, monkeypatch):
+    import flowfield.agent_tools as tools
+
+    execution = fixture(tmp_path)
+
+    def registry(*args, **kwargs):
+        canonical = create_mcp(*args, **kwargs)
+
+        @canonical.tool()
+        def future_project_operation(project_id: str, name: str) -> dict:
+            return {"project": project_id, "name": name}
+
+        return canonical
+
+    monkeypatch.setattr(tools, "create_mcp", registry)
+
+    async def exercise():
+        grant = await coordinator_scope(Supervisor(execution.workspace), "harbor")
+        result = await grant.call("future_project_operation", {"name": "Available immediately"})
+        assert not result.isError
+        assert json.loads(result.content[0].text) == {
+            "project": "harbor",
+            "name": "Available immediately",
+        }
+        assert (
+            await grant.call("future_project_operation", {"project_id": "other", "name": "x"})
+        ).isError
+        assert "list_projects" not in grant.tools and "initialize_project" not in grant.tools
+        grant.revoke()
+        assert (await grant.call("future_project_operation", {"name": "late"})).isError
+
+    asyncio.run(exercise())
+
+
+def test_coordinator_reviews_exact_result_and_service_delivers_with_queue_paused(tmp_path):
+    from test_results import current
+    from test_results import fixture as result_fixture
+
+    from flowfield.actors import actor
+
+    service, repo, _ = result_fixture(tmp_path)
+    service.results.process("harbor")
+    version = current(service)
+    assert version.status == "ready"
+
+    async def exercise():
+        grant = await coordinator_scope(service, "harbor", author="coordinator:saved-turn")
+        assert not (await grant.call("get_result", {"result_id": version.id})).isError
+        assert not (await grant.call("get_task_input", {"task_id": "work"})).isError
+        request = {
+            "result_id": version.id,
+            "review": {
+                "expected_revision": version.revision,
+                "candidate_commit": "wrong",
+                "action": "approve",
+            },
+        }
+        wrong = await grant.call("review_result", request)
+        assert wrong.isError
+        assert current(service).approved_at is None
+        request["review"]["candidate_commit"] = version.candidate_commit
+        request["review"]["expected_revision"] += 1
+        assert (await grant.call("review_result", request)).isError
+        request["review"]["expected_revision"] = version.revision
+        # Omitting author cannot inherit the request model's human default.
+        approved = await grant.call("review_result", request)
+        assert not approved.isError, approved
+        assert current(service).approved_by == "coordinator:saved-turn"
+        assert actor(current(service).approved_by).label == "Coordinator"
+        assert not service.execution.settings("harbor").enabled
+        grant.revoke()
+
+    asyncio.run(exercise())
+    service.results.process("harbor")
+    assert current(service).status == "delivered"
+    assert service.workspace.task("harbor", "work").status == "done"
+    from flowfield.adapters.git_workspace import git
+
+    assert git(repo, "rev-parse", "HEAD").decode().strip() == version.candidate_commit
+
+
+def test_coordinator_controls_workers_and_preserves_worker_scope(tmp_path, monkeypatch):
+    execution = fixture(tmp_path)
+    service = Supervisor(execution.workspace)
+
+    async def validate(self, choice, project_id=None):
+        assert choice.model == "fixture" and choice.effort == "low"
+
+    monkeypatch.setattr(Supervisor, "validate_agent_choice", validate)
+
+    async def exercise():
+        grant = await coordinator_scope(service, "harbor")
+        settings = execution.settings("harbor")
+        saved = await grant.call(
+            "configure_workers",
+            {
+                "settings": {
+                    "expected_revision": settings.revision,
+                    "model": "fixture",
+                    "effort": "low",
+                    "max_parallel": 2,
+                }
+            },
+        )
+        assert not saved.isError, saved
+        settings = execution.settings("harbor")
+        assert settings.max_parallel == 2
+        assert not (
+            await grant.call(
+                "set_queue", {"change": {"expected_revision": settings.revision, "enabled": False}}
+            )
+        ).isError
+        assert not execution.settings("harbor").enabled
+        run = execution.page("harbor").items
+        assert not run
+        settings = execution.settings("harbor")
+        assert not (
+            await grant.call(
+                "set_queue", {"change": {"expected_revision": settings.revision, "enabled": True}}
+            )
+        ).isError
+        run = execution.claim("harbor", BASE, {BASE: set()})
+        assert run
+        execution.started("harbor", run.id)
+        worker = worker_scope(WorkerBridge(execution, run, None))
+        assert set(worker.tools) == {
+            "read_context",
+            "search_context",
+            "update_stages",
+            "ask_question",
+            "submit_result",
+        }
+        for name in set(grant.tools) - set(worker.tools):
+            denied = await worker.call(name, {})
+            assert denied.structuredContent["error"]["code"] == "operation_denied"
+        stopped = await grant.call(
+            "stop_run", {"run_id": run.id, "request": {"expected_revision": run.revision}}
+        )
+        assert not stopped.isError, stopped
+        assert execution.get("harbor", run.id).status == "stopped"
+        retried = await grant.call(
+            "retry_run",
+            {
+                "run_id": run.id,
+                "request": {"expected_revision": execution.get("harbor", run.id).revision},
+            },
+        )
+        assert not retried.isError, retried
+        assert execution.workspace.task("harbor", run.task_id).status == "up_next"
+
+    asyncio.run(exercise())
+
+
+def test_coordinator_relays_bound_answer_once_without_enabling_queue(tmp_path):
+    from test_input_continuation import question, queue
+
+    from flowfield.questions import Questions
+    from flowfield.reply_models import ReplyBinding
+
+    execution = fixture(tmp_path)
+    run, question_record = question(execution)
+    execution.finish("harbor", run.id, "waiting_for_input", input_checkpoint=BASE)
+    queue(execution, False)
+
+    async def exercise():
+        grant = await coordinator_scope(
+            Supervisor(execution.workspace), "harbor", author="coordinator:answer-turn"
+        )
+        gate = await grant.call("get_task_input", {"task_id": run.task_id})
+        binding = {key: gate.structuredContent[key] for key in ReplyBinding.model_fields}
+        request = {
+            "id": "answer-once",
+            "binding": binding,
+            "body": "All filtered rows",
+            "action": "answer",
+            "author": "human",
+        }
+        saved = await grant.call("reply_to_task", {"task_id": run.task_id, "request": request})
+        assert not saved.isError, saved
+        repeated = await grant.call("reply_to_task", {"task_id": run.task_id, "request": request})
+        assert not repeated.isError
+        assert repeated.structuredContent == saved.structuredContent
+        answer = Questions(execution.workspace).get("harbor", question_record.id)
+        assert answer.answer == "All filtered rows"
+        assert answer.updated_by == "coordinator:answer-turn"
+        assert not execution.settings("harbor").enabled
+        assert execution.claim("harbor", BASE, {BASE: set()}) is None
+
+    asyncio.run(exercise())
+    queue(execution, True)
+    successor = execution.claim("harbor", BASE, {BASE: set()})
+    assert successor and successor.predecessor_id == run.id
+    assert "All filtered rows" in execution.assignment("harbor", successor.id)["input"]
+    assert execution.claim("harbor", BASE, {BASE: set()}) is None

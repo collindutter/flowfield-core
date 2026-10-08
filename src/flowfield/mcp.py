@@ -21,8 +21,6 @@ from flowfield.application import (
     TaskEdit,
     TaskIdentifier,
     TaskPriority,
-    TaskProgress,
-    TaskPublish,
     TaskReconcile,
     Workspace,
 )
@@ -51,6 +49,7 @@ def create_mcp(
     supervisor: Callable[[], Supervisor] | None = None,
     *,
     origin: str | None = None,
+    include_workspace_tools: bool = True,
 ) -> FastMCP:
     mcp = FastMCP(
         "Flowfield",
@@ -164,10 +163,12 @@ def create_mcp(
             lambda: inspection_view(Inspections(workspace()).prepare(project_id, request))
         )
 
-    @mcp.tool(annotations=read)
-    async def list_projects(after: str | None = None, limit: int = 20) -> CallToolResult:
-        """Discover project IDs and paths in bounded pages."""
-        return await invoke(lambda: reads().projects(after=after, limit=limit))
+    if include_workspace_tools:
+
+        @mcp.tool(annotations=read)
+        async def list_projects(after: str | None = None, limit: int = 20) -> CallToolResult:
+            """Discover project IDs and paths in bounded pages."""
+            return await invoke(lambda: reads().projects(after=after, limit=limit))
 
     @mcp.tool(annotations=read)
     async def get_project(project_id: Identifier) -> CallToolResult:
@@ -181,25 +182,31 @@ def create_mcp(
             lambda: workspace().edit_project(project_id, attributed(changes)).model_dump()
         )
 
-    @mcp.tool(annotations=write)
-    async def initialize_project(
-        project_id: Identifier,
-        path: str,
-        name: str | None = None,
-        task_prefix: ProjectPrefix | None = None,
-    ) -> CallToolResult:
-        """Adopt an existing absolute directory; preserve files, Git state and portable config."""
-        return await mutate(
-            lambda: (
-                workspace()
-                .setup_project(
-                    ProjectSetup(
-                        id=project_id, path=path, name=name, task_prefix=task_prefix, author="agent"
+    if include_workspace_tools:
+
+        @mcp.tool(annotations=write)
+        async def initialize_project(
+            project_id: Identifier,
+            path: str,
+            name: str | None = None,
+            task_prefix: ProjectPrefix | None = None,
+        ) -> CallToolResult:
+            """Adopt an existing absolute directory, preserving files, Git and portable config."""
+            return await mutate(
+                lambda: (
+                    workspace()
+                    .setup_project(
+                        ProjectSetup(
+                            id=project_id,
+                            path=path,
+                            name=name,
+                            task_prefix=task_prefix,
+                            author="agent",
+                        )
                     )
+                    .model_dump()
                 )
-                .model_dump()
             )
-        )
 
     @mcp.tool(annotations=read)
     async def get_project_guidance(project_id: Identifier, preview: bool = True) -> CallToolResult:
@@ -438,40 +445,6 @@ def create_mcp(
         return await mutate(
             lambda: (
                 workspace().prioritize_task(project_id, task_id, attributed(priority)).model_dump()
-            )
-        )
-
-    @mcp.tool(annotations=write)
-    async def publish_task(
-        project_id: Identifier, task_id: TaskIdentifier, publication: TaskPublish
-    ) -> CallToolResult:
-        """Prepare an existing task's assignment after reading its full intent and task evidence.
-        Prefer create_task/edit_task with preparation when also authoring intent. This legacy
-        operation name means preparation, not scheduling: it neither moves the task nor enables
-        the queue. Use revision from get_task. Resolve consequential
-        gaps first; unfinished prerequisites may remain. Include stages to reconcile a stale
-        plan in this same operation. Never grants code approval.
-        """
-        return await mutate(
-            lambda: (
-                workspace().publish_task(project_id, task_id, attributed(publication)).model_dump()
-            )
-        )
-
-    @mcp.tool(annotations=write)
-    async def record_progress(
-        project_id: Identifier, task_id: TaskIdentifier, progress: TaskProgress
-    ) -> CallToolResult:
-        """Record actual coordinated progress, never intent to start or a worker launch.
-
-        Keep progress current while working. In review means a result awaits review;
-        Manual Done requires completion='report' and explicit report acceptance.
-        Code and managed results require review_result and service delivery.
-        Reopen/defer only after reconciling the work.
-        """
-        return await mutate(
-            lambda: (
-                workspace().record_progress(project_id, task_id, attributed(progress)).model_dump()
             )
         )
 

@@ -1,3 +1,4 @@
+import { fixtureProgress } from "./support";
 import { fixtureStages } from "./support";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -181,7 +182,7 @@ test("three-task board across CLI, browser and MCP, with archive and mobile read
     project_id: "harbor",
     task_id: "rounding",
   });
-  await call("record_progress", {
+  await fixtureProgress(request, {
     project_id: "harbor",
     task_id: "rounding",
     progress: { expected_revision: current.revision, status: "in_progress" },
@@ -430,7 +431,7 @@ test("priority races preserve agent progress and message drafts; touch can prior
       message: "Keep this notification alongside the priority failure.",
     },
   });
-  await call("record_progress", {
+  await fixtureProgress(request, {
     project_id: "race",
     task_id: "one",
     progress: { expected_revision: 1, status: "in_progress" },
@@ -565,7 +566,7 @@ test("archive preserves dated records and supports restore and mobile archiving"
   for (const [id, status, milestone_id] of [
     ["older", "up_next", "csv"],
     ["newer", "done", null],
-  ]) {
+  ] as const) {
     await call("create_task", {
       project_id: "archive-list",
       task: {
@@ -577,7 +578,7 @@ test("archive preserves dated records and supports restore and mobile archiving"
       },
     });
     if (status === "done")
-      await call("record_progress", {
+      await fixtureProgress(request, {
         project_id: "archive-list",
         task_id: id,
         progress: {
@@ -880,7 +881,7 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
   ).toHaveCount(0);
   const first = cli([
     "task",
-    "publish",
+    "prepare",
     "PRE-1",
     "--completion",
     "report",
@@ -911,7 +912,7 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
   await expect(draft).toBeVisible();
   const fromCli = cli([
     "task",
-    "publish",
+    "prepare",
     "PRE-1",
     "--completion",
     "report",
@@ -942,11 +943,11 @@ test("publication shares browser, CLI and MCP state without manual editing", asy
     project_id: "publication",
     task_id: "PRE-1",
   });
-  await call("publish_task", {
+  await call("edit_task", {
     project_id: "publication",
     task_id: "PRE-1",
-    publication: {
-      completion: "report",
+    changes: {
+      preparation: { completion: "report" },
       expected_revision: current.revision,
     },
   });

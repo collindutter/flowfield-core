@@ -18,12 +18,12 @@ from flowfield.errors import ApplicationError
 from flowfield.execution import Execution
 from flowfield.execution_models import (
     QueueEdit,
-    ReviewAction,
     RunAction,
     SettingsEdit,
     Usage,
     WorkerResult,
 )
+from flowfield.result_models import ResultReview
 from flowfield.results import Results
 
 BASE, RESULT = "a" * 40, "b" * 40
@@ -153,11 +153,19 @@ def test_claim_preserves_exact_assignment_and_refuses_changed_launch(tmp_path: P
 def test_review_is_bound_to_code_and_current_intent(tmp_path: Path) -> None:
     execution = fixture(tmp_path)
     run = result(execution, process=False)
-    with pytest.raises(ApplicationError, match="exact code result"):
-        execution.review(
+    with pytest.raises(ApplicationError, match="exact current candidate"):
+        results = Results(execution.workspace)
+        version = results.page("harbor", run.task_id).items[0]
+        results.review(
             "harbor",
-            run.id,
-            ReviewAction(expected_revision=run.revision, result_commit=BASE, action="accept"),
+            version.id,
+            ResultReview(
+                expected_revision=version.revision,
+                candidate_commit=BASE,
+                action="approve",
+                note="",
+                author="human",
+            ),
         )
     task = execution.workspace.task("harbor", run.task_id)
     with pytest.raises(ApplicationError, match="manual progress"):
@@ -172,14 +180,17 @@ def test_review_is_bound_to_code_and_current_intent(tmp_path: Path) -> None:
         Results(execution.workspace).page("harbor", run.task_id).items[0].problem_code
         == "assignment_changed"
     )
-    execution.review(
+    results = Results(execution.workspace)
+    version = results.page("harbor", run.task_id).items[0]
+    results.review(
         "harbor",
-        run.id,
-        ReviewAction(
-            expected_revision=run.revision,
-            result_commit=RESULT,
+        version.id,
+        ResultReview(
+            expected_revision=version.revision,
+            candidate_commit=RESULT,
             action="request_changes",
             note="Implement the updated requirement",
+            author="human",
         ),
     )
     upcoming = execution.workspace.task("harbor", task.id)
@@ -299,14 +310,17 @@ def test_followup_checks_prerequisites_in_its_own_base(tmp_path: Path) -> None:
         task.id,
         TaskEdit(expected_revision=task.revision, dependencies=[prerequisite.task_id]),
     )
-    execution.review(
+    results = Results(execution.workspace)
+    version = results.page("harbor", worker.task_id).items[0]
+    results.review(
         "harbor",
-        worker.id,
-        ReviewAction(
-            expected_revision=worker.revision,
-            result_commit=earlier_code,
+        version.id,
+        ResultReview(
+            expected_revision=version.revision,
+            candidate_commit=earlier_code,
             action="request_changes",
             note="Use the new prerequisite",
+            author="human",
         ),
     )
     task = execution.workspace.task("harbor", task.id)

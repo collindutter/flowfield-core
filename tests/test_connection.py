@@ -98,7 +98,7 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                 ]
                 assert "environment" not in config and "runtime" in config
                 assert {
-                    "publish_task",
+                    "edit_task",
                     "get_task",
                     "get_board",
                     "get_task_input",
@@ -106,7 +106,18 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                     "cancel_task_reply",
                 } <= tools.keys()
                 assert (
-                    not {"approve_task", "revise_task", "register_project", "create_project"}
+                    not {
+                        "approve_task",
+                        "revise_task",
+                        "register_project",
+                        "create_project",
+                        "publish_task",
+                        "record_progress",
+                        "review_run",
+                        "check_run_integration",
+                        "prepare_integration",
+                        "apply_integration",
+                    }
                     & tools.keys()
                 )
                 assert {"get_project_guidance", "update_project_guidance"} <= tools.keys()
@@ -204,7 +215,6 @@ def test_mcp_board_parity_and_restart(tmp_path: Path) -> None:
                         json={"expected_revision": 2, "body": "Preserve row order."},
                     )
                     for name, parameter, change in [
-                        ("record_progress", "progress", {"status": "done", "completion": "report"}),
                         ("edit_task", "changes", {"title": "Stale"}),
                     ]:
                         conflict = await session.call_tool(
