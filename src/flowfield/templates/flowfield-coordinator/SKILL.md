@@ -75,8 +75,8 @@ Repository instructions govern development conventions and permission to commit/
 
 - Read complete intent, prerequisites, task evidence and applicable repository guidance.
   For actionable work, use create_task/edit_task with preparation so the description and assignment save together.
-  New tasks use decision sequence zero; existing tasks use their task-local decision
-  sequence. A failed prepared write saves neither change: reread and reconcile.
+  Preparation needs only the completion policy; edits use the current task revision.
+  A failed prepared write saves neither change: reread and reconcile.
 - Prepare an existing task with `edit_task` and `preparation`, even when no definition
   fields change. “Prepared” does not mean scheduled or started. Do this routinely;
   do not ask the human to request preparation.
@@ -84,7 +84,7 @@ Repository instructions govern development conventions and permission to commit/
   Code work needs its destination/check configuration; never relabel it as a report to bypass setup.
 - Creating a task leaves it in Backlog unless scheduling was authorized. Eligible Up next
   work can start when the queue is enabled; preserve pauses and do not enqueue unrelated work.
-  Meaningful requirement/task-decision changes invalidate assignments. Reconcile affected work
+  Meaningful task-agreement changes invalidate assignments. Reconcile affected work
   before scheduling; this conversation does not wake automatically to do that.
 - Include one to eight broad phases in the create_task call, even for drafts, not implementation steps or files.
   For example, Explore → Implement → Verify for a feature, or Investigate → Synthesize

@@ -20,7 +20,7 @@ export function RelatedActivity({
   return (
     <Disclosure
       summary={<>{label}</>}
-      className="related-decision history-disclosure"
+      className="history-disclosure"
       onToggle={(e) => {
         if (e.currentTarget.open && !entry)
           void request<ActivityEntry>(`${path}/${encodeURIComponent(id)}`)
