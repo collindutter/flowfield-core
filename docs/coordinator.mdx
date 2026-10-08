@@ -9,16 +9,15 @@ Open a card to discuss that task without losing the conversation.
 
 ## Start planning
 
-Install and authenticate [Codex](/integrations/codex), including the managed ACP runtime.
+Install and sign in to [Codex](/integrations/codex), then run `flowfield harness install codex`.
 Add an existing project using **Add project → Choose directory** or `flowfield project init`.
 In the Coordinator, choose a model, reasoning effort and access mode beside the input, then save.
-Local uses the service host’s tools, credentials and native harness configuration automatically.
-Worker delivery branches, setup and checks can be configured later. Built-in chat supplies
-its own MCP connection; `flowfield integration connect codex` is only for standalone sessions.
+The Coordinator uses the service host’s tools and credentials. Configure worker setup when
+you are ready to run tasks. Its Flowfield connection is automatic; standalone Codex sessions
+use [a separate connection](/integrations/codex#connect-a-standalone-coordinator).
 
 Write your message and select **Send** (or press Enter). Use Command/Ctrl+Enter or
-Shift+Enter for a new line. Opening a project
-starts no model turn. Send is available once you have saved these choices.
+Shift+Enter for a new line. Send is available once you have saved your model settings.
 The coordinator manages work through project-scoped Flowfield tools, including destination,
 setup/check commands, result-preview settings and setup validation. Validation runs in a
 separate checkout without starting a model or enabling the worker queue. You can also ask it
@@ -103,11 +102,9 @@ interactions. Selecting a task never launches a worker.
 
 ## Follow and stop
 
-Replies and public tool activity stream in order, with tool activity shown in grey;
-private reasoning is never displayed. A grey session note explains whether history was
-resumed, and the status below each reply stays visible even before output arrives.
-One coordinator turn can run per project, independently
-of worker slots. You can write your next draft while it runs, then send when it finishes.
+Replies and tool activity stream in order. Tool activity appears in grey, and each reply
+shows its current status. One coordinator turn can run per project, independently of worker
+slots. You can write your next draft while it runs, then send when it finishes.
 
 **Stop** ends the selected coordinator turn. Saved task changes remain, and task workers
 continue independently. If a connection fails, the retained turn explains whether it stopped

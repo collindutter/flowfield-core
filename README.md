@@ -53,7 +53,7 @@ flowfield project init
 Start planning in the [Coordinator](https://docs.flowfield.sh/coordinator), or connect a
 [standalone coding agent](https://docs.flowfield.sh/integrations/codex#connect-a-standalone-coordinator).
 Built-in chat and workers use your Codex login through the managed ACP runtime.
-Codex is the first supported harness; further integrations are planned.
+Codex is the supported harness for the Coordinator and workers.
 
 ## Fits your existing project
 

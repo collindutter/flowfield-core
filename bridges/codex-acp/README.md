@@ -57,7 +57,7 @@ never a moving latest tag. Local bundles require an explicit trusted SHA-256.
 
 The release workflow attaches those same tested archives after its normal publishing
 gates. Manual rehearsal and main-branch CI retain artifacts without publishing a release.
-Runtime installation does not select ACP in the scheduler or adopt Local for a project.
+Installing the bridge does not enable queues or select worker models.
 
 An explicit **model-free** native probe launches only a disposable thread and sleep
 command, verifies that command exits, and removes its isolated HOME/CODEX_HOME:

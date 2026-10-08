@@ -30,8 +30,7 @@ Choose **Add project** in the sidebar, then **Choose directory**. The native fol
 opens on the machine running Flowfield. Select your existing project directory, then review
 the prefilled **Name**, **Project ID** and **Task prefix** below it. All three are required and
 editable. Choose a unique ID and three-letter prefix if another project already uses them.
-Review the guidance option, then click **Add project**. Selecting or previewing a directory
-does not register it or write guidance files.
+Review the guidance option, then click **Add project**.
 
 You can also register the same project from another terminal in its directory:
 
@@ -39,14 +38,13 @@ You can also register the same project from another terminal in its directory:
 flowfield project init
 ```
 
-Add project offers **Install project guidance**. Keep it selected to add the coordinator
-skill and its `AGENTS.md` reference while preserving existing instructions. If skipped,
+Keep **Install project guidance** selected to add the coordinator skill and its `AGENTS.md`
+reference while preserving existing instructions. If skipped,
 install later under **Project settings → Coordinator**. Commit the instructions so workers
 receive them in their checkouts.
 
-Registration adds `.flowfield/config.toml`. Flowfield adopts your project; it does not
-create directories, initialize Git or scaffold an application. Without a desktop folder
-chooser, use the CLI option.
+Registration saves the project identity in `.flowfield/config.toml`. Use the CLI if a
+desktop folder chooser is unavailable.
 
 ## Start planning
 
@@ -55,28 +53,11 @@ and save. Describe what you want to achieve. For example:
 
 > Help me add CSV export to this project. Review the existing code and suggest a small first task before starting implementation.
 
-Chat is scoped to the selected project.
-Flowfield automatically uses the local machine; worker checks and delivery configuration
-can wait until you are ready to run tasks.
-
-Built-in chat supplies its own Flowfield guidance and MCP connection; you can plan before
-installing repository guidance. To plan from a standalone Codex session,
-follow [standalone coordinator setup](/integrations/codex#connect-a-standalone-coordinator)
-instead.
+The Coordinator works in the selected project and is ready to plan without repository
+guidance. Worker setup can wait until you are ready to run tasks. For a standalone Codex
+conversation, follow [standalone coordinator setup](/integrations/codex#connect-a-standalone-coordinator).
 
 ## Prepare the first task
-
-If you skipped guidance during registration, preview and install it in **Coordinator**
-settings or from a terminal in your project directory:
-
-```sh
-flowfield project guidance preview
-flowfield project guidance install
-```
-
-Installation preserves existing instructions and adds a reference to
-`.agents/skills/flowfield-coordinator/SKILL.md`. Review and commit the added files under
-your project's usual rules before running workers.
 
 Ask your coordinator to configure the destination branch, dependency setup and checks,
 then validate setup. Add a run command if you want to try results locally. Choose a worker
@@ -99,6 +80,9 @@ its feed shows worker activity and any questions.
 Answer questions in the task feed or **Needs you**. Your saved answer lets the service
 continue managed work when the queue permits it. **Pause queue** prevents new starts;
 active workers continue. **Stop worker** stops the selected attempt.
+
+**Retry worker** returns stopped or failed work to **Up next**. It starts when the queue is
+running and a worker slot is available. The queue status shows occupancy, such as **1/2 active**.
 
 ## Review and finish
 

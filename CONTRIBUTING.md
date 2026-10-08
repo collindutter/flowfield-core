@@ -77,7 +77,7 @@ keep real Git, cleanup, concurrency and exact-approval coverage intact.
 Schema 44 is the initialization baseline, captured in
 `tests/fixtures/schema_44.sql`. Append each schema change to the ordered registry in
 `src/flowfield/migrations.py`; do not edit previous migrations or the baseline SQL.
-The 0.1.0 rehearsal and intermediate development schemas are unsupported. New workspaces
+Databases from 0.1.0 and earlier development builds are unsupported. New workspaces
 start at this baseline; startup never resets an older workspace.
 Migration callbacks change only the database using `execute`/`executemany`. The storage
 owner controls the transaction, version, migration history and pre-upgrade snapshot;
@@ -106,7 +106,7 @@ Feature development continues on main.
 
 ## Versioning and releases
 
-The first release is **0.1.0**. `pyproject.toml` owns the version; uv keeps its entry in
+`pyproject.toml` owns the version; uv keeps its entry in
 `uv.lock` aligned. Tags use `vX.Y.Z`. During 0.x, patches contain compatible fixes;
 minor releases contain new capabilities or breaking changes, with explicit upgrade notes.
 From 1.0 onward, Semantic Versioning applies: major for breaking changes, minor for
@@ -131,7 +131,7 @@ implementation, documentation and checks. Commit reviewed notes before releasing
 make setup
 pnpm --dir web exec playwright install chromium
 make release-check
-uv run --no-sync python scripts/release.py 0.1.0 --dry-run
+uv run --no-sync python scripts/release.py 0.2.0 --dry-run
 ```
 
 `release-check` runs local checks, browser journeys, clean builds, pip wheel/source and uv tool
@@ -154,7 +154,7 @@ tags matching `v*`. Publishing uses short-lived GitHub identity tokens.
 After reviewing the preparation and explicitly authorizing publication, run from clean main:
 
 ```sh
-uv run --no-sync python scripts/release.py 0.1.0
+uv run --no-sync python scripts/release.py 0.2.0
 ```
 
 The command holds a repository release lock, checks identity/notes, bumps only the version

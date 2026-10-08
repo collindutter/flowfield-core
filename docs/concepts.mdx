@@ -49,8 +49,7 @@ observations remain inspectable.
 
 **Current tokens**, below worker output, shows the agent's latest context-window report.
 Hover or focus the ring for its reported token count and capacity. This measures the current
-context, separately from cumulative tokens consumed by the work. Unavailable cumulative usage
-is omitted from the normal output view.
+context rather than total tokens consumed across the task.
 
 An ongoing worker attempt stays at the bottom of the feed as progress events arrive. After
 completion, its output remains in that attempt event; the result contains the worker report
@@ -64,12 +63,18 @@ Manual creation starts with one stage describing the entered outcome. Workers re
 progress against those stages; completing them does not approve code or mark a task Done.
 
 Tasks move through **Backlog**, **Up next**, **In progress**, **In review** and **Done**.
+Each column scrolls independently below its heading. On narrow screens, scroll the board
+horizontally to reach the other columns.
+
 Up next expresses your execution priorities. Run queue enables eligible starts; an enabled
 empty queue stays enabled. New ready tasks can start when added to it.
 
 The queue starts paused, including after restart. Pause leaves active work running.
 Each project starts with one worker slot; two independent tasks can run in separate
 checkouts after you increase the maximum to two. Waiting for review frees the worker slot.
+The queue shows active workers against that maximum, such as **1/2 active**.
+**Retry worker** queues a fresh attempt with the preserved work; it respects queue pause,
+dependencies and available slots.
 
 **Needs you** collects questions, reviews and interventions. The browser's Connected
 indicator describes its live update stream.
@@ -90,9 +95,8 @@ Each project has one [Coordinator](/coordinator), with its model, effort and acc
 selected beside the chat input. Changes apply to subsequent messages and do not configure
 your standalone coding agent.
 
-Flowfield uses Local automatically, with the installed host tools and Codex ACP runtime.
-Choose an access mode beside the chat input or in Workers settings; its supported modes
-include its own approval and review behavior.
+Agents use the tools and credentials on the machine running Flowfield. Codex supplies
+the available access modes; choose one beside the Coordinator input or in Workers settings.
 
 Tool permission requests from connected harness sessions have durable answers
 and response controls in the Coordinator, the task view and **Needs you**. Requests expire or close when

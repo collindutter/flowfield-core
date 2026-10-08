@@ -120,6 +120,9 @@ running. `task runs stop ATTEMPT_ID` targets one attempt. Inspect `task results 
 candidate commit are required. `task results retry-delivery --help` describes recovery
 when approved code is blocked from reaching the checkout.
 
+`task runs retry ATTEMPT_ID` returns stopped or failed work to Up next. It does not enable
+a paused queue or bypass the worker limit.
+
 Use `project workers models` to read model IDs and supported reasoning efforts, then
 `project workers configure --help` for explicit model, effort and parallel-worker settings.
 Saving worker settings does not enable the queue.

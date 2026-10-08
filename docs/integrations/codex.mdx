@@ -47,17 +47,16 @@ Follow [Worker setup and checks](/worker-setup) to configure and validate delive
 In **Workers**, select a model, reasoning effort and access mode from the connected harness.
 Project defaults can be overridden for individual tasks.
 
-Local uses the tools, credentials and native harness configuration available to the Flowfield
-service. Each attempt gets a separate checkout, temporary directory and output directory.
-Setup chooses the project's dependency tooling; Flowfield does not create a Python environment.
+Each attempt uses the service host's tools and credentials in a separate checkout, with its
+own temporary and output directories. Setup commands install your project's dependencies.
 Use `FLOWFIELD_WORKSPACE` and `FLOWFIELD_RUNTIME_DIR` in reusable setup scripts. Keep databases,
 ports and other shared resources separate, or serialize work with one worker slot.
 
 Checks use the service's Local environment. Saved inspection launchers use the terminal's
 host environment plus the inspection copy's paths; credentials are never written into them.
-Native tool permission requests appear in the task and **Needs you**. Result delivery still
-requires explicit approval. Local workspaces protect ordinary parallel edits; they do not
-contain arbitrary daemons or isolate the whole machine.
+Tool permission requests appear in the task and **Needs you**. Result delivery requires
+explicit approval. Worktrees separate file edits; shared services, ports and databases
+still need their own isolation.
 
 If the service cannot find Codex, restart it from a terminal with the correct PATH, then use
 **Reload models**. Installing a bridge does not enable queues.

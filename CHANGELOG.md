@@ -1,48 +1,41 @@
 # Changelog
 
-Reviewed release notes describe changes by user impact. See CONTRIBUTING.md for versioning
-and release preparation. A version heading becomes a release when its package is published.
-
 ## 0.2.0
 
-Plan, run and review work together in Flowfield with the embedded Coordinator.
+Plan, run and review work together with the Coordinator beside your board.
 
 - Keep a persistent Coordinator conversation beside the board and selected task. Resume
   native conversation history, attach files, select models and access modes, and use
   supported native commands and Fast mode.
-- Run the Coordinator and managed workers through the shared Local/ACP runtime with
-  scoped tools, durable permission requests, bounded stop/cleanup and explicit recovery.
+- Run the Coordinator and workers locally with scoped tools, saved permission answers
+  and explicit stop/recovery controls.
 - Add an existing project through the directory picker and optionally preview/install
   guidance during adoption. Review required, prefilled project details before adding it.
-  The Coordinator can configure and validate worker setup through
-  its project-scoped tools without requiring installed repository guidance.
-- Follow mandatory task stages and worker output in the task feed. Active output stays
-  after new feed events; completed output stays in its attempt event. Focused activity
-  updates replace output polling without refreshing the whole board for each chunk.
-- Remove the fixed 15-minute agent execution cap while preserving explicit stop and bounded
-  cleanup. Clarify current context tokens and omit unavailable usage totals from worker output.
+  Ask the Coordinator to configure and validate worker setup.
+- Follow task stages and streaming worker output in the feed. Ongoing output stays at
+  the bottom; completed output remains with its attempt. View Current tokens below output.
+- Run workers without the previous 15-minute execution cap; use Stop worker when needed.
 - Confirm exact-result approval in the task composer, with an optional testing or approval
-  comment. Standalone Record testing controls are removed; earlier observations remain readable.
+  comment, and request changes from the same task feed.
 - Simplify navigation with a permanent project rail, persistent project views, task context
   beside the Coordinator and shared scroll boundaries. Refine tooltips, relative timestamps,
   task overrides, action ordering and review colors; remove routine session-resume notices.
 - Scroll board columns independently with fixed headings and thinner native scrollbars.
   Show active workers against capacity and make queued retries reflect the queue state.
-- Remove the Decisions feature and retired worker runtime. Keep durable technical guidance
-  in the repository and use task conversations for questions, feedback and review.
+- Remove the Decisions feature. Keep durable technical guidance in the repository and
+  use task conversations for questions, feedback and review.
 - Open the ready local service in a browser for interactive launches; use `--no-open` to
   suppress this. Noninteractive launches print the URL.
 
-**Upgrade:** 0.2.0 establishes schema 44 as the supported storage baseline. The 0.1.0 and
-intermediate rehearsal schemas are unsupported and are refused without modification;
-there is no automatic migration from them. Stop Flowfield and preserve the old workspace
-before upgrading. Use a separate data directory for a fresh workspace when needed;
-existing schema-44 workspaces open unchanged. Never delete old state to bypass this check.
+**Upgrade:** 0.2.0 supports schema 44. Databases from 0.1.0 and earlier development builds
+cannot be upgraded to it. Stop Flowfield, preserve your old workspace and use a separate
+data directory for a fresh start. Existing schema-44 workspaces open unchanged.
 
 Install the matching managed bridge with `flowfield harness install codex`; keep native
-Codex installed and signed in. Review/update installed project guidance separately and
-start a fresh standalone coding conversation afterward. Restart Flowfield after upgrading;
-the worker queue starts paused. Read the installation and storage docs before resuming work.
+Codex installed and signed in. Update installed project guidance and start a fresh standalone
+coding conversation afterward. Restart Flowfield after upgrading; the worker queue starts paused.
+See the [installation](https://docs.flowfield.sh/installation) and
+[storage](https://docs.flowfield.sh/storage) guides.
 
 ## 0.1.0
 

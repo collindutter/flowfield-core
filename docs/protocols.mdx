@@ -25,10 +25,8 @@ Flowfield provides the coordinator commands `/status`, `/compact`, `/mcp` and `/
 the harness advertises them. Other advertised commands are not exposed. See
 [Coordinator](/coordinator) for the controls and session behavior.
 
-Codex is the first supported harness. An ACP-compatible agent is not automatically a supported
-Flowfield integration: session continuity, capabilities, cancellation and native cleanup must
-be integrated and verified. The packaged Codex bridge includes the cleanup support Flowfield
-uses to confirm that an attempt's native work has stopped. Install it with
+Flowfield currently supports Codex through its packaged ACP bridge, including session
+continuity and native process cleanup. Install it with
 `flowfield harness install codex`; authenticate Codex separately.
 
 ## MCP: working with Flowfield
