@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1
+
+- Fix an unnecessary vertical board scrollbar when horizontal scrolling is needed.
+- Keep code previews at a stable height so switching files preserves the task feed's
+  reading position. File lists and diffs scroll independently and fill the preview frame;
+  selecting another file starts its preview at the top.
+- Correct coordinator guidance to use the current task preparation contract, removing
+  obsolete decision-sequence instructions.
+
+**Upgrade:** restart Flowfield after updating. Schema-44 workspaces remain compatible.
+Update installed project guidance through project settings and start a fresh standalone
+coding conversation to use the corrected instructions.
+
 ## 0.2.0
 
 Plan, run and review work together with the Coordinator beside your board.
