@@ -59,9 +59,11 @@ test("task links open native tabs without losing the original selection or draft
     `/projects/${projectId}/tasks/${first.key}`,
   );
   const catalogs: Response[] = [];
-  context.on("response", (response) => {
-    if (new URL(response.url()).pathname === "/api/worker-models")
-      catalogs.push(response);
+  // Superseded catalog reads may be aborted after headers, before the body arrives.
+  context.on("requestfinished", async (request) => {
+    if (new URL(request.url()).pathname !== "/api/worker-models") return;
+    const response = await request.response();
+    if (response) catalogs.push(response);
   });
 
   for (const gesture of ["middle", "modifier"] as const) {
