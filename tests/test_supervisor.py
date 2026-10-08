@@ -1,6 +1,7 @@
 """Service lifecycle with a deterministic harness; never invokes a model."""
 
 import asyncio
+import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -66,6 +67,10 @@ class FakeWorker:
         return await self.run(self.choice.model, self.choice.effort, text, self.tools)
 
     async def run(self, model, effort, prompt, tools):
+        brief = json.loads(prompt)
+        assert brief["flowfield_connection"] in brief["instructions"]
+        assert "Before ending, call submit_result" in brief["instructions"]
+        assert "A final chat summary does not submit a result" in brief["instructions"]
         assert {t["name"] for t in tools} == {
             "read_context",
             "search_context",

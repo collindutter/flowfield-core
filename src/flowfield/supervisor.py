@@ -380,10 +380,15 @@ class Supervisor:
             )
             brief["flowfield_connection"] = server.name
             brief["instructions"] = (
+                "You are the assigned Flowfield task worker. "
                 f"Use only the {server.name} MCP connection for Flowfield operations; "
                 "it is bound to this worker attempt. Other Flowfield connections and the "
                 "Flowfield CLI belong to standalone coordination; do not use them. "
                 "Keep your assigned worker role when reading repository guidance. "
+                "Before ending, call submit_result with the actual outcome, evidence and "
+                "limitations, or ask_question if blocked on human input. A final chat summary "
+                "does not submit a result. If a workflow tool fails, inspect its error and "
+                "resolve it before ending; do not replace submission with chat prose. "
                 + str(brief["instructions"])
             )
             assert client.session.session_id
