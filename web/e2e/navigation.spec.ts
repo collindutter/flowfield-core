@@ -684,11 +684,19 @@ test("sidebar rail names remain accessible and idle input opens deliberately", a
   });
   expect(question.ok()).toBe(true);
   await page.goto("/projects/sidebar-names");
+  const settings = page.getByRole("dialog", {
+    name: "Coordinator model settings",
+    exact: true,
+  });
+  await settings.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(settings).not.toBeVisible();
   const sidebar = page.getByRole("navigation", {
     name: "Projects",
     exact: true,
   });
   const short = sidebar.getByRole("link", { name: "Short", exact: true });
+  await short.scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise(requestAnimationFrame));
   await short.hover();
   await expect(page.getByRole("tooltip")).toHaveText("Short");
   await page.keyboard.press("Escape");
