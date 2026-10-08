@@ -20,6 +20,7 @@ from flowfield.application import Workspace
 from flowfield.coordinator_models import CoordinatorSend
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
+from flowfield.permission_models import PermissionAnswer
 from flowfield.run_activity import MAX_TOTAL, ActivityUpdate, ContextUsage
 from flowfield.supervisor import Supervisor
 
@@ -236,6 +237,45 @@ def test_planning_before_worker_delivery_configuration(tmp_path, monkeypatch):
         assert (await settled(service, turn)).status == "completed"
         assert service.workspace.task("harbor", "chat-task").updated_by == f"coordinator:{turn.id}"
         await service.close()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("choice", ["allow", "future", "deny"])
+def test_long_native_permission_reaches_coordinator_and_preserves_offered_choices(
+    tmp_path, monkeypatch, choice
+):
+    service, conversation = setup(
+        tmp_path, monkeypatch, scenario="permission", flags=("long-permission",)
+    )
+
+    async def exercise():
+        turn = service.coordinator.send("harbor", conversation.id, message())
+        try:
+            async with asyncio.timeout(10):
+                while not service.permissions.page("harbor").pending:
+                    await asyncio.sleep(0.02)
+            pending = service.permissions.page("harbor").pending[0]
+            assert pending.role == "coordinator" and pending.turn_id == turn.id
+            assert len(pending.options[1].label) > 400
+            assert pending.options[1].label.endswith('console.log("complete-prefix")\'`')
+            assert [o.id for o in pending.options] == ["allow", "future", "deny"]
+            assert "command: inspect project" in pending.details
+            service.permissions.answer(
+                "harbor",
+                pending.id,
+                PermissionAnswer(expected_revision=pending.revision, option_id=choice),
+            )
+            completed = await settled(service, turn)
+            assert completed.status == "completed", completed.notice
+            assert any(
+                '"optionId": "' + choice + '"' in item.text for item in completed.activity.items
+            )
+            saved = service.permissions.page("harbor").items[0]
+            assert saved.answer == choice and saved.released_at
+            assert saved.options == pending.options and saved.details == pending.details
+        finally:
+            await service.close()
 
     asyncio.run(exercise())
 

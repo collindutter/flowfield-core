@@ -96,6 +96,10 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
     }
     await route.fulfill({ json: settings });
   });
+  const longPermissionLabel =
+    "Yes, and don't ask again for commands that start with `node -e '" +
+    'fetch("http://127.0.0.1:8902/pocket-list.js");'.repeat(8) +
+    'console.log("complete-prefix")\'`';
   let permission = {
     id: "request-1",
     project_id: "agent-settings",
@@ -111,6 +115,7 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
     details: "command: pnpm test\ncwd: /project/worktree",
     options: [
       { id: "allow", label: "Allow once", kind: "allow_once" },
+      { id: "future", label: longPermissionLabel, kind: "allow_always" },
       { id: "deny", label: "Reject once", kind: "reject_once" },
     ],
     revision: 1,
@@ -240,6 +245,27 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
   await expect(
     detail.getByText("command: pnpm test", { exact: false }),
   ).toBeVisible();
+  const longChoice = detail.getByRole("button", {
+    name: longPermissionLabel,
+    exact: true,
+  });
+  await expect(longChoice).toBeVisible();
+  await expect(longChoice).toHaveText(longPermissionLabel);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await longChoice.scrollIntoViewIfNeeded();
+  expect(
+    await longChoice.evaluate(
+      (button) =>
+        button.scrollWidth <= button.clientWidth && button.clientHeight > 32,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: "/tmp/flowfield-permission-mobile.png" });
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({ path: "/tmp/flowfield-slice3-settings.png" });
   await detail.getByRole("button", { name: "Reject once" }).click();
   await expect(detail.getByRole("button", { name: "Allow once" })).toHaveCount(
@@ -333,7 +359,13 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
   ).toBeVisible();
   await page.screenshot({ path: "/tmp/flowfield-slice2-attention.png" });
   await action.getByRole("button", { name: "Allow once" }).click();
-  await expect(action.getByText(/Allow once · Answer recorded/)).toBeVisible();
+  await expect(action.getByRole("button", { name: "Allow once" })).toHaveCount(
+    0,
+  );
+  const history = page.getByRole("region", { name: "History", exact: true });
+  await expect(history.getByText(/Allow once · Answer recorded/)).toBeVisible();
+  await page.reload();
+  await expect(history.getByText(/Allow once · Answer recorded/)).toBeVisible();
 });
 
 test("Integration uses Local automatically and preserves drafts across project tabs", async ({

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from flowfield.activity_text import retain
-from flowfield.adapters.acp_session import PermissionRequest
+from flowfield.adapters.acp_permissions import permission_handler
 from flowfield.adapters.agent_mcp import serve_scope
 from flowfield.adapters.codex_agent import CodexAgent, command_options
 from flowfield.adapters.local_execution import LocalHost
@@ -20,7 +20,6 @@ from flowfield.attachments import Attachments
 from flowfield.coordinator_models import CoordinatorSend, CoordinatorTurn
 from flowfield.coordinator_store import CoordinatorStore
 from flowfield.errors import ApplicationError
-from flowfield.permission_models import PermissionOption
 from flowfield.reads import size
 from flowfield.run_activity import ActivityRecorder, ActivityUpdate
 
@@ -278,23 +277,9 @@ class Coordinator:
                         turn_id=turn.id,
                         conversation_id=turn.conversation_id,
                     ) as permission_turn:
-
-                        async def request_permission(request: PermissionRequest) -> str | None:
-                            return await permission_turn.request(
-                                request.tool_id,
-                                request.title,
-                                [
-                                    PermissionOption.model_validate(
-                                        {"id": i, "label": label, "kind": kind}
-                                    )
-                                    for i, label, kind in request.options
-                                ],
-                                details=request.details,
-                            )
-
                         outcome = await client.prompt(
                             prompt,
-                            request_permission,
+                            permission_handler(permission_turn),
                             attachments=attachments,
                         )
                     status = "completed" if outcome.get("status") == "completed" else "failed"

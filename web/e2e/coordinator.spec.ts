@@ -330,6 +330,10 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   await input.press("Enter");
   await expect(page.getByText("Let’s plan the work.")).toBeVisible();
   const now = new Date().toISOString();
+  const longPermissionLabel =
+    "Yes, and don't ask again for commands that start with `node -e '" +
+    'fetch("http://127.0.0.1:8902/pocket-list.js");'.repeat(8) +
+    'console.log("complete-prefix")\'`';
   permission = {
     id: "setup",
     project_id: "chat-browser",
@@ -342,7 +346,10 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
     tool_id: "setup-tool",
     title: "Install project dependencies",
     details: "command: pnpm install",
-    options: [{ id: "yes", label: "Allow once", kind: "allow_once" }],
+    options: [
+      { id: "yes", label: "Allow once", kind: "allow_once" },
+      { id: "future", label: longPermissionLabel, kind: "allow_always" },
+    ],
     revision: 1,
     status: "pending",
     answer: null,
@@ -361,6 +368,18 @@ test("coordinator streams, stops, retains history and drafts beside responsive w
   await expect(
     page.getByRole("button", { name: "Allow once", exact: true }),
   ).toBeVisible();
+  const longChoice = page.getByRole("button", {
+    name: longPermissionLabel,
+    exact: true,
+  });
+  await expect(longChoice).toHaveText(longPermissionLabel);
+  await longChoice.scrollIntoViewIfNeeded();
+  expect(
+    await longChoice.evaluate(
+      (button) =>
+        button.scrollWidth <= button.clientWidth && button.clientHeight > 32,
+    ),
+  ).toBe(true);
   await page.screenshot({
     path: testInfo.outputPath("coordinator-permission.png"),
   });

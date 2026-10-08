@@ -9,6 +9,7 @@ Plan, run and review work together with the Coordinator beside your board.
   supported native commands and Fast mode.
 - Run the Coordinator and workers locally with scoped tools, saved permission answers
   and explicit stop/recovery controls.
+- Show long command permission choices in full without interrupting the agent.
 - Add an existing project through the directory picker and optionally preview/install
   guidance during adoption. Review required, prefilled project details before adding it.
   Ask the Coordinator to configure and validate worker setup.

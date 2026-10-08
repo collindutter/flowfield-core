@@ -41,6 +41,7 @@ export function PermissionControl({
                 key={option.id}
                 size="sm"
                 variant="outline"
+                className="h-auto min-h-8 max-w-full whitespace-normal wrap-anywhere py-1.5 text-left"
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true);

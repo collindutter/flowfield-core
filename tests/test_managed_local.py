@@ -240,8 +240,16 @@ def test_parallel_mixed_language_project_delivery(tmp_path, monkeypatch, linked_
     asyncio.run(exercise())
 
 
-def test_native_permission_is_durable_and_does_not_approve_result(tmp_path, monkeypatch):
-    service, repo, _ = configured(tmp_path, monkeypatch, scenario="permission")
+@pytest.mark.parametrize("long_label", [False, True])
+def test_native_permission_is_durable_and_does_not_approve_result(
+    tmp_path, monkeypatch, long_label
+):
+    service, repo, _ = configured(
+        tmp_path,
+        monkeypatch,
+        scenario="permission",
+        flags=("long-permission",) if long_label else (),
+    )
     base = baseline(repo)
     run = service.execution.claim("harbor", base, {base: set()})
 
@@ -254,15 +262,22 @@ def test_native_permission_is_durable_and_does_not_approve_result(tmp_path, monk
             pending = service.permissions.page("harbor").pending[0]
             assert "command: inspect project" in pending.details
             assert "Before:\nbefore" in pending.details and "After:\nafter" in pending.details
+            option = "future" if long_label else "allow"
+            if long_label:
+                assert len(pending.options[1].label) > 400
+                assert pending.options[1].label.endswith('console.log("complete-prefix")\'`')
+                assert [o.id for o in pending.options] == ["allow", "future", "deny"]
             service.permissions.answer(
                 "harbor",
                 pending.id,
-                PermissionAnswer(expected_revision=pending.revision, option_id="allow"),
+                PermissionAnswer(expected_revision=pending.revision, option_id=option),
             )
             await job
             assert service.execution.get("harbor", run.id).status == "in_review"
             saved = service.permissions.page("harbor").items[0]
-            assert saved.released_at and saved.answer == "allow"
+            assert saved.released_at and saved.answer == option
+            assert saved.options == pending.options
+            assert service.results.page("harbor", run.task_id).items[0].approved_by is None
             assert baseline(repo) == base
         finally:
             await service.close()

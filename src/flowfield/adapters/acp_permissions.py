@@ -11,6 +11,6 @@ def permission_handler(turn: PermissionTurn) -> PermissionHandler:
             PermissionOption.model_validate({"id": identity, "label": label, "kind": kind})
             for identity, label, kind in value.options
         ]
-        return await turn.request(value.tool_id, value.title, options)
+        return await turn.request(value.tool_id, value.title, options, details=value.details)
 
     return request

@@ -9,7 +9,9 @@ from flowfield.agent_models import AgentRecord, AgentRole
 
 class PermissionOption(AgentRecord):
     id: str = Field(min_length=1, max_length=200)
-    label: str = Field(min_length=1, max_length=200)
+    # Native choices can include an entire command prefix. Preserve that scope;
+    # presentation text shares the bounded public-detail budget, not ID limits.
+    label: str = Field(min_length=1, max_length=16000)
     kind: Literal["allow_once", "allow_always", "reject_once", "reject_always"]
 
 

@@ -206,6 +206,21 @@ async def main():
                 )
             future = asyncio.get_running_loop().create_future()
             pending["permission"] = future
+            options = [
+                {"optionId": "allow", "name": "Allow once", "kind": "allow_once"},
+                {"optionId": "deny", "name": "Reject once", "kind": "reject_once"},
+            ]
+            if "long-permission" in sys.argv:
+                options.insert(
+                    1,
+                    {
+                        "optionId": "future",
+                        "name": "Yes, and don't ask again for commands that start with `node -e '"
+                        + 'fetch("http://127.0.0.1:8902/pocket-list.js");' * 8
+                        + 'console.log("complete-prefix")\'`',
+                        "kind": "allow_always",
+                    },
+                )
             send(
                 {
                     "id": "permission",
@@ -222,10 +237,7 @@ async def main():
                                 }
                             ],
                         },
-                        "options": [
-                            {"optionId": "allow", "name": "Allow once", "kind": "allow_once"},
-                            {"optionId": "deny", "name": "Reject once", "kind": "reject_once"},
-                        ],
+                        "options": options,
                     },
                 }
             )

@@ -11,7 +11,7 @@ from typing import Any, BinaryIO
 
 from flowfield.adapters import git_integration as gitops
 from flowfield.adapters import local_checks
-from flowfield.adapters.acp_session import PermissionRequest
+from flowfield.adapters.acp_permissions import permission_handler
 from flowfield.adapters.codex_agent import CodexAgent, model_options
 from flowfield.adapters.git_workspace import GitWorkspace, contains
 from flowfield.adapters.local_execution import LocalAttempt, LocalHost
@@ -32,7 +32,6 @@ from flowfield.execution_models import (
     WorkerSettings,
 )
 from flowfield.integration import Integrations
-from flowfield.permission_models import PermissionOption
 from flowfield.permissions import Permissions
 from flowfield.results import Results
 from flowfield.run_activity import ActivityRecorder, ActivityUpdate
@@ -399,21 +398,9 @@ class Supervisor:
                 turn_id=run.id,
                 run_id=run.id,
             ) as turn:
-
-                async def request_permission(request: PermissionRequest) -> str | None:
-                    return await turn.request(
-                        request.tool_id,
-                        request.title,
-                        [
-                            PermissionOption.model_validate({"id": i, "label": label, "kind": kind})
-                            for i, label, kind in request.options
-                        ],
-                        details=request.details,
-                    )
-
                 outcome = await client.prompt(
                     json.dumps(brief, ensure_ascii=False),
-                    request_permission,
+                    permission_handler(turn),
                     attachments=Attachments(self.workspace).inputs(
                         run.project_id,
                         run.task_id,
