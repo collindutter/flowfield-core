@@ -25,6 +25,7 @@ dependencies = [
 ]
 
 [project.urls]
+Documentation = "https://docs.flowfield.sh"
 Repository = "https://github.com/flowfield-sh/flowfield-core"
 Issues = "https://github.com/flowfield-sh/flowfield-core/issues"
 
