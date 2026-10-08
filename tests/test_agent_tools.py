@@ -16,6 +16,32 @@ from flowfield.mcp import create_mcp
 from flowfield.supervisor import Supervisor, WorkerBridge
 
 
+def test_project_paging_contracts_are_declared_and_enforced(tmp_path):
+    execution = fixture(tmp_path)
+
+    async def exercise():
+        grant = await coordinator_scope(Supervisor(execution.workspace), "harbor")
+        for tool in grant.tools.values():
+            properties = tool.inputSchema["properties"]
+            if "limit" in properties:
+                limit = properties["limit"]
+                assert limit["minimum"] == 1, tool.name
+                assert limit["maximum"] >= limit["default"], tool.name
+        assert (
+            grant.tools["get_task_conversation"].inputSchema["properties"]["limit"]["maximum"] == 30
+        )
+        assert grant.tools["get_results"].inputSchema["properties"]["limit"]["maximum"] == 10
+        oversized = await grant.call("list_tasks", {"limit": 100})
+        assert oversized.isError
+        assert oversized.structuredContent["error"]["code"] == "invalid_request"
+        valid = await grant.call("list_tasks", {"limit": 20})
+        assert not valid.isError
+        assert "items" in valid.structuredContent
+        grant.revoke()
+
+    asyncio.run(exercise())
+
+
 def test_coordinator_reads_overlap_with_bounded_revocable_access(tmp_path):
     service = fixture(tmp_path)
 

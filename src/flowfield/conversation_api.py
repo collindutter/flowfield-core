@@ -129,8 +129,8 @@ def add_conversation_tools(mcp: FastMCP, workspace: Callable[[], Workspace]) -> 
         project_id: str,
         task_id: str,
         item_id: str,
-        offset: int = 0,
-        expected_revision: int | None = None,
+        offset: Annotated[int, Field(ge=0)] = 0,
+        expected_revision: Annotated[int | None, Field(ge=1)] = None,
     ) -> ConversationSource:
         """Read a 6000-character page of the exact linked evidence JSON; never edit from excerpts.
         Definition/question/plan revisions are immutable; attempt/result state remains current.

@@ -2,18 +2,21 @@
 
 import asyncio
 from collections.abc import Callable
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from flowfield.execution_history import ExecutionHistory
 from flowfield.execution_models import QueueEdit, RunAction, SettingsEdit
 from flowfield.integration_models import IntegrationConfig
-from flowfield.reads import ContextReads, receipt
+from flowfield.reads import MAX_LIMIT, ContextReads, receipt
 from flowfield.result_models import ResultReview
 from flowfield.setup_validation import SetupCheckRequest
 from flowfield.supervisor import Supervisor
+
+PageLimit = Annotated[int, Field(ge=1, le=MAX_LIMIT)]
 
 
 def add_execution_tools(
@@ -24,7 +27,10 @@ def add_execution_tools(
 
     @mcp.tool(annotations=read)
     def get_executions(
-        project_id: str, task_id: str, offset: int = 0, limit: int = 20
+        project_id: str,
+        task_id: str,
+        offset: Annotated[int, Field(ge=0)] = 0,
+        limit: PageLimit = 20,
     ) -> dict[str, Any]:
         """Page typed worker, validation and delivery executions with result relationships.
         Human approval is a result decision, not an execution.
@@ -37,7 +43,10 @@ def add_execution_tools(
 
     @mcp.tool(annotations=read)
     def get_results(
-        project_id: str, task_id: str, before: int | None = None, limit: int = 10
+        project_id: str,
+        task_id: str,
+        before: int | None = None,
+        limit: Annotated[int, Field(ge=1, le=10)] = 10,
     ) -> dict[str, Any]:
         """Read proposed result versions, validation and delivery state; newest is current.
         Follow integration_id for observed checks and combined changes.
@@ -130,7 +139,10 @@ def add_execution_tools(
 
     @mcp.tool(annotations=read)
     def get_runs(
-        project_id: str, task_id: str | None = None, before: int | None = None, limit: int = 10
+        project_id: str,
+        task_id: str | None = None,
+        before: int | None = None,
+        limit: PageLimit = 10,
     ) -> dict[str, Any]:
         """Page attempt summaries; request get_run for a result's checks/limitations/location."""
         page = supervisor().execution.page(project_id, task_id=task_id, before=before, limit=limit)
@@ -173,7 +185,9 @@ def add_execution_tools(
     @mcp.tool(annotations=write)
     def retry_run(project_id: str, run_id: str, request: RunAction) -> dict[str, Any]:
         """Explicitly select a fresh attempt after a confirmed failure/stop/input
-        resolution. Preserve prior files; no automatic retry.
+        resolution. Queues the task for a fresh attempt; returns the updated prior attempt.
+        Starts depend on queue/capacity; inspect task/get_runs for the new attempt.
+        Preserve prior files; no automatic retry.
         """
         return supervisor().execution.retry(project_id, run_id, request).model_dump()
 
@@ -233,7 +247,7 @@ def add_execution_tools(
 
     @mcp.tool(annotations=read)
     def get_integrations(
-        project_id: str, run_id: str | None = None, before: int | None = None, limit: int = 10
+        project_id: str, run_id: str | None = None, before: int | None = None, limit: PageLimit = 10
     ) -> dict[str, Any]:
         """Page integration summaries; get_integration returns exact check output and location."""
         page = supervisor().integrations.page(project_id, run_id, before, limit)

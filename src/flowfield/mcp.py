@@ -2,12 +2,12 @@
 
 import json
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from anyio import to_thread
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from flowfield.activity import ActivityCreate, EntryKind
 from flowfield.application import (
@@ -39,9 +39,11 @@ from flowfield.questions import (
     Questions,
     QuestionWithdraw,
 )
-from flowfield.reads import ContextReads, receipt
+from flowfield.reads import MAX_LIMIT, ContextReads, receipt
 from flowfield.search import Entity, History, Search
 from flowfield.supervisor import Supervisor
+
+PageLimit = Annotated[int, Field(ge=1, le=MAX_LIMIT)]
 
 
 def create_mcp(
@@ -127,7 +129,7 @@ def create_mcp(
         project_id: Identifier,
         inspection_id: Identifier | None = None,
         result_id: Identifier | None = None,
-        command_offset: int = 0,
+        command_offset: Annotated[int, Field(ge=0)] = 0,
     ) -> CallToolResult:
         """Read a retained copy by ID, or the latest copy for a result.
         Provide an inspection_id or result_id.
@@ -166,7 +168,7 @@ def create_mcp(
     if include_workspace_tools:
 
         @mcp.tool(annotations=read)
-        async def list_projects(after: str | None = None, limit: int = 20) -> CallToolResult:
+        async def list_projects(after: str | None = None, limit: PageLimit = 20) -> CallToolResult:
             """Discover project IDs and paths in bounded pages."""
             return await invoke(lambda: reads().projects(after=after, limit=limit))
 
@@ -252,7 +254,7 @@ def create_mcp(
         since: str | None = None,
         until: str | None = None,
         before: int | None = None,
-        limit: int = 20,
+        limit: PageLimit = 20,
     ) -> CallToolResult:
         """Search words in project evidence with bounded snippets and exact source references.
         Defaults to current sources; history/all includes old task/question revisions and
@@ -276,7 +278,7 @@ def create_mcp(
 
     @mcp.tool(annotations=read)
     async def list_milestones(
-        project_id: Identifier, after: str | None = None, limit: int = 20
+        project_id: Identifier, after: str | None = None, limit: PageLimit = 20
     ) -> CallToolResult:
         """Read milestone groupings without a dependency or work-status lifecycle."""
         return await invoke(lambda: reads().milestones(project_id, after=after, limit=limit))
@@ -320,7 +322,7 @@ def create_mcp(
         readiness: str | None = None,
         query: str | None = None,
         after: int | None = None,
-        limit: int = 20,
+        limit: PageLimit = 20,
     ) -> CallToolResult:
         """Page summaries by task number; filter status/type/milestone/readiness or key/title.
 
@@ -357,7 +359,7 @@ def create_mcp(
         task_id: TaskIdentifier,
         relation: Literal["prerequisites", "blocked_by", "dependents"] = "prerequisites",
         after: int | None = None,
-        limit: int = 20,
+        limit: PageLimit = 20,
     ) -> CallToolResult:
         """Page related task summaries by task number; use counts on get_task to see omissions."""
         return await invoke(
@@ -368,7 +370,10 @@ def create_mcp(
 
     @mcp.tool(annotations=read)
     async def list_task_revisions(
-        project_id: Identifier, task_id: TaskIdentifier, before: int | None = None, limit: int = 20
+        project_id: Identifier,
+        task_id: TaskIdentifier,
+        before: int | None = None,
+        limit: PageLimit = 20,
     ) -> CallToolResult:
         """Page revision metadata newest first. Use get_text with revision for saved fields."""
         return await invoke(
@@ -382,8 +387,8 @@ def create_mcp(
         identity: str | None = None,
         field: str = "body",
         revision: int | None = None,
-        offset: int = 0,
-        limit: int = 4000,
+        offset: Annotated[int, Field(ge=0)] = 0,
+        limit: Annotated[int, Field(ge=1, le=4000)] = 4000,
     ) -> CallToolResult:
         """Deliberately read full text in bounded chunks; next_offset continues.
 
@@ -472,7 +477,7 @@ def create_mcp(
         kind: EntryKind | None = None,
         current_only: bool = False,
         before: int | None = None,
-        limit: int = 20,
+        limit: PageLimit = 20,
     ) -> CallToolResult:
         """Read task activity or project events; next_cursor pages older entries.
 
@@ -510,7 +515,7 @@ def create_mcp(
         status: str = "active",
         task_id: TaskIdentifier | None = None,
         after: int | None = None,
-        limit: int = 20,
+        limit: PageLimit = 20,
     ) -> CallToolResult:
         """Read bounded Needs you summaries; active includes open and answered, not applied."""
         return await invoke(
