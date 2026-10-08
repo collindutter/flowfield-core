@@ -10,7 +10,9 @@ class AgentRecord(BaseModel):
 
 
 class AgentChoice(AgentRecord):
-    harness: Literal["codex"] = "codex"
+    harness: str = Field(
+        default="codex", min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$"
+    )
     model: str = Field(min_length=1, max_length=200)
     effort: str = Field(min_length=1, max_length=40)
     mode: str | None = Field(default=None, min_length=1, max_length=200)

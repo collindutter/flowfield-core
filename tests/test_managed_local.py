@@ -493,7 +493,7 @@ def test_native_mode_discovery_needs_no_environment_activation(tmp_path, monkeyp
 
     service = Supervisor(fixture(tmp_path).workspace)
 
-    async def catalog():
+    async def catalog(*, harness="codex"):
         return [ModelOption(id="test-model", name="Test", efforts=["low"], modes=[])]
 
     monkeypatch.setattr(service, "model_options", catalog)

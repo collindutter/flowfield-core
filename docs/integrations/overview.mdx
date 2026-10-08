@@ -10,7 +10,7 @@ in your coding harness. Both work with the same board, task feeds and review.
 Built-in chat supplies its own scoped MCP connection. Standalone coding conversations use
 the project skill and an explicitly registered MCP connection.
 
-The Coordinator and task workers use ACP to communicate with their harness.
+The Coordinator and task workers use ACP for Codex and native RPC for Pi.
 See [ACP and MCP](/protocols) for how the two protocols fit together and which capabilities
 Flowfield supports.
 
@@ -31,9 +31,8 @@ skill guides planning and review; workers receive separate instructions for impl
 
 ## Harnesses
 
-[Codex](/integrations/codex) is the first implemented integration, covering coordinator
-MCP setup, the Coordinator and service-managed workers. See [Codex setup](/integrations/codex)
-for installation and connection instructions.
+[Codex](/integrations/codex) and [Pi](/integrations/pi) support the Coordinator and
+service-managed workers. Choose a harness separately for coordinator messages and workers.
 
 Installing Flowfield does not install or authenticate a harness. After changing an MCP
 connection or project skill, start a fresh coding conversation to load the new configuration.

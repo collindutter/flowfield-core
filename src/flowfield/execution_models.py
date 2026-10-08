@@ -26,6 +26,9 @@ class Record(BaseModel):
 
 
 class WorkerSettings(Record):
+    harness: str = Field(
+        default="codex", min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$"
+    )
     project_id: str
     revision: int = 1
     model: str | None = None
@@ -42,6 +45,9 @@ class WorkerOccupancy(Record):
 
 
 class SettingsEdit(Record):
+    harness: str = Field(
+        default="codex", min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$"
+    )
     expected_revision: int = Field(ge=1)
     model: str = Field(min_length=1, max_length=200)
     effort: str = Field(min_length=1, max_length=40)
@@ -88,6 +94,9 @@ class NativeMode(Record):
 
 
 class ModelOption(Record):
+    harness: str = Field(
+        default="codex", min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$"
+    )
     id: str
     name: str
     efforts: list[str]

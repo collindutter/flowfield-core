@@ -9,9 +9,10 @@ Open a card to discuss that task without losing the conversation.
 
 ## Start planning
 
-Install and sign in to [Codex](/integrations/codex), then run `flowfield harness install codex`.
+Install and sign in to [Codex](/integrations/codex) or [Pi](/integrations/pi).
+Codex also needs `flowfield harness install codex`; Pi needs no bridge.
 Add an existing project using **Add project → Choose directory** or `flowfield project init`.
-In the Coordinator, choose a model, reasoning effort and access mode beside the input, then save.
+In the Coordinator, choose a harness, model, reasoning effort and access mode beside the input, then save.
 The Coordinator uses the service host’s tools and credentials. Configure worker setup when
 you are ready to run tasks. Its Flowfield connection is automatic; standalone Codex sessions
 use [a separate connection](/integrations/codex#connect-a-standalone-coordinator).
@@ -34,7 +35,8 @@ Use the model button beside the input to change model, effort or access. Changes
 message; a running turn keeps its saved choice. Standalone coding-agent settings are separate.
 Save to apply your choices; Cancel or closing the popup discards unsaved changes.
 
-Access modes come from Codex, including Read only, workspace access and Auto review.
+Codex offers Read only, workspace access and Auto review. Pi offers full host access
+without sandboxing or per-tool approval.
 Auto review uses Codex's native
 reviewer; permission requests that need your answer appear in the chat and **Needs you**.
 Answer one of the offered options while the turn is waiting. Stopping or ending the turn
@@ -49,7 +51,7 @@ with the conversation and can be downloaded from their message links.
 You can attach up to four files: UTF-8 text/code up to 64 KiB each, or PNG, JPEG and WebP
 images up to 2 MiB each. Their contents accompany the message sent to the agent; images
 require image support from the connected harness. Coordinator attachments remain part of
-its native session history, subject to Codex's context management. Reattach a file if you
+its native session history, subject to the harness's context management. Reattach a file if you
 start a new session or need details that compaction has omitted. Previously sent files
 remain available to download. Task-feed answers and feedback accompany separate worker
 attempts; attach files again when later input needs their contents.
@@ -57,9 +59,9 @@ Each project has 128 MiB of attachment storage. Unsent uploads expire after 24 h
 
 Type `/` to see the available coordinator commands. Use arrow keys and Enter to select,
 then send the command. Escape returns to ordinary writing. The list contains only commands
-supported by both Flowfield and the connected Codex session; discovery starts no model turn.
+supported by both Flowfield and the connected harness; discovery starts no model turn.
 Flowfield loads the list when the composer is ready and briefly caches it. Opening commands
-immediately may still show a loading state while Codex starts.
+immediately may still show a loading state while the harness starts. The Codex commands are:
 
 | Command | Effect |
 | --- | --- |
@@ -123,12 +125,12 @@ are saved by the service. Older messages load on demand and stay visible as new 
 Long output is bounded and omissions are marked. Tool activity shows names, status and
 available commands or paths.
 
-Messages resume the same native Codex session, including its tool history and native
+Messages resume the same native harness session, including its tool history and native
 context management, across turns and service restarts. Each turn gets a fresh scoped
 Flowfield connection. Stopping a turn ends its processes without deleting the saved session.
 
-If Codex cannot resume a session, Flowfield keeps the chat and reports the failure. Check
-Codex on the service host and send a new message to retry, or choose **Start new session**.
+If the harness cannot resume a session, Flowfield keeps the chat and reports the failure. Check
+the harness on the service host and send a new message to retry, or choose **Start new session**.
 That choice requires confirmation and sends a bounded summary of recent exchanges; it does not restore
 native tool history or earlier attachment contents. No failed prompt is replayed automatically.
 Record ongoing work in tasks; keep enduring project decisions in the repository’s existing documents.

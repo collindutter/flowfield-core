@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from test_execution import fixture
 
 from flowfield.adapters.git_workspace import baseline, git
@@ -94,8 +95,10 @@ class FakeWorker:
         await self.stack.aclose()
 
 
-def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
-    monkeypatch.setattr("flowfield.supervisor.CodexAgent", FakeWorker)
+@pytest.mark.parametrize("harness", ["codex", "pi"])
+def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch, harness):
+    target = "pi_agent.PiAgent" if harness == "pi" else "codex_agent.CodexAgent"
+    monkeypatch.setattr(f"flowfield.adapters.{target}", FakeWorker)
     monkeypatch.setattr("flowfield.supervisor.process_stamp", lambda pid: "fixture-process")
     execution = fixture(tmp_path)
     repo = tmp_path / "harbor"
@@ -139,6 +142,16 @@ def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
         await service.start()
         assert not execution.settings("harbor").enabled
         settings = execution.settings("harbor")
+        settings = execution.configure(
+            "harbor",
+            SettingsEdit(
+                expected_revision=settings.revision,
+                harness=harness,
+                model="test-model",
+                effort="low",
+                mode="full-access" if harness == "pi" else "workspace-write",
+            ),
+        )
         execution.queue("harbor", QueueEdit(expected_revision=settings.revision, enabled=True))
         for _ in range(100):
             page = execution.page("harbor")
@@ -147,6 +160,8 @@ def test_managed_claim_result_review_and_restart(tmp_path, monkeypatch):
             await asyncio.sleep(0.05)
         run = execution.page("harbor").items[0]
         assert run.status == "in_review" and run.usage.total_tokens is None
+        assert run.agent_settings.choice.harness == harness
+        assert run.applied_agent.harness == harness
         from flowfield.run_activity import RunActivity
 
         activity = RunActivity(execution.workspace).read("harbor", run.id)
@@ -224,7 +239,7 @@ def test_parallel_queue_capacity_pause_and_exact_delivery(tmp_path, monkeypatch)
                 self.release.set()
             return True
 
-    monkeypatch.setattr("flowfield.supervisor.CodexAgent", ControlledWorker)
+    monkeypatch.setattr("flowfield.adapters.codex_agent.CodexAgent", ControlledWorker)
     monkeypatch.setattr("flowfield.supervisor.process_stamp", lambda pid: "fixture-process")
     execution = fixture(tmp_path, count=3, cap=2)
     from flowfield.browser import BrowserReads

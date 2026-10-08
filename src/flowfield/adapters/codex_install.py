@@ -135,6 +135,7 @@ def status(directory: Path, environment: Mapping[str, str]) -> dict[str, Any]:
         "executable": str(binary),
         "codex": codex,
         "codex_available": codex is not None,
+        "available": codex is not None,
         "message": "Managed Codex runtime installed."
         if codex
         else "Bridge installed. Install Codex on the service PATH before starting managed work.",

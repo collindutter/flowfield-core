@@ -14,7 +14,8 @@ uv tool install flowfield-core
 uv keeps Flowfield in its own environment and exposes the `flowfield` command.
 If the command is missing from PATH, run `uv tool update-shell` and open a new terminal.
 The package contains the CLI, service, browser UI and agent guidance. Node and pnpm are
-only needed to develop from source. Flowfield requires Python 3.12 or newer.
+only needed to develop Flowfield from source. Pi has its own Node runtime requirement.
+Flowfield requires Python 3.12 or newer.
 
 ## Alternative: pip
 
@@ -42,6 +43,17 @@ flowfield harness install codex
 
 This downloads the matching ACP bridge; it does not install Codex or change your login.
 Make sure `codex` is on PATH in the terminal where you start Flowfield. Workers also need Git.
+
+## Set up Pi
+
+Alternatively, install and authenticate [Pi](/integrations/pi), then check it:
+
+```sh
+flowfield harness status pi
+```
+
+Pi uses native RPC, with no Codex installation or ACP bridge required. Select **Pi**
+in the Coordinator and worker settings. Pi runs with unsandboxed host access.
 
 ## Start and stop
 

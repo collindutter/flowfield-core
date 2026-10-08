@@ -18,6 +18,49 @@ import { ContentStack } from "./DetailLayout";
 type Settings = components["schemas"]["AgentSettingsView"];
 type Choice = components["schemas"]["AgentChoice-Output"];
 type Model = components["schemas"]["ModelOption"];
+export type Harness = Choice["harness"];
+
+export function useHarnessCatalog(refresh: unknown) {
+  return useResource<components["schemas"]["HarnessStatus"][]>(
+    "agent-harnesses",
+    refresh,
+  );
+}
+
+export function HarnessField({
+  value,
+  onChange,
+  catalog,
+  disabled = false,
+}: {
+  value: Harness;
+  onChange: (value: Harness) => void;
+  catalog: ReturnType<typeof useHarnessCatalog>;
+  disabled?: boolean;
+}) {
+  return (
+    <Label className="field block">
+      Harness
+      <NativeSelect
+        aria-label="Harness"
+        value={value}
+        disabled={disabled || catalog.loading}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {!catalog.data?.some((item) => item.id === value) && (
+          <option value={value}>{value || "Choose a harness"}</option>
+        )}
+        {catalog.data?.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+            {item.available ? "" : " (not installed)"}
+          </option>
+        ))}
+      </NativeSelect>
+      {catalog.error && <span role="alert">{catalog.error}</span>}
+    </Label>
+  );
+}
 
 export function AgentModelFields({
   model,
@@ -161,11 +204,7 @@ function useAgentSettingsContent({
 }: AgentSettingsProps) {
   const resource = useResource<Settings>(path, refresh);
   const [retry, setRetry] = useState(0);
-  const catalog = useResource<Model[]>(
-    retry ? "worker-models?refresh=true" : "worker-models",
-    retry,
-    180000,
-  );
+  const harnesses = useHarnessCatalog(retry);
   const [draft, setDraft] = useState<{
     revision: number;
     selection: Choice | null;
@@ -185,6 +224,15 @@ function useAgentSettingsContent({
   const data = resource.data;
   const selection = draft ? draft.selection : data?.selection;
   const choice = selection ?? data?.effective?.choice;
+  const harness =
+    choice?.harness ?? harnesses.data?.find((item) => item.available)?.id ?? "";
+  const catalog = useResource<Model[]>(
+    harness && !resource.loading
+      ? `worker-models?harness=${encodeURIComponent(harness)}${retry ? "&refresh=true" : ""}`
+      : null,
+    retry,
+    180000,
+  );
   const model = choice?.model ?? "";
   const effort = choice?.effort ?? "";
   const mode = choice?.mode ?? "";
@@ -200,6 +248,7 @@ function useAgentSettingsContent({
       !catalog.data ||
       catalog.data.some(
         (item) =>
+          (item.harness ?? "codex") === saved?.harness &&
           item.id === saved?.model &&
           item.efforts.includes(saved.effort) &&
           !!item.modes?.some((mode) => mode.id === saved.mode) &&
@@ -207,12 +256,18 @@ function useAgentSettingsContent({
       );
     onReady?.(!resource.error && available ? (saved ?? null) : null);
   }, [data, resource.error, catalog.data, onReady]);
-  function change(model: string, effort: string, mode: string, fast: boolean) {
+  function change(
+    model: string,
+    effort: string,
+    mode: string,
+    fast: boolean,
+    nextHarness = harness,
+  ) {
     if (data)
       setDraft({
         revision: draft?.revision ?? data.revision,
         selection: {
-          harness: "codex",
+          harness: nextHarness,
           model,
           effort,
           mode: mode || null,
@@ -261,8 +316,7 @@ function useAgentSettingsContent({
       {(catalog.error || (!catalog.loading && !catalog.data?.length)) && (
         <Alert>
           <AlertDescription>
-            {catalog.error ||
-              "No models are available from this Codex installation."}{" "}
+            {catalog.error || "No models are available from this harness."}{" "}
             <Button
               variant="outline"
               size="sm"
@@ -284,6 +338,12 @@ function useAgentSettingsContent({
           className="content-stack"
           data-space={compact ? "content" : "section"}
         >
+          <HarnessField
+            catalog={harnesses}
+            disabled={resource.loading}
+            value={harness}
+            onChange={(value) => change("", "", "", false, value)}
+          />
           <AgentModelFields
             model={model}
             effort={effort}
@@ -302,6 +362,7 @@ function useAgentSettingsContent({
                 stale ||
                 !catalog.data?.some(
                   (item) =>
+                    (item.harness ?? "codex") === harness &&
                     item.id === model &&
                     item.efforts.includes(effort) &&
                     !!item.modes?.some((choice) => choice.id === mode) &&
@@ -386,7 +447,10 @@ function useAgentSettingsContent({
     </ContentStack>
   );
   const saved = data?.effective?.choice;
-  const selected = catalog.data?.find((item) => item.id === saved?.model);
+  const selected = catalog.data?.find(
+    (item) =>
+      (item.harness ?? "codex") === saved?.harness && item.id === saved?.model,
+  );
   const fastControl =
     selected?.fast && saved ? (
       <Tooltip>

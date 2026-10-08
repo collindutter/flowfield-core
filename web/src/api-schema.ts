@@ -1000,6 +1000,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/agent-harnesses": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Harnesses */
+    get: operations["harnesses_api_agent_harnesses_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/worker-models": {
     parameters: {
       query?: never;
@@ -2061,9 +2078,8 @@ export interface components {
       /**
        * Harness
        * @default codex
-       * @constant
        */
-      harness: "codex";
+      harness: string;
       /** Model */
       model: string;
       /** Effort */
@@ -2078,9 +2094,8 @@ export interface components {
       /**
        * Harness
        * @default codex
-       * @constant
        */
-      harness: "codex";
+      harness: string;
       /** Model */
       model: string;
       /** Effort */
@@ -2601,6 +2616,19 @@ export interface components {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
     };
+    /** HarnessStatus */
+    HarnessStatus: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /** Description */
+      description: string;
+      /** Available */
+      available: boolean;
+      /** Message */
+      message: string;
+    };
     /** Health */
     Health: {
       /**
@@ -2998,6 +3026,11 @@ export interface components {
     };
     /** ModelOption */
     ModelOption: {
+      /**
+       * Harness
+       * @default codex
+       */
+      harness: string;
       /** Id */
       id: string;
       /** Name */
@@ -3893,6 +3926,11 @@ export interface components {
     };
     /** SettingsEdit */
     SettingsEdit: {
+      /**
+       * Harness
+       * @default codex
+       */
+      harness: string;
       /** Expected Revision */
       expected_revision: number;
       /** Model */
@@ -4695,6 +4733,11 @@ export interface components {
     };
     /** WorkerSettings */
     WorkerSettings: {
+      /**
+       * Harness
+       * @default codex
+       */
+      harness: string;
       /** Project Id */
       project_id: string;
       /**
@@ -7047,10 +7090,31 @@ export interface operations {
       };
     };
   };
+  harnesses_api_agent_harnesses_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HarnessStatus"][];
+        };
+      };
+    };
+  };
   models_api_worker_models_get: {
     parameters: {
       query?: {
         refresh?: boolean;
+        harness?: string;
       };
       header?: never;
       path?: never;

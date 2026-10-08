@@ -1,6 +1,7 @@
 """Coordinator tools for managed work; workers never receive this MCP server."""
 
 import asyncio
+import os
 from collections.abc import Callable
 from typing import Annotated, Any
 
@@ -8,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from flowfield.adapters.agents import harness_options
 from flowfield.execution_history import ExecutionHistory
 from flowfield.execution_models import QueueEdit, RunAction, SettingsEdit
 from flowfield.integration_models import IntegrationConfig
@@ -118,9 +120,17 @@ def add_execution_tools(
         )
 
     @mcp.tool(annotations=read)
-    async def list_worker_models() -> list[dict[str, Any]]:
-        """Discover this Codex installation's models/efforts; no inference or implicit selection."""
-        return [item.model_dump() for item in await supervisor().model_options()]
+    def list_agent_harnesses() -> list[dict[str, Any]]:
+        """List registered harnesses for coordinator and worker model discovery."""
+        return [
+            item.model_dump()
+            for item in harness_options(supervisor().workspace.directory, os.environ)
+        ]
+
+    @mcp.tool(annotations=read)
+    async def list_worker_models(harness: str = "codex") -> list[dict[str, Any]]:
+        """Discover installed harness models and efforts without starting inference."""
+        return [item.model_dump() for item in await supervisor().model_options(harness=harness)]
 
     @mcp.tool(annotations=read)
     def get_workers(project_id: str) -> dict[str, Any]:

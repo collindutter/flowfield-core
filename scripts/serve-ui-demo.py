@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import uvicorn
 
 from flowfield import supervisor as worker_module
+from flowfield.adapters import codex_agent
 from flowfield.adapters.git_workspace import git
 from flowfield.adapters.local_execution import LocalHost
 from flowfield.api import create_app
@@ -487,7 +488,7 @@ def main():
             parser.error("Choose a new directory, or --resume an existing demo; nothing was reset.")
     else:
         seed(root)
-    worker_module.CodexAgent = DemoWorker
+    codex_agent.CodexAgent = DemoWorker
     worker_module.model_options = demo_models
     worker_module.process_stamp = lambda pid: "simulated-demo-process"
     app = create_app(data_dir=root / "state")

@@ -114,6 +114,17 @@ def connection_command(
     output(run, json_output, display)
 
 
+@harness_app.command("list")
+def harness_list(ctx: typer.Context, json_output: Json = False) -> None:
+    """List registered harnesses and local runtime availability."""
+    from flowfield.adapters.agents import harness_options
+
+    output(
+        lambda: [item.model_dump() for item in harness_options(ctx.obj.directory, os.environ)],
+        json_output,
+    )
+
+
 @harness_app.command("install")
 def harness_install(
     ctx: typer.Context,
@@ -125,31 +136,21 @@ def harness_install(
     json_output: Json = False,
 ) -> None:
     """Install the compatible agent runtime; does not enable workers or change project access."""
-    from flowfield.adapters import codex_install
+    from flowfield.adapters.agents import install_runtime
 
     def run() -> dict[str, Any]:
-        if harness != "codex":
-            raise ApplicationError("unsupported_harness", "Only codex installation is supported.")
-        if (bundle is None) != (sha256 is None):
-            raise ApplicationError("invalid_request", "Use --bundle and --sha256 together.")
-        if bundle is not None and sha256 is not None:
-            codex_install.install(ctx.obj.directory, bundle.expanduser(), sha256)
-        else:
-            codex_install.download_install(ctx.obj.directory)
-        return codex_install.status(ctx.obj.directory, os.environ)
+        return install_runtime(harness, ctx.obj.directory, os.environ, bundle, sha256)
 
     output(run, json_output, lambda value: typer.echo(value["message"]))
 
 
 @harness_app.command("status")
 def harness_status(ctx: typer.Context, harness: str, json_output: Json = False) -> None:
-    """Check the installed runtime and Codex path without starting an agent."""
-    from flowfield.adapters import codex_install
+    """Check the installed runtime without starting an agent."""
+    from flowfield.adapters.agents import get_harness
 
     def run() -> dict[str, Any]:
-        if harness != "codex":
-            raise ApplicationError("unsupported_harness", "Only codex installation is supported.")
-        return codex_install.status(ctx.obj.directory, os.environ)
+        return get_harness(harness).status(ctx.obj.directory, os.environ)
 
     output(run, json_output, lambda value: typer.echo(value["message"]))
 

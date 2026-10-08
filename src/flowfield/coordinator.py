@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Literal
 from flowfield.activity_text import retain
 from flowfield.adapters.acp_permissions import permission_handler
 from flowfield.adapters.agent_mcp import serve_scope
-from flowfield.adapters.codex_agent import CodexAgent, command_options
+from flowfield.adapters.agents import Agent, command_options, create_agent
 from flowfield.adapters.local_execution import LocalHost
 from flowfield.agent_models import AgentCommand
 from flowfield.agent_settings import AgentSettings
@@ -38,7 +38,8 @@ permission to change active work. If a result_id is present, discuss that exact 
 Without selected_task, do not assume an earlier selection is still the human's focus.
 Use only the named scoped MCP connection for Flowfield operations. Do not use ambient
 Flowfield connections, CLI or database files. Project identity is already bound to these tools.
-Use the host's tools under the selected native access mode. You may perform explicitly
+Use the host's tools under the selected native access mode.
+Do not daemonize commands or leave detached/background jobs running. You may perform explicitly
 requested initial project or environment setup directly, including configuration and dependencies.
 When asked to set up this project for workers, read integration and inspection settings,
 save the agreed destination and trusted setup/check/run commands, then use validate_project_setup.
@@ -186,7 +187,7 @@ class Coordinator:
 
     async def _run(self, turn: CoordinatorTurn) -> None:
         workspace = self.supervisor.workspace
-        client: CodexAgent | None = None
+        client: Agent | None = None
         temporary: tempfile.TemporaryDirectory[str] | None = None
         recorder = ActivityRecorder(workspace, turn.project_id, turn.id, store=self.store)
         status: Literal["completed", "failed", "stopped"] = "failed"
@@ -208,7 +209,9 @@ class Coordinator:
                     environment = LocalHost(os.environ).launch_environment(
                         Path(project.path), Path(temporary.name)
                     )
-                    client = CodexAgent(workspace.directory, Path(project.path), environment)
+                    client = create_agent(
+                        turn.settings.choice, workspace.directory, Path(project.path), environment
+                    )
                     with workspace.connection(write=True, project_id=turn.project_id) as db:
                         current = self.store._get(db, turn.project_id, turn.id)
                         if current.status != "starting":
@@ -255,7 +258,7 @@ class Coordinator:
                     session_note = (
                         "Agent session resumed with native conversation history."
                         if session_id
-                        else "Checking Codex without starting a conversation."
+                        else "Checking the harness without starting a conversation."
                         if native_command
                         else "New agent session started."
                     )

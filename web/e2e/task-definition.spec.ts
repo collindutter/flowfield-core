@@ -1,7 +1,7 @@
-import { fixtureStages } from "./support";
+import { fixtureStages, test } from "./support";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
 
 test("long definitions collapse with a fade and history loads only when expanded", async ({
   page,

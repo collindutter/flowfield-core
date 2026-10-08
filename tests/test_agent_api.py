@@ -12,7 +12,7 @@ from flowfield.supervisor import Supervisor
 
 
 def test_settings_validation_and_permission_http_journey(tmp_path, monkeypatch):
-    async def models(self):
+    async def models(self, *, harness="codex", refresh=False):
         return [ModelOption(id="supported", name="Supported", efforts=["low", "high"])]
 
     monkeypatch.setattr(Supervisor, "model_options", models)
@@ -102,7 +102,7 @@ def test_model_catalog_coalesces_caches_refreshes_and_retries(tmp_path, monkeypa
     calls = 0
     fail = False
 
-    async def discover(directory):
+    async def discover(directory, harness="codex"):
         nonlocal calls
         calls += 1
         await asyncio.sleep(0)
@@ -119,7 +119,7 @@ def test_model_catalog_coalesces_caches_refreshes_and_retries(tmp_path, monkeypa
         assert first == second and calls == 1
         assert await service.model_options() == first and calls == 1
         assert await service.model_options(refresh=True) == first and calls == 2
-        service.catalog_at -= 301
+        service.catalog_at["codex"] -= 301
         assert await service.model_options() == first and calls == 3
         fail = True
         try:

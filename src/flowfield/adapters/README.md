@@ -9,9 +9,25 @@ this boundary; the service owns assignments, input delivery, approval and integr
   workers or wake an inactive conversation.
 - `codex_agent.py` resolves the installed standalone bridge and native choices over ACP.
   Local workers use native coding tools and a revocable, run-bound Flowfield MCP endpoint.
+- `pi_agent.py` controls native Pi RPC with isolated scoped MCP, persistent coordinator
+  sessions and full host access. Forced termination after a prompt keeps cleanup uncertain.
+- `agents.py` registers harness metadata, factories, model discovery and installation.
+  Coordinator, worker, CLI and browser paths use that registry.
 - `local_execution.py` prepares Local attempts. Git adapters own
   worktrees, candidate checks and delivery. The supervisor reserves work, freezes input,
   starts workers and reconciles recovery through the shared application operations.
+
+## Adding a harness
+
+Implement the `Agent` protocol and register a `Harness` in `agents.py`. Supply a
+factory, native model discovery, status and optional managed installer. The registry
+feeds `/api/agent-harnesses`, MCP discovery and the browser selector. Stored harness
+IDs are strings; unknown registrations fail explicitly rather than falling back.
+Model catalogs and coordinator command caches are scoped by harness. Keep native
+permissions, capabilities, session persistence and cleanup receipts in the adapter.
+A forced process exit must not claim that native tools have stopped.
+
+## Execution
 
 The ACP path separates `GitWorkspace` (checkout and result capture),
 `LocalHost`/`LocalAttempt` (explicit host environment and per-attempt scratch state),
@@ -45,12 +61,12 @@ bindings. Saved input, reservation and execution remain distinct facts. Worker c
 uses preserved workspaces and deliberate context; it does not promise a persistent harness
 session. The browser reads application activity, never provider messages directly.
 
-The embedded coordinator uses the same ACP adapter with scoped planning tools and its saved
+The embedded coordinator uses the selected harness adapter with scoped planning tools and its saved
 Access mode. It runs in the registered project directory and resumes the native session across
 turns and service restarts. Application history remains durable; explicit recovery from a missing
 session uses a bounded handoff instead of claiming to replay the complete native history.
-Mid-run steering and additional production harnesses remain future work. Deterministic adapters test application behavior without model calls.
-The installed service requires no Node runtime.
+Mid-run steering remains unsupported. Deterministic adapters test application behavior without model calls.
+The service and Codex bridge require no Node runtime; Pi has its own runtime requirements.
 
 Local setup, validation and inspection use the same host/tooling model. Saved inspection
 launchers inherit the human terminal environment and contain only copy-specific paths,

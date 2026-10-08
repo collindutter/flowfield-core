@@ -1,0 +1,63 @@
+---
+title: Pi
+description: Run the Coordinator and task workers with Pi's native RPC interface.
+---
+
+## Install and authenticate
+
+Install [Pi](https://pi.dev) (`@earendil-works/pi-coding-agent`, version 1.1.0 or later)
+and sign in with `/login`, or configure a supported provider's API key. Make sure `pi`
+is on the service host's PATH. `PI_PATH` can select another executable.
+
+```sh
+flowfield harness status pi
+flowfield serve
+```
+
+No ACP bridge is needed. `flowfield harness install pi` checks the existing Pi installation;
+it does not download Pi or authenticate a provider.
+
+## Choose Pi
+
+In the Coordinator's model settings, select **Harness → Pi**, then a model, reasoning
+effort and access mode. Do the same under **Project settings → Workers** for worker
+defaults. Empty settings select an installed harness automatically. Tasks can override
+their worker harness. Saved Codex selections stay unchanged; switch those to Pi explicitly.
+
+Model discovery uses your Pi model registry and credentials without starting a model turn.
+Models use `provider/model` identifiers. From the CLI:
+
+```sh
+flowfield project workers models --harness pi --json
+flowfield project workers configure --harness pi \
+  --model PROVIDER/MODEL --effort low --mode full-access
+```
+
+Choose an effort returned by discovery. Saving settings does not start the queue.
+
+## Access and sessions
+
+Pi runs with **full host access**, not a sandbox or per-tool approval gate. Use trusted
+projects and tasks. Workers still use separate Git worktrees, and results still require
+explicit approval before delivery. Do not leave daemonized or detached jobs running.
+
+Managed sessions use Flowfield's scoped MCP tools, not ambient MCP servers or user/project
+extensions. Native login and model files are reused without replacing your Pi configuration.
+Extension-provided models are not loaded. Project instructions remain available.
+
+Coordinator turns resume a Pi session stored under Flowfield's data directory. If you
+switch harnesses or a saved session cannot be loaded, Flowfield reports the mismatch;
+choose **Start new session** to retain chat while beginning a replacement native session.
+Worker continuations use fresh attempts with preserved work, as with Codex.
+
+## Standalone coordinator
+
+A standalone Pi conversation can use the public Flowfield MCP endpoint:
+
+```sh
+pi mcp add flowfield --url http://127.0.0.1:8765/mcp/
+flowfield project guidance install
+```
+
+Start Pi in that project and ask it to use Flowfield. This connection is separate from
+the scoped tools supplied automatically to managed sessions.

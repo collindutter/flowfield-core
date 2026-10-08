@@ -19,6 +19,26 @@ export const test = base.extend({
 });
 
 export async function stubModelCatalog(context: BrowserContext) {
+  await context.route("**/api/agent-harnesses", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "codex",
+          name: "Codex",
+          description: "ACP",
+          available: true,
+          message: "",
+        },
+        {
+          id: "pi",
+          name: "Pi",
+          description: "RPC",
+          available: true,
+          message: "",
+        },
+      ],
+    }),
+  );
   await context.route("**/api/worker-models*", (route) =>
     route.fulfill({ json: [] }),
   );

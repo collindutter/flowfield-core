@@ -106,6 +106,7 @@ flowfield inbox list
 flowfield inbox show QUESTION_ID
 flowfield project workers show
 flowfield project workers models
+flowfield project workers models --harness pi
 flowfield project workers run
 flowfield project workers pause
 flowfield task runs list
@@ -125,6 +126,7 @@ a paused queue or bypass the worker limit.
 
 Use `project workers models` to read model IDs and supported reasoning efforts, then
 `project workers configure --help` for explicit model, effort and parallel-worker settings.
+Use `configure --harness pi` to select Pi; omission preserves the saved harness.
 Saving worker settings does not enable the queue.
 
 Questions and replies preserve their task, attempt and result bindings. Answering does
@@ -158,6 +160,7 @@ See [Codex](/integrations/codex) for project setup and fresh-session verificatio
 ## Managed runtime installation
 
 ```sh
+flowfield harness list
 flowfield harness install codex
 flowfield harness status codex
 ```
@@ -175,6 +178,10 @@ flowfield harness install codex --bundle /path/to/bundle.zip --sha256 CHECKSUM
 
 Both commands work with the service stopped and accept `--json`. Installation preserves
 previous executable paths and does not enable queues or change project access settings.
+
+For Pi, `flowfield harness status pi` checks the installed executable and
+`flowfield harness install pi` verifies availability without downloading a bridge.
+Install and authenticate Pi separately. See [Pi setup](/integrations/pi).
 
 ## Automation
 

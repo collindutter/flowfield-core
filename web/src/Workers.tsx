@@ -1,7 +1,12 @@
 import { useNotifications } from "./Notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
-import { AgentModelFields } from "./AgentSettings";
+import {
+  AgentModelFields,
+  HarnessField,
+  useHarnessCatalog,
+  type Harness,
+} from "./AgentSettings";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -137,19 +142,29 @@ export function WorkerSettings({
   const path = `projects/${projectId}/workers`;
   const resource = useResource<Settings>(path, refresh);
   const [modelRetry, setModelRetry] = useState(0);
-  const catalog = useResource<Model[]>(
-    modelRetry ? "worker-models?refresh=true" : "worker-models",
-    modelRetry,
-    180000,
-  );
-  const models = catalog.data ?? [];
+  const harnesses = useHarnessCatalog(modelRetry);
   const [draft, setDraft] = useState<{
+    harness: Harness;
     model: string;
     effort: string;
     mode: string;
     cap: number;
     revision: number;
   } | null>(null);
+  const harness =
+    draft?.harness ??
+    (resource.data?.model
+      ? resource.data.harness
+      : harnesses.data?.find((item) => item.available)?.id) ??
+    "";
+  const catalog = useResource<Model[]>(
+    harness && !resource.loading
+      ? `worker-models?harness=${encodeURIComponent(harness)}${modelRetry ? "&refresh=true" : ""}`
+      : null,
+    modelRetry,
+    180000,
+  );
+  const models = catalog.data ?? [];
   const model = draft?.model ?? resource.data?.model ?? "";
   const effort = draft?.effort ?? resource.data?.effort ?? "";
   const mode = draft?.mode ?? resource.data?.mode ?? "";
@@ -157,8 +172,10 @@ export function WorkerSettings({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const dirty =
+    !!draft &&
     !!resource.data &&
-    (model !== (resource.data.model ?? "") ||
+    (harness !== (resource.data.harness ?? "codex") ||
+      model !== (resource.data.model ?? "") ||
       effort !== (resource.data.effort ?? "") ||
       mode !== (resource.data.mode ?? "") ||
       cap !== resource.data.max_parallel);
@@ -183,14 +200,13 @@ export function WorkerSettings({
         project dependencies in their separate workspaces.
       </p>
       <p className="detail-metadata">
-        Harness: Codex. Native tool decisions never approve code delivery.
+        Native tool decisions never approve code delivery.
       </p>
       {catalog.loading && <p role="status">Loading available models…</p>}
       {!catalog.loading && (catalog.error || !models.length) && (
         <Alert variant={catalog.error ? "destructive" : "default"}>
           <AlertDescription>
-            {catalog.error ||
-              "No models are available from this Codex installation."}
+            {catalog.error || "No models are available from this harness."}
             <Button
               size="sm"
               variant="outline"
@@ -213,6 +229,7 @@ export function WorkerSettings({
               "PUT",
               {
                 expected_revision: draft?.revision ?? resource.data.revision,
+                harness,
                 model,
                 effort,
                 mode: mode || null,
@@ -236,6 +253,20 @@ export function WorkerSettings({
           className="content-stack"
           data-space="section"
         >
+          <HarnessField
+            catalog={harnesses}
+            value={harness}
+            onChange={(harness) =>
+              setDraft({
+                harness,
+                model: "",
+                effort: "",
+                mode: "",
+                cap,
+                revision: draft?.revision ?? resource.data!.revision,
+              })
+            }
+          />
           <AgentModelFields
             model={model}
             effort={effort}
@@ -245,6 +276,7 @@ export function WorkerSettings({
             loading={catalog.loading || resource.loading}
             change={(model, effort, mode) =>
               setDraft({
+                harness,
                 model,
                 effort,
                 mode,
@@ -262,6 +294,7 @@ export function WorkerSettings({
               value={cap}
               onChange={(event) =>
                 setDraft({
+                  harness,
                   model,
                   effort,
                   mode,
@@ -278,7 +311,11 @@ export function WorkerSettings({
                 !dirty ||
                 stale ||
                 !models.some(
-                  (item) => item.id === model && item.efforts.includes(effort),
+                  (item) =>
+                    (item.harness ?? "codex") === harness &&
+                    item.id === model &&
+                    item.efforts.includes(effort) &&
+                    item.modes?.some((value) => value.id === mode),
                 )
               }
             >

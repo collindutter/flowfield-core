@@ -378,7 +378,7 @@ export function Composer({
                       agentCommands.map((item) => (
                         <Command.Item
                           key={item.name}
-                          value={`codex:${item.name}`}
+                          value={`agent:${item.name}`}
                           disabled={disabled}
                           onMouseDown={(event) => event.preventDefault()}
                           onSelect={() => {
@@ -394,7 +394,7 @@ export function Composer({
                       ))}
                     {nativeCommands.error && (
                       <Command.Item
-                        value="reload-codex-commands"
+                        value="reload-agent-commands"
                         disabled={nativeCommands.loading}
                         onMouseDown={(event) => event.preventDefault()}
                         onSelect={() => nativeCommands.load(true)}

@@ -3,11 +3,12 @@ title: ACP and MCP
 description: How Flowfield communicates with coding agents and exposes project tools.
 ---
 
-Flowfield uses two complementary protocols:
+Flowfield uses these protocols:
 
 | Protocol | Connection | Purpose |
 | --- | --- | --- |
 | Agent Client Protocol (ACP) | Flowfield → coding harness | Send messages, receive activity, select settings and handle tool permission requests. |
+| Pi RPC | Flowfield → Pi | Send messages, resume sessions, select models and stream public activity. |
 | Model Context Protocol (MCP) | Coding harness → Flowfield | Read project context, maintain tasks and report work through scoped tools. |
 
 ## ACP: running the conversation
@@ -28,6 +29,12 @@ the harness advertises them. Other advertised commands are not exposed. See
 Flowfield currently supports Codex through its packaged ACP bridge, including session
 continuity and native process cleanup. Install it with
 `flowfield harness install codex`; authenticate Codex separately.
+
+## Pi RPC
+
+The [Pi adapter](/integrations/pi) controls `pi --mode rpc` over JSONL. It waits for
+settled runs rather than treating prompt acceptance as completion. Pi runs with full
+host access; Flowfield does not emulate Codex sandbox modes or permission prompts.
 
 ## MCP: working with Flowfield
 

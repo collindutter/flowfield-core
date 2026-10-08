@@ -1,11 +1,13 @@
 """Managed-worker HTTP operations shared by the board and coordinator."""
 
 import asyncio
+import os
 from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import APIRouter, Query
 
+from flowfield.adapters.agents import HarnessStatus, harness_options
 from flowfield.adapters.git_review import changed_files, file_patch
 from flowfield.errors import ApplicationError
 from flowfield.execution_models import (
@@ -27,9 +29,13 @@ from flowfield.supervisor import Supervisor
 def execution_router(supervisor: Callable[[], Supervisor]) -> APIRouter:
     router = APIRouter(prefix="/api")
 
+    @router.get("/agent-harnesses")
+    def harnesses() -> list[HarnessStatus]:
+        return harness_options(supervisor().workspace.directory, os.environ)
+
     @router.get("/worker-models")
-    async def models(refresh: bool = False) -> list[ModelOption]:
-        return await supervisor().model_options(refresh=refresh)
+    async def models(refresh: bool = False, harness: str = "codex") -> list[ModelOption]:
+        return await supervisor().model_options(harness=harness, refresh=refresh)
 
     @router.get("/projects/{project_id}/workers")
     def settings(project_id: str) -> WorkerSettings:

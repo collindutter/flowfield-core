@@ -34,11 +34,12 @@ Flowfield protects your working changes and keeps approval tied to the code you 
 
 ## Install
 
-Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/), then:
+Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or
+[Pi](https://pi.dev), then:
 
 ```sh
 uv tool install flowfield-core
-flowfield harness install codex
+flowfield harness install codex  # For Codex; Pi needs no bridge.
 flowfield serve
 ```
 
@@ -52,8 +53,9 @@ flowfield project init
 
 Start planning in the [Coordinator](https://docs.flowfield.sh/coordinator), or connect a
 [standalone coding agent](https://docs.flowfield.sh/integrations/codex#connect-a-standalone-coordinator).
-Built-in chat and workers use your Codex login through the managed ACP runtime.
-Codex is the supported harness for the Coordinator and workers.
+Choose **Codex** or **Pi** in the Coordinator and worker model settings.
+Codex uses the managed ACP runtime; Pi uses native RPC and your Pi login.
+See [Pi setup](docs/integrations/pi.mdx) for installation and access limits.
 
 ## Fits your existing project
 

@@ -1,7 +1,7 @@
-import { fixtureStages } from "./support";
+import { fixtureStages, test } from "./support";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
 
 test("task settings cancel dismissed edits, reject stale saves and reset; tool answers survive reload", async ({
   page,
@@ -63,7 +63,7 @@ test("task settings cancel dismissed edits, reject stale saves and reset; tool a
   const discovery = new Promise<void>((resolve) => {
     releaseModels = resolve;
   });
-  await page.route("**/api/worker-models", async (route) => {
+  await page.route("**/api/worker-models*", async (route) => {
     await discovery;
     await route.fulfill({
       json: [

@@ -12,7 +12,7 @@ from typing import Any, BinaryIO
 from flowfield.adapters import git_integration as gitops
 from flowfield.adapters import local_checks
 from flowfield.adapters.acp_permissions import permission_handler
-from flowfield.adapters.codex_agent import CodexAgent, model_options
+from flowfield.adapters.agents import Agent, create_agent, get_harness, model_options
 from flowfield.adapters.git_workspace import GitWorkspace, contains
 from flowfield.adapters.local_execution import LocalAttempt, LocalHost
 from flowfield.agent_models import AgentChoice
@@ -55,15 +55,15 @@ class Supervisor:
         self.results = Results(workspace)
         self.setup_validation = SetupValidation(workspace)
         self.delivery_jobs: dict[str, asyncio.Task[None]] = {}
-        self.clients: dict[str, CodexAgent] = {}
+        self.clients: dict[str, Agent] = {}
         self.permissions = Permissions(workspace)
         from flowfield.coordinator import Coordinator
 
         self.coordinator = Coordinator(self)
         self.jobs: dict[str, asyncio.Task[None]] = {}
         self.setup_jobs: dict[str, asyncio.Task[list[CheckResult]]] = {}
-        self.catalog_job: asyncio.Task[list[ModelOption]] | None = None
-        self.catalog_at = 0.0
+        self.catalog_jobs: dict[str, asyncio.Task[list[ModelOption]]] = {}
+        self.catalog_at: dict[str, float] = {}
         self.loop_task: asyncio.Task[None] | None = None
         self.lock: BinaryIO | None = None
         self.closing = False
@@ -96,26 +96,37 @@ class Supervisor:
             self.lock = None
             raise
 
-    async def model_options(self, *, refresh: bool = False) -> list[ModelOption]:
+    async def model_options(
+        self, *, harness: str = "codex", refresh: bool = False
+    ) -> list[ModelOption]:
         if self.closing:
             raise ApplicationError("service_stopping", "The service is stopping.", 409)
+        get_harness(harness)
         clock = asyncio.get_running_loop().time()
-        if self.catalog_job is None or (
-            self.catalog_job.done()
+        job = self.catalog_jobs.get(harness)
+        if job is None or (
+            job.done()
             and (
                 refresh
-                or clock - self.catalog_at > 300
-                or self.catalog_job.cancelled()
-                or self.catalog_job.exception() is not None
+                or clock - self.catalog_at[harness] > 300
+                or job.cancelled()
+                or job.exception() is not None
             )
         ):
-            self.catalog_at = clock
-            self.catalog_job = asyncio.create_task(model_options(self.workspace.directory))
-        return await asyncio.shield(self.catalog_job)
+            self.catalog_at[harness] = clock
+            job = asyncio.create_task(model_options(self.workspace.directory, harness))
+            self.catalog_jobs[harness] = job
+        return await asyncio.shield(job)
 
     async def configure(self, project_id: str, request: SettingsEdit) -> WorkerSettings:
         await self.validate_agent_choice(
-            AgentChoice(model=request.model, effort=request.effort, mode=request.mode, fast=False),
+            AgentChoice(
+                harness=request.harness,
+                model=request.model,
+                effort=request.effort,
+                mode=request.mode,
+                fast=False,
+            ),
             project_id,
         )
         return self.execution.configure(project_id, request)
@@ -123,17 +134,21 @@ class Supervisor:
     async def validate_agent_choice(
         self, choice: AgentChoice, project_id: str | None = None
     ) -> None:
-        models = await self.model_options()
+        models = await self.model_options(harness=choice.harness)
         if not any(
-            item.id == choice.model
+            item.harness == choice.harness
+            and item.id == choice.model
             and choice.effort in item.efforts
-            and (choice.mode is None or choice.mode in {mode.id for mode in item.modes})
+            and (
+                (choice.mode is None and get_harness(choice.harness).legacy_mode is not None)
+                or choice.mode in {mode.id for mode in item.modes}
+            )
             and (not choice.fast or item.fast)
             for item in models
         ):
             raise ApplicationError(
                 "model_unavailable",
-                "Choose a model and effort returned by this Codex installation.",
+                "Choose a model, effort and access mode offered by the selected harness.",
                 409,
             )
 
@@ -214,7 +229,7 @@ class Supervisor:
             )
 
     async def _execute(self, run: Run, repository: Path) -> None:
-        client: CodexAgent | None = None
+        client: Agent | None = None
         environment: LocalAttempt | None = None
         scope_stack = contextlib.AsyncExitStack()
         activity: ActivityRecorder | None = None
@@ -254,8 +269,16 @@ class Supervisor:
                 "common_git": str(environment.common_git),
             }
             self.execution.save_local(run.id, metadata)
-            client = CodexAgent(
-                self.workspace.directory, environment.checkout, environment.launch_environment()
+            choice = (
+                run.agent_settings.choice
+                if run.agent_settings
+                else AgentChoice(model=run.model, effort=run.effort)
+            )
+            client = create_agent(
+                choice,
+                self.workspace.directory,
+                environment.checkout,
+                environment.launch_environment(),
             )
             self.clients[run.id] = client
             bridge = WorkerBridge(self.execution, run, client)
@@ -270,11 +293,6 @@ class Supervisor:
                 process_stamp=await asyncio.to_thread(process_stamp, client.process.pid),
             )
             self.execution.save_local(run.id, metadata)
-            choice = (
-                run.agent_settings.choice
-                if run.agent_settings
-                else AgentChoice(model=run.model, effort=run.effort)
-            )
             applied_agent = await client.configure(choice)
             if getattr(client, "supports_activity", False):
                 activity = ActivityRecorder(self.workspace, run.project_id, run.id)
@@ -347,6 +365,7 @@ class Supervisor:
                     "sections in pages; search_context searches only this frozen assignment. "
                     "New discoveries are observations, not authority to change intent. "
                     "Use the local host's installed tools and native harness permissions. "
+                    "Do not daemonize commands or leave detached/background jobs running. "
                     "Discover commands on PATH; install project dependencies "
                     "in "
                     "this checkout/runtime when needed. Keep manifests, lockfiles and setup "
@@ -595,9 +614,10 @@ class Supervisor:
         self.closing = True
         await self.coordinator.close()
         self.permissions.close()
-        if self.catalog_job and not self.catalog_job.done():
-            self.catalog_job.cancel()
-            await asyncio.gather(self.catalog_job, return_exceptions=True)
+        for job in self.catalog_jobs.values():
+            if not job.done():
+                job.cancel()
+        await asyncio.gather(*self.catalog_jobs.values(), return_exceptions=True)
         await self.setup_validation.close()
         if self.loop_task:
             self.loop_task.cancel()

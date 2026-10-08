@@ -1,7 +1,7 @@
-import { fixtureStages } from "./support";
+import { fixtureStages, test } from "./support";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import type { components } from "../src/api-schema";
 
 type Turn = components["schemas"]["CoordinatorTurn"];

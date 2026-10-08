@@ -1,6 +1,7 @@
 """Managed execution commands under the existing project/task namespaces."""
 
 from typing import Any
+from urllib.parse import urlencode
 
 import typer
 
@@ -159,14 +160,23 @@ def register(project_app: typer.Typer, task_app: typer.Typer) -> None:
         )
 
     @workers.command("models")
-    def models(ctx: typer.Context, json_output: Json = False) -> None:
-        output(lambda: ctx.obj.request("GET", "worker-models"), json_output, show)
+    def models(
+        ctx: typer.Context,
+        harness: str = typer.Option("codex", help="Registered harness ID"),
+        json_output: Json = False,
+    ) -> None:
+        output(
+            lambda: ctx.obj.request("GET", "worker-models?" + urlencode({"harness": harness})),
+            json_output,
+            show,
+        )
 
     @workers.command("configure")
     def configure(
         ctx: typer.Context,
         model: str = typer.Option(...),
         effort: str = typer.Option(...),
+        harness: str | None = typer.Option(None, help="Harness ID; defaults to saved harness"),
         mode: str | None = typer.Option(
             None,
             help="Native mode ID from `worker models --json`. Omission preserves the current mode.",
@@ -183,6 +193,7 @@ def register(project_app: typer.Typer, task_app: typer.Typer) -> None:
                 path,
                 {
                     "expected_revision": current["revision"],
+                    "harness": harness or current.get("harness", "codex"),
                     "model": model,
                     "effort": effort,
                     "mode": mode if mode is not None else current.get("mode"),
