@@ -17,6 +17,7 @@ import { taskHref } from "./navigation";
 import { label } from "./workspace";
 import { Markdown } from "./Markdown";
 import { CheckEvidence, IntegrationEvidence } from "./Integration";
+import { ArtifactGallery, RunLive } from "./RunMedia";
 
 const CodeDiff = lazy(() => import("./CodeDiff"));
 type Run = components["schemas"]["Run"];
@@ -146,6 +147,23 @@ function ExecutionDetail({
           projectId={projectId}
           taskKey={taskKey}
         />
+      )}
+      {item.kind === "worker" && item.run_id && (
+        <>
+          {active.includes(item.status) && (
+            <RunLive
+              projectId={projectId}
+              runId={item.run_id}
+              refresh={refresh}
+            />
+          )}
+          <ArtifactGallery
+            projectId={projectId}
+            runId={item.run_id}
+            refresh={refresh}
+            activeRunId={active.includes(item.status) ? item.run_id : undefined}
+          />
+        </>
       )}
       {item.kind !== "worker" && (
         <>

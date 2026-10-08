@@ -31,6 +31,7 @@ import { useFeedScroll } from "./useFeedScroll";
 import { TaskActionHost, WorkerActions } from "./TaskActions";
 import { WorkState } from "./WorkState";
 import { StageSequence } from "./StageSequence";
+import { ArtifactGallery, RunLive } from "./RunMedia";
 
 type Gate = components["schemas"]["InputEligibility"];
 type Binding = components["schemas"]["ReplyCreate"]["binding"];
@@ -442,6 +443,24 @@ export function TaskConversation({
       value={{ actions: actionHost, context: actionContext }}
     >
       <ContentStack ref={root} space="section" className="task-conversation">
+        {!executionId && (
+          <>
+            {activeAttempt && (
+              <RunLive
+                key={activeAttempt.source_id}
+                projectId={projectId}
+                runId={activeAttempt.source_id}
+                refresh={tick}
+              />
+            )}
+            <ArtifactGallery
+              projectId={projectId}
+              taskId={task.id}
+              refresh={tick}
+              activeRunId={activeAttempt?.source_id}
+            />
+          </>
+        )}
         <ContentStack>
           <strong>Activity</strong>
           {(page.error || selected.error || gate.error || execution.error) && (
